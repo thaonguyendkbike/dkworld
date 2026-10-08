@@ -25,7 +25,7 @@ let animatedTruck, truckProgress = 0;
 // Khối 9: Logistics, Forklifts & Truck Fleet
 let activeLogisticsTruck = null;
 let activeForklift = null;
-let activeForkliftInitialPos = { x: 54.0, y: 0, z: -32.5, rotY: 0 };
+let activeForkliftInitialPos = { x: 58.0, y: 0, z: -35.6, rotY: -Math.PI / 2 };
 let logisticsCycleTime = 0;
 let guardGate1 = null;
 let guardSaluteAngle = 0;
@@ -4808,7 +4808,7 @@ function createUnassembledFrameRack(x, y, z, rotY, id, name) {
 function buildLogisticsAndEquipment() {
   // 1. Xe nâng điện Komatsu hiện đại (Khối 9: Mast thủy lực, càng nâng, cabin & đèn xoay amber)
   // Xe nâng 1 tham gia chu kỳ bốc dỡ tại Xưởng B
-  createDetailedForklift(54.0, 0, -32.5, 0, 'forklift1', 'Xe nâng điện Komatsu FB25 #01 (Xưởng B)', { isActiveCycle: true });
+  createDetailedForklift(58.0, 0, -35.6, -Math.PI / 2, 'forklift1', 'Xe nâng điện Komatsu FB25 #01 (Xưởng B)', { isActiveCycle: true });
 
   // Xe nâng 2 túc trực bốc dỡ tại Cửa Kho Linh Kiện D2.1
   createDetailedForklift(-48.0, 0, -60.0, Math.PI / 2, 'forklift2', 'Xe nâng điện Komatsu FB25 #02 (Kho D2.1)', { isActiveCycle: false });
@@ -4830,7 +4830,7 @@ function buildLogisticsAndEquipment() {
   createUnassembledFrameRack(-52.0, 0, -62.0, 0, 'frameRack2', 'Kệ khung xe đạp điện chưa lắp ráp Kho D2.1');
 
   // 7. Các chồng pallet gỗ & thùng carton phụ tùng xuất xưởng
-  createPalletStack(58, 0, -31);
+  createPalletStack(64.5, 0, -31);
   createPalletStack(61, 0, -31);
   createPalletStack(-58, 0, -58);
   createPalletStack(-54, 0, -58);
@@ -6386,7 +6386,7 @@ function buildPeopleAndCharacters() {
 
   // 3. Kỹ sư KCS (Lê Tuấn Anh): Đứng tại sân thử xe DK1 cầm tablet kiểm tra
   const kcs = createCharacter({ shirtColor: 0xea580c, pantsColor: 0x1e293b, hatColor: 0xffffff, holdingTablet: true });
-  kcs.position.set(60, 0, -28);
+  kcs.position.set(63.5, 0, -28);
   kcs.rotation.y = Math.PI / 4;
   kcs.userData = {
     id: 'kcsInspector',
@@ -6400,7 +6400,7 @@ function buildPeopleAndCharacters() {
 
   // Xe máy điện DK Roma SX đặt trên bệ kiểm định cạnh KCS
   const testBike = createDetailedDKBike(0xffb703, 'DK Roma SX Đang Kiểm Định');
-  testBike.position.set(61.8, 0, -27.2);
+  testBike.position.set(65.0, 0, -27.2);
   testBike.rotation.y = -Math.PI / 4;
   scene.add(testBike);
 
@@ -8881,6 +8881,9 @@ function setupAnimatedVehicles() {
 
 // ============================================================================
 // CHU TRÌNH LOGISTICS LIÊN TỤC KHÉP KÍN (CONTINUOUS LOGISTICS STATE MACHINE)
+// Chu trình: Xe tải từ đường ĐT234 -> Cổng DK1 -> Lùi vào bến bốc hàng Xưởng B ->
+// Xe nâng xúc pallet xe máy điện từ Xưởng B xếp lên xe tải ->
+// Đóng cửa thùng, cửa xưởng -> Xe tải xuất bến qua Cổng DK1 ra đường ĐT234 -> Lặp lại
 // ============================================================================
 function updateLogisticsCycle(delta, time, isNight) {
   if (!activeLogisticsTruck || !activeForklift) return;
@@ -8922,6 +8925,7 @@ function updateLogisticsCycle(delta, time, isNight) {
   const fl = activeForklift.group;
   const flLift = activeForklift.liftGroup;
   const doorB1 = shutterDoors.find((d) => d.id === 'doorB1');
+  const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
 
   // Xoay đèn cảnh báo amber trên nóc xe nâng và xe tải
   rotatingBeacons.forEach((b) => {
@@ -8940,236 +8944,246 @@ function updateLogisticsCycle(delta, time, isNight) {
   const lerp = THREE.MathUtils.lerp;
   const smooth = (t) => THREE.MathUtils.smoothstep(t, 0, 1);
 
+  // Vị trí đỗ của xe tải & xe nâng:
+  // Xe tải đỗ tại (58.0, 0, -24.5), rotation.y = 0. Đuôi xe quay về Z âm (-28.53).
+  // Cửa cuốn xưởng B (doorB1) tại Z = -33.17.
+  // Khoảng cách từ đuôi xe tải tới cửa xưởng B là 4.64 mét (khoảng bốc dỡ cực kỳ rộng rãi, tuyệt đối không va chạm).
+  // Xe nâng chờ sẵn bên trong Xưởng B tại (58.0, 0, -35.6, rotY = -Math.PI / 2).
+
   // =========================================================================
-  // GIAI ĐOẠN 1: XE TẢI TIẾN VÀO CỔNG 1 (0.0s - 7.0s)
+  // GIAI ĐOẠN 1: XE TẢI TIẾN TỪ ĐƯỜNG ĐT234 VÀO CỔNG 1 (0.0s - 7.5s)
   // =========================================================================
-  if (ct < 7.0) {
-    const t = smooth(ct / 7.0);
-    // Từ đường ĐT234 (80, 0, 12) rẽ vào Cổng 1 (77.5, 0, -14) -> (74, 0, -20)
+  if (ct < 7.5) {
+    const t = smooth(ct / 7.5);
+    // Từ đường ĐT234 (82, 0, 10) rẽ vào Cổng 1 (77.5, 0, -18) -> đường nội bộ (66, 0, -20)
     if (t < 0.5) {
       const subT = t / 0.5;
-      truck.position.x = lerp(80.0, 77.5, subT);
-      truck.position.z = lerp(12.0, -14.0, subT);
-      truck.rotation.y = lerp(-Math.PI, -Math.PI * 0.8, subT);
+      truck.position.x = lerp(82.0, 77.5, subT);
+      truck.position.z = lerp(10.0, -18.0, subT);
+      truck.rotation.y = lerp(-Math.PI, -Math.PI * 0.75, subT);
     } else {
       const subT = (t - 0.5) / 0.5;
-      truck.position.x = lerp(77.5, 74.0, subT);
-      truck.position.z = lerp(-14.0, -20.0, subT);
-      truck.rotation.y = lerp(-Math.PI * 0.8, -Math.PI / 2, subT);
+      truck.position.x = lerp(77.5, 66.0, subT);
+      truck.position.z = lerp(-18.0, -20.0, subT);
+      truck.rotation.y = lerp(-Math.PI * 0.75, -Math.PI / 2, subT);
     }
 
-    // Barie Cổng 1 tự động nâng lên chào đón xe tải
-    const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
-    if (barrier1) barrier1.targetAngle = Math.PI / 2.3;
-
-    // Bảo vệ Cổng 1 giơ tay chào điều lệnh nghiêm trang
-    guardSaluteAngle += (1.0 - guardSaluteAngle) * delta * 4;
+    // Barie Cổng 1 tự động nâng lên chào đón xe tải từ đường vào
+    if (barrier1) {
+      barrier1.targetAngle = (ct >= 1.2 && ct <= 5.8) ? Math.PI / 2.3 : 0.0;
+    }
+    const guardTarget = (ct >= 1.2 && ct <= 5.8) ? 1.0 : 0.0;
+    guardSaluteAngle += (guardTarget - guardSaluteAngle) * delta * 4;
 
     // Đóng cửa thùng xe tải & đóng cửa cuốn xưởng B
     doorL.rotation.y = 0;
     doorR.rotation.y = 0;
     if (doorB1) doorB1.targetProgress = 0.0;
 
-    // Xe nâng ở vị trí chờ bên trong Xưởng B
-    fl.position.set(54.0, 0, -32.5);
-    fl.rotation.y = 0;
+    // Xe nâng chờ sẵn bên trong Xưởng B, mang sẵn pallet xe máy điện thành phẩm
+    fl.position.set(58.0, 0, -35.6);
+    fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
-
-    // Pallet hàng nhập nằm sẵn trên thùng xe tải
-    ensureTruckInboundPalletLoaded();
+    ensureForkliftOutboundPalletLoaded();
   }
   // =========================================================================
-  // GIAI ĐOẠN 2: CHẠY TỚI SÂN BỐC DỠ XƯỞNG B (7.0s - 13.0s)
+  // GIAI ĐOẠN 2: CHẠY TRÊN ĐƯỜNG NỘI BỘ & CUA VÀO SÂN BỐC DỠ XƯỞNG B (7.5s - 14.5s)
   // =========================================================================
-  else if (ct < 13.0) {
-    const t = smooth((ct - 7.0) / 6.0);
-    // Qua cổng vào đường nội bộ: (74, -20) -> (62, -20) -> cua vào trước cửa xưởng (58, -23)
-    if (t < 0.6) {
-      const subT = t / 0.6;
-      truck.position.x = lerp(74.0, 62.0, subT);
+  else if (ct < 14.5) {
+    const t = smooth((ct - 7.5) / 7.0);
+
+    if (t < 0.45) {
+      const subT = t / 0.45;
+      // Chạy dọc đường nội bộ từ (66, -20) -> (58, -20)
+      truck.position.x = lerp(66.0, 58.0, subT);
       truck.position.z = -20.0;
       truck.rotation.y = -Math.PI / 2;
+    } else if (t < 0.7) {
+      const subT = (t - 0.45) / 0.25;
+      // Bắt đầu cua mũi xe chuẩn bị lùi vào bến: (58, -20) -> (58, -21.5)
+      truck.position.x = 58.0;
+      truck.position.z = lerp(-20.0, -21.5, subT);
+      truck.rotation.y = lerp(-Math.PI / 2, 0, subT);
     } else {
-      const subT = (t - 0.6) / 0.4;
-      truck.position.x = lerp(62.0, 58.0, subT);
-      truck.position.z = lerp(-20.0, -23.0, subT);
-      truck.rotation.y = lerp(-Math.PI / 2, -Math.PI, subT);
+      const subT = (t - 0.7) / 0.3;
+      // Lùi thẳng đuôi vào bến bốc hàng Xưởng B: (58, -21.5) -> (58, -24.5)
+      truck.position.x = 58.0;
+      truck.position.z = lerp(-21.5, -24.5, subT);
+      truck.rotation.y = 0;
     }
 
-    // Barie hạ xuống & bảo vệ hạ tay sau khi xe qua
-    const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
+    // Barie hạ xuống & bảo vệ hạ tay
     if (barrier1) barrier1.targetAngle = 0;
     guardSaluteAngle += (0.0 - guardSaluteAngle) * delta * 3;
 
     doorL.rotation.y = 0;
     doorR.rotation.y = 0;
     if (doorB1) doorB1.targetProgress = 0.0;
+
+    fl.position.set(58.0, 0, -35.6);
+    fl.rotation.y = -Math.PI / 2;
+    flLift.position.y = activeForklift.initialY;
+    ensureForkliftOutboundPalletLoaded();
   }
   // =========================================================================
-  // GIAI ĐOẠN 3: LÙI SÁT CỬA BỐC DỠ, MỞ CỬA THÙNG & CUỐN CỬA XƯỞNG (13.0s - 18.0s)
+  // GIAI ĐOẠN 3: LÙI ĐỖ CHUẨN, MỞ CỬA CUỐN XƯỞNG B & MỞ CỬA THÙNG XE (14.5s - 18.0s)
   // =========================================================================
   else if (ct < 18.0) {
-    const t = smooth((ct - 13.0) / 5.0);
-    // Xe tải lùi từ (58, -23) đuôi hướng về phía Bắc sát Cửa B1 (58, -30.5)
-    truck.position.x = 58.0;
-    truck.position.z = lerp(-23.0, -30.5, t);
-    truck.rotation.y = 0; // Đuôi xe quay về phía Z âm (sát cửa cuốn)
+    const t = smooth((ct - 14.5) / 3.5);
+    truck.position.set(58.0, 0, -24.5);
+    truck.rotation.y = 0;
 
-    // Cửa cuốn Xưởng B cuộn mở lên
-    if (doorB1) doorB1.targetProgress = Math.min(1.0, t * 1.3);
+    // Cửa cuốn Xưởng B cuộn mở lên đón xe nâng
+    if (doorB1) doorB1.targetProgress = t;
 
     // Cửa thùng xe tải mở 2 cánh ra 110 độ
-    const doorAngle = smooth(Math.max(0, (t - 0.3) / 0.7)) * 1.95;
+    const doorAngle = smooth(Math.max(0, (t - 0.2) / 0.8)) * 1.92;
     doorL.rotation.y = -doorAngle;
     doorR.rotation.y = doorAngle;
 
-    fl.position.set(54.0, 0, -32.5);
-    flLift.position.y = activeForklift.initialY;
+    // Càng nâng bắt đầu nâng pallet xe điện lên độ cao sàn thùng xe (1.22m)
+    fl.position.set(58.0, 0, -35.6);
+    fl.rotation.y = -Math.PI / 2;
+    flLift.position.y = lerp(activeForklift.initialY, 1.22, t);
+    ensureForkliftOutboundPalletLoaded();
   }
   // =========================================================================
-  // GIAI ĐOẠN 4: XE NÂNG RA BỐC DỠ PALLET HÀNG NHẬP VÀO KHO (18.0s - 28.0s)
+  // GIAI ĐOẠN 4: XE NÂNG TIẾN RA BỐC PALLET XE MÁY ĐIỆN LÊN XE TẢI (18.0s - 29.0s)
   // =========================================================================
-  else if (ct < 28.0) {
-    const t = (ct - 18.0) / 10.0;
-    truck.position.set(58.0, 0, -30.5);
+  else if (ct < 29.0) {
+    const t = (ct - 18.0) / 11.0;
+    truck.position.set(58.0, 0, -24.5);
     truck.rotation.y = 0;
-    doorL.rotation.y = -1.95;
-    doorR.rotation.y = 1.95;
+    doorL.rotation.y = -1.92;
+    doorR.rotation.y = 1.92;
     if (doorB1) doorB1.targetProgress = 1.0;
 
-    // t: 0.0 -> 0.3: Xe nâng từ (54, -32.5) tiến ra sau thùng xe (58, -31.8)
-    if (t < 0.3) {
-      const subT = smooth(t / 0.3);
-      fl.position.x = lerp(54.0, 58.0, subT);
-      fl.position.z = lerp(-32.5, -31.8, subT);
-      fl.rotation.y = lerp(0, -Math.PI / 2, subT);
-      flLift.position.y = activeForklift.initialY + 0.3; // Nâng càng ngang sàn xe tải
-    }
-    // t: 0.3 -> 0.5: Luồn càng vào pallet và nâng bổng pallet lên
-    else if (t < 0.5) {
-      const subT = smooth((t - 0.3) / 0.2);
-      fl.position.set(58.0, 0, -31.8);
+    // t: 0.0 -> 0.35: Xe nâng tiến thẳng từ trong xưởng (z = -35.6) tới sát thùng xe tải (z = -29.6)
+    // Pallet xe điện luồn vào đúng vị trí sàn thùng xe tải
+    if (t < 0.35) {
+      const subT = smooth(t / 0.35);
+      fl.position.set(58.0, 0, lerp(-35.6, -29.6, subT));
       fl.rotation.y = -Math.PI / 2;
-      flLift.position.y = activeForklift.initialY + 0.3 + subT * 0.35; // Nâng lên khỏi sàn xe
-
-      // Gắn pallet hàng vào càng nâng
-      attachInboundPalletToForklift();
+      flLift.position.y = 1.22;
+      ensureForkliftOutboundPalletLoaded();
     }
-    // t: 0.5 -> 0.8: Xe nâng lùi vào trong Xưởng B (53.5, -34.0)
-    else if (t < 0.8) {
-      const subT = smooth((t - 0.5) / 0.3);
-      fl.position.x = lerp(58.0, 53.5, subT);
-      fl.position.z = lerp(-31.8, -34.0, subT);
-      fl.rotation.y = lerp(-Math.PI / 2, 0, subT);
-      flLift.position.y = activeForklift.initialY + 0.65;
-    }
-    // t: 0.8 -> 1.0: Hạ pallet đặt lên sàn kho Xưởng B
-    else {
-      const subT = smooth((t - 0.8) / 0.2);
-      fl.position.set(53.5, 0, -34.0);
-      fl.rotation.y = 0;
-      flLift.position.y = activeForklift.initialY + (1 - subT) * 0.65;
-
-      // Đặt pallet vào kho
-      if (subT > 0.8) detachInboundPalletToWarehouse();
-    }
-  }
-  // =========================================================================
-  // GIAI ĐOẠN 5: XE NÂNG CHUYỂN HÀNG THÀNH PHẨM XUẤT XƯỞNG LÊN XE TẢI (28.0s - 38.0s)
-  // =========================================================================
-  else if (ct < 38.0) {
-    const t = (ct - 28.0) / 10.0;
-    truck.position.set(58.0, 0, -30.5);
-    truck.rotation.y = 0;
-    doorL.rotation.y = -1.95;
-    doorR.rotation.y = 1.95;
-    if (doorB1) doorB1.targetProgress = 1.0;
-
-    // t: 0.0 -> 0.3: Xe nâng xoay qua kệ hàng thành phẩm (53.0, -31.5) & xúc pallet xe điện
-    if (t < 0.3) {
-      const subT = smooth(t / 0.3);
-      fl.position.x = lerp(53.5, 53.0, subT);
-      fl.position.z = lerp(-34.0, -31.5, subT);
-      fl.rotation.y = lerp(0, Math.PI / 2, subT);
-      flLift.position.y = activeForklift.initialY + subT * 0.45;
-      attachOutboundPalletToForklift();
-    }
-    // t: 0.3 -> 0.6: Chở pallet thành phẩm tiến ra đuôi xe tải (58, -31.8)
-    else if (t < 0.6) {
-      const subT = smooth((t - 0.3) / 0.3);
-      fl.position.x = lerp(53.0, 58.0, subT);
-      fl.position.z = lerp(-31.5, -31.8, subT);
-      fl.rotation.y = lerp(Math.PI / 2, -Math.PI / 2, subT);
-      flLift.position.y = activeForklift.initialY + 0.6;
-    }
-    // t: 0.6 -> 0.8: Đặt pallet thành phẩm vào thùng xe tải
-    else if (t < 0.8) {
-      const subT = smooth((t - 0.6) / 0.2);
-      fl.position.set(58.0, 0, -31.8);
+    // t: 0.35 -> 0.55: Hạ càng nâng xuống sàn xe để đặt pallet xe điện lên thùng xe tải
+    else if (t < 0.55) {
+      const subT = smooth((t - 0.35) / 0.20);
+      fl.position.set(58.0, 0, -29.6);
       fl.rotation.y = -Math.PI / 2;
-      flLift.position.y = activeForklift.initialY + 0.6 - subT * 0.3; // Đặt chạm sàn xe
+      flLift.position.y = lerp(1.22, 1.08, subT);
 
-      if (subT > 0.8) attachOutboundPalletToTruck();
+      // Chuyển giao pallet xe máy điện sang thùng xe tải
+      if (subT > 0.6) {
+        attachOutboundPalletToTruck();
+      }
     }
-    // t: 0.8 -> 1.0: Xe nâng lùi về vị trí nghỉ bên trong Xưởng B
+    // t: 0.55 -> 0.95: Xe nâng lùi thẳng trở lại bên trong Xưởng B (z = -35.6)
+    else if (t < 0.95) {
+      const subT = smooth((t - 0.55) / 0.40);
+      fl.position.set(58.0, 0, lerp(-29.6, -35.6, subT));
+      fl.rotation.y = -Math.PI / 2;
+      flLift.position.y = lerp(1.08, activeForklift.initialY, subT);
+    }
+    // t: 0.95 -> 1.0: Đã lùi an toàn bên trong xưởng, sẵn sàng ca tiếp
     else {
-      const subT = smooth((t - 0.8) / 0.2);
-      fl.position.x = lerp(58.0, 54.0, subT);
-      fl.position.z = lerp(-31.8, -32.5, subT);
-      fl.rotation.y = lerp(-Math.PI / 2, 0, subT);
+      fl.position.set(58.0, 0, -35.6);
+      fl.rotation.y = -Math.PI / 2;
       flLift.position.y = activeForklift.initialY;
     }
   }
   // =========================================================================
-  // GIAI ĐOẠN 6: ĐÓNG CỬA THÙNG & HẠ CỬA CUỐN XƯỞNG B (38.0s - 42.0s)
+  // GIAI ĐOẠN 5: ĐÓNG CỬA THÙNG XE & HẠ CỬA CUỐN XƯỞNG B (29.0s - 33.0s)
   // =========================================================================
-  else if (ct < 42.0) {
-    const t = smooth((ct - 38.0) / 4.0);
-    truck.position.set(58.0, 0, -30.5);
+  else if (ct < 33.0) {
+    const t = smooth((ct - 29.0) / 4.0);
+    truck.position.set(58.0, 0, -24.5);
     truck.rotation.y = 0;
 
     // 2 Cánh cửa thùng xe tải khép chặt
-    doorL.rotation.y = -1.95 * (1 - t);
-    doorR.rotation.y = 1.95 * (1 - t);
+    doorL.rotation.y = -1.92 * (1 - t);
+    doorR.rotation.y = 1.92 * (1 - t);
 
     // Cửa cuốn Xưởng B cuộn hạ xuống
     if (doorB1) doorB1.targetProgress = 1.0 - t;
 
-    fl.position.set(54.0, 0, -32.5);
-    fl.rotation.y = 0;
+    fl.position.set(58.0, 0, -35.6);
+    fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
   }
   // =========================================================================
-  // GIAI ĐOẠN 7: XE TẢI RỜI BÃI BỐC DỠ, XUẤT CỔNG 1 RA ĐT234 (42.0s - 48.0s)
+  // GIAI ĐOẠN 6: XE TẢI CHỞ HÀNG RỜI BẾN, RA ĐƯỜNG NỘI BỘ (33.0s - 40.0s)
   // =========================================================================
-  else {
-    const t = smooth((ct - 42.0) / 6.0);
+  else if (ct < 40.0) {
+    const t = smooth((ct - 33.0) / 7.0);
     doorL.rotation.y = 0;
     doorR.rotation.y = 0;
     if (doorB1) doorB1.targetProgress = 0.0;
 
-    // Xe tải tiến ra khỏi xưởng: (58, -30.5) -> (58, -23) -> cua ra đường nội bộ (68, -20) -> Cổng 1 (74, -20) -> ĐT234 (80, 5)
-    if (t < 0.3) {
-      const subT = t / 0.3;
+    fl.position.set(58.0, 0, -35.6);
+    fl.rotation.y = -Math.PI / 2;
+    flLift.position.y = activeForklift.initialY;
+
+    if (t < 0.4) {
+      const subT = t / 0.4;
+      // Xe tải tiến thẳng ra khỏi bến: (58, -24.5) -> (58, -20.0)
       truck.position.x = 58.0;
-      truck.position.z = lerp(-30.5, -23.0, subT);
-      truck.rotation.y = 0;
-    } else if (t < 0.6) {
-      const subT = (t - 0.3) / 0.3;
-      truck.position.x = lerp(58.0, 68.0, subT);
-      truck.position.z = lerp(-23.0, -20.0, subT);
+      truck.position.z = lerp(-24.5, -20.0, subT);
       truck.rotation.y = lerp(0, Math.PI / 2, subT);
     } else {
-      const subT = (t - 0.6) / 0.4;
-      truck.position.x = lerp(68.0, 80.0, subT);
-      truck.position.z = lerp(-20.0, 5.0, subT);
-      truck.rotation.y = lerp(Math.PI / 2, Math.PI, subT);
+      const subT = (t - 0.4) / 0.6;
+      // Chạy dọc đường nội bộ hướng về Cổng 1: (58, -20) -> (72, -20)
+      truck.position.x = lerp(58.0, 72.0, subT);
+      truck.position.z = -20.0;
+      truck.rotation.y = Math.PI / 2;
     }
 
-    // Barie Cổng 1 mở lên & bảo vệ chào khi xe tải xuất xưởng
-    const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
-    if (barrier1) barrier1.targetAngle = t < 0.85 ? Math.PI / 2.3 : 0;
-    guardSaluteAngle += ((t < 0.85 ? 1.0 : 0.0) - guardSaluteAngle) * delta * 4;
+    // Barie Cổng 1 bắt đầu mở lên khi xe tải tiến đến gần
+    if (barrier1) {
+      barrier1.targetAngle = (ct >= 36.5) ? Math.PI / 2.3 : 0;
+    }
+    const guardTarget = (ct >= 36.5) ? 1.0 : 0.0;
+    guardSaluteAngle += (guardTarget - guardSaluteAngle) * delta * 4;
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 7: XUẤT QUA CỔNG 1, RẼ RA ĐƯỜNG ĐT234 (40.0s - 48.0s)
+  // =========================================================================
+  else {
+    const t = smooth((ct - 40.0) / 8.0);
+    doorL.rotation.y = 0;
+    doorR.rotation.y = 0;
+    if (doorB1) doorB1.targetProgress = 0.0;
+
+    fl.position.set(58.0, 0, -35.6);
+    fl.rotation.y = -Math.PI / 2;
+    flLift.position.y = activeForklift.initialY;
+
+    if (t < 0.45) {
+      const subT = t / 0.45;
+      // Tiến qua Cổng DK1: (72, -20) -> (77.5, -20) -> (79, -15)
+      truck.position.x = lerp(72.0, 79.0, subT);
+      truck.position.z = lerp(-20.0, -15.0, subT);
+      truck.rotation.y = lerp(Math.PI / 2, Math.PI * 0.75, subT);
+    } else {
+      const subT = (t - 0.45) / 0.55;
+      // Rẽ ra đường ĐT234 đi về phía Nam: (79, -15) -> (82, 10)
+      truck.position.x = lerp(79.0, 82.0, subT);
+      truck.position.z = lerp(-15.0, 10.0, subT);
+      truck.rotation.y = lerp(Math.PI * 0.75, Math.PI, subT);
+    }
+
+    // Barie đóng lại sau khi xe qua cổng
+    if (barrier1) {
+      barrier1.targetAngle = (t < 0.5) ? Math.PI / 2.3 : 0.0;
+    }
+    const guardTarget = (t < 0.5) ? 1.0 : 0.0;
+    guardSaluteAngle += (guardTarget - guardSaluteAngle) * delta * 4;
+
+    // Khi sắp hết chu kỳ, chuẩn bị sẵn pallet xe điện cho xe nâng ở chu kỳ tiếp theo
+    if (t > 0.85) {
+      ensureForkliftOutboundPalletLoaded();
+    }
   }
 
   // Cập nhật tư thế chào của Bảo vệ Cổng DK1
@@ -9179,53 +9193,17 @@ function updateLogisticsCycle(delta, time, isNight) {
   }
 }
 
-// Helpers chuyển giao Pallet giữa Xe tải, Xe nâng và Kho xưởng
-function ensureTruckInboundPalletLoaded() {
-  if (!truckInboundPallet) {
-    truckInboundPallet = createForkliftPalletCargo('components');
-  }
-  if (activeLogisticsTruck && activeLogisticsTruck.truckPalletSlot) {
-    if (truckInboundPallet.parent !== activeLogisticsTruck.truckPalletSlot) {
-      activeLogisticsTruck.truckPalletSlot.add(truckInboundPallet);
-      truckInboundPallet.position.set(0, 0, 0);
-      truckInboundPallet.rotation.set(0, 0, 0);
-    }
-  }
-}
-
-function attachInboundPalletToForklift() {
-  if (truckInboundPallet && activeForklift && activeForklift.liftGroup) {
-    if (truckInboundPallet.parent !== activeForklift.liftGroup) {
-      activeForklift.liftGroup.add(truckInboundPallet);
-      truckInboundPallet.position.set(0.68, 0.08, 0);
-      truckInboundPallet.rotation.set(0, 0, 0);
-    }
-  }
-}
-
-function detachInboundPalletToWarehouse() {
-  if (truckInboundPallet) {
-    if (!warehouseStoredPallet) {
-      warehouseStoredPallet = truckInboundPallet;
-    }
-    if (warehouseStoredPallet.parent !== scene) {
-      scene.add(warehouseStoredPallet);
-      warehouseStoredPallet.position.set(53.5, 0.05, -34.0);
-      warehouseStoredPallet.rotation.set(0, 0, 0);
-    }
-  }
-}
-
-function attachOutboundPalletToForklift() {
+// Helpers chuyển giao Pallet xe máy điện giữa Xe nâng và Xe tải
+function ensureForkliftOutboundPalletLoaded() {
   if (!truckOutboundPallet) {
     truckOutboundPallet = createForkliftPalletCargo('ebikes');
   }
   if (activeForklift && activeForklift.liftGroup) {
     if (truckOutboundPallet.parent !== activeForklift.liftGroup) {
       activeForklift.liftGroup.add(truckOutboundPallet);
-      truckOutboundPallet.position.set(0.68, 0.08, 0);
-      truckOutboundPallet.rotation.set(0, 0, 0);
     }
+    truckOutboundPallet.position.set(1.2, 0.08, 0);
+    truckOutboundPallet.rotation.set(0, 0, 0);
   }
 }
 
@@ -9233,10 +9211,27 @@ function attachOutboundPalletToTruck() {
   if (truckOutboundPallet && activeLogisticsTruck && activeLogisticsTruck.truckPalletSlot) {
     if (truckOutboundPallet.parent !== activeLogisticsTruck.truckPalletSlot) {
       activeLogisticsTruck.truckPalletSlot.add(truckOutboundPallet);
-      truckOutboundPallet.position.set(0, 0, 0);
-      truckOutboundPallet.rotation.set(0, 0, 0);
     }
+    truckOutboundPallet.position.set(0, 0, 0);
+    truckOutboundPallet.rotation.set(0, 0, 0);
   }
+}
+
+function ensureTruckInboundPalletLoaded() {
+  // Tương thích ngược nếu còn lời gọi
+  ensureForkliftOutboundPalletLoaded();
+}
+
+function attachInboundPalletToForklift() {
+  ensureForkliftOutboundPalletLoaded();
+}
+
+function detachInboundPalletToWarehouse() {
+  // Không cần thiết trong luồng xuất xưởng xe điện
+}
+
+function attachOutboundPalletToForklift() {
+  ensureForkliftOutboundPalletLoaded();
 }
 
 function setupTrain() {
