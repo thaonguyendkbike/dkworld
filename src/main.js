@@ -25,6 +25,7 @@ let railwayGateArms = [];
 let skyClouds = [];
 let fluffySheeps = [];
 let rowingBoat;
+let lotusLeaves = [];
 let riverFishGroup;
 let chimneySmokePuffs = [];
 
