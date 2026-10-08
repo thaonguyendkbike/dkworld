@@ -438,16 +438,33 @@ function getEastHillSurfaceY(x, z) {
   return Math.max(0.2, -2.0 + 26.0 * (1 - dist / radius));
 }
 
-// Tính toán độ cao sườn đồi phân khu DK2 (quanh ao cá và đàn gà thả đồi)
+// Tính toán độ cao sườn đồi phân khu DK2 (bao gồm Đồi chính DK2 và Đồi mới chuồng gà)
 function getDK2HillSurfaceY(x, z) {
-  const hx = CONFIG.HILLS.dk2.position.x; // -120
-  const hz = CONFIG.HILLS.dk2.position.z; // -78
-  const radius = CONFIG.HILLS.dk2.radius; // 54
-  const dist = Math.hypot(x - hx, z - hz);
-  if (dist >= radius) return 0.05;
-  const coneApexY = 23.0;
-  const coneBaseY = -2.0;
-  return Math.max(0.05, coneBaseY + (coneApexY - coneBaseY) * (1 - dist / radius));
+  let maxY = 0.05;
+
+  // 1. Đồi chính DK2 (Đỉnh +23m)
+  const hx1 = CONFIG.HILLS.dk2.position.x; // -120
+  const hz1 = CONFIG.HILLS.dk2.position.z; // -78
+  const r1 = CONFIG.HILLS.dk2.radius;     // 54
+  const dist1 = Math.hypot(x - hx1, z - hz1);
+  if (dist1 < r1) {
+    const y1 = -2.0 + 25.0 * (1 - dist1 / r1);
+    if (y1 > maxY) maxY = y1;
+  }
+
+  // 2. Đồi mới phía Tây Nam (Khu chuồng gà & đàn gà thả đồi theo khoanh tròn đỏ)
+  if (CONFIG.HILLS.dk2NewHill) {
+    const hx2 = CONFIG.HILLS.dk2NewHill.position.x; // -142
+    const hz2 = CONFIG.HILLS.dk2NewHill.position.z; // -38
+    const r2 = CONFIG.HILLS.dk2NewHill.radius;     // 34
+    const dist2 = Math.hypot(x - hx2, z - hz2);
+    if (dist2 < r2) {
+      const y2 = -1.0 + 15.5 * (1 - dist2 / r2);
+      if (y2 > maxY) maxY = y2;
+    }
+  }
+
+  return maxY;
 }
 
 function buildVastTerrainAndClouds() {
@@ -1974,27 +1991,27 @@ function buildNhaDieuHanhDK2() {
     group.add(wSouth);
   }
 
-  // Koi Pond
+  // Koi Pond (Hồ cá Koi cảnh quan - Bố trí khoảng cách chuẩn không lấn đường nhựa và không lấn nhà)
   const koiBed = new THREE.Mesh(
-    new THREE.BoxGeometry(7.0, 0.6, 9.0),
+    new THREE.BoxGeometry(5.4, 0.6, 8.0),
     new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 })
   );
-  koiBed.position.set(cfg.width / 2 + 4.5, 0.3, 0);
+  koiBed.position.set(cfg.width / 2 + 3.8, 0.3, 0);
   group.add(koiBed);
 
   waterKoiMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(6.4, 8.4),
+    new THREE.PlaneGeometry(4.8, 7.4),
     createStylizedWaterMaterial(false)
   );
   waterKoiMesh.rotation.x = -Math.PI / 2;
-  waterKoiMesh.position.set(cfg.width / 2 + 4.5, 0.55, 0);
+  waterKoiMesh.position.set(cfg.width / 2 + 3.8, 0.55, 0);
   group.add(waterKoiMesh);
 
   // Đàn cá Koi bơi lội trong hồ nước
-  buildKoiFish(group, cfg.width / 2 + 4.5, 0.45, 0);
+  buildKoiFish(group, cfg.width / 2 + 3.8, 0.45, 0);
 
   // Ghế đá công viên & Chậu cây cảnh bên hồ cá Koi
-  buildPondAmenities(group, cfg.width / 2 + 4.5, 0);
+  buildPondAmenities(group, cfg.width / 2 + 3.8, 0);
 
   scene.add(group);
   buildingMeshes.push(body);
@@ -2046,44 +2063,44 @@ function buildKoiFish(parentGroup, pondCenterX, pondY, pondCenterZ) {
 
 // Tiện ích ghế đá và chậu cây bon sai quanh hồ nước
 function buildPondAmenities(parentGroup, pondX, pondZ) {
-  // Ghế đá công viên
-  [-3.8, 3.8].forEach((gx) => {
+  // Ghế đá công viên (Bố trí gọn gàng sát thành hồ cá)
+  [-2.2, 2.2].forEach((gx) => {
     const bench = new THREE.Group();
     bench.position.set(pondX + gx, 0, pondZ - 2.8);
     bench.rotation.y = gx > 0 ? -Math.PI / 4 : Math.PI / 4;
 
     const seat = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 0.12, 0.5),
+      new THREE.BoxGeometry(1.4, 0.12, 0.45),
       new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 })
     );
     seat.position.y = 0.45;
     bench.add(seat);
 
     const leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, 0.4), new THREE.MeshStandardMaterial({ color: 0x475569 }));
-    leg1.position.set(-0.6, 0.22, 0);
+    leg1.position.set(-0.5, 0.22, 0);
     bench.add(leg1);
 
     const leg2 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, 0.4), new THREE.MeshStandardMaterial({ color: 0x475569 }));
-    leg2.position.set(0.6, 0.22, 0);
+    leg2.position.set(0.5, 0.22, 0);
     bench.add(leg2);
 
     parentGroup.add(bench);
   });
 
-  // Chậu cây cảnh Bon sai
-  [pondZ + 3.5, pondZ - 3.5].forEach((pz) => {
+  // Chậu cây cảnh Bon sai gọn gàng
+  [pondZ + 3.2, pondZ - 3.2].forEach((pz) => {
     const pot = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.5, 0.35, 0.6, 8),
+      new THREE.CylinderGeometry(0.45, 0.3, 0.55, 8),
       new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 })
     );
-    pot.position.set(pondX + 3.8, 0.3, pz);
+    pot.position.set(pondX + 2.4, 0.28, pz);
     parentGroup.add(pot);
 
     const bush = new THREE.Mesh(
-      new THREE.SphereGeometry(0.65, 8, 8),
+      new THREE.SphereGeometry(0.55, 8, 8),
       new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8, flatShading: true })
     );
-    bush.position.set(pondX + 3.8, 0.9, pz);
+    bush.position.set(pondX + 2.4, 0.8, pz);
     parentGroup.add(bush);
   });
 }
@@ -2286,6 +2303,7 @@ function buildSanThanhPhamDK2() {
 // 8. DK2: Hillside, Winding Road, Eco-Pond & Orchid Garden
 // ============================================================================
 function buildDK2HillAndOrchidGarden() {
+  // 1. Đồi chính DK2 (Đỉnh cao phía Bắc)
   const hillCfg = CONFIG.HILLS.dk2;
   const hill = new THREE.Mesh(
     new THREE.ConeGeometry(hillCfg.radius, hillCfg.height, 11),
@@ -2295,7 +2313,19 @@ function buildDK2HillAndOrchidGarden() {
   hill.receiveShadow = true;
   scene.add(hill);
 
-  // Terraced stone walls
+  // 2. Đồi mới chuồng gà DK2 (Theo khoanh tròn đỏ trên ảnh phía Tây Nam)
+  if (CONFIG.HILLS.dk2NewHill) {
+    const nhCfg = CONFIG.HILLS.dk2NewHill;
+    const newHill = new THREE.Mesh(
+      new THREE.ConeGeometry(nhCfg.radius, nhCfg.height, 11),
+      new THREE.MeshStandardMaterial({ color: nhCfg.color, roughness: 0.9, flatShading: true })
+    );
+    newHill.position.set(nhCfg.position.x, nhCfg.height / 2 - 1.5, nhCfg.position.z);
+    newHill.receiveShadow = true;
+    scene.add(newHill);
+  }
+
+  // Terraced stone walls bám quanh sườn đồi
   const stoneMat = new THREE.MeshStandardMaterial({ color: 0x5a6572, roughness: 0.9, flatShading: true });
   for (let tier = 1; tier <= 3; tier++) {
     const terrace = new THREE.Mesh(
@@ -2309,53 +2339,101 @@ function buildDK2HillAndOrchidGarden() {
     scene.add(terrace);
   }
 
-  // Circular Pond
-  const pondCfg = CONFIG.BUILDINGS.hoTronDK2;
-  const pondRim = new THREE.Mesh(
-    new THREE.CylinderGeometry(pondCfg.radius + 0.8, pondCfg.radius + 0.8, pondCfg.height, 24),
-    new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 })
-  );
-  pondRim.position.set(pondCfg.position.x, pondCfg.position.y, pondCfg.position.z);
-  pondRim.castShadow = true;
-  scene.add(pondRim);
+  // Tuyến đường mòn sinh thái DK2: Cuối sân -> Vườn Lan -> Ao cá -> Đồi chuồng gà
+  buildDK2EcoTrail();
 
-  waterRoundPondMesh = new THREE.Mesh(
-    new THREE.CircleGeometry(pondCfg.radius, 32),
-    createStylizedWaterMaterial(false)
-  );
-  waterRoundPondMesh.rotation.x = -Math.PI / 2;
-  waterRoundPondMesh.position.set(pondCfg.position.x, pondCfg.position.y + pondCfg.height / 2 + 0.05, pondCfg.position.z);
-  scene.add(waterRoundPondMesh);
-
-  // Winding Road
-  buildWindingHillRoad();
-
-  // Orchid Greenhouse
+  // Orchid Greenhouse (Đã dịch chuyển theo mũi tên)
   buildVuonLanDK2();
 
-  // Hillside Eco-Fish Pond (Ao cá đồi sinh thái theo ảnh 2)
+  // Hillside Eco-Fish Pond (Đã dịch chuyển lên cạnh Vườn Lan)
   buildDK2HillPond();
 
-  // Free-Range Hillside Chickens (Đàn gà thả đồi theo ảnh 2)
+  // Free-Range Hillside Chickens (Đã dịch chuyển sang Đồi mới)
   buildFreeRangeChickens();
 }
 
-function buildWindingHillRoad() {
-  const curvePoints = [
-    new THREE.Vector3(-100, 0.1, -45),
-    new THREE.Vector3(-108, 2.5, -52),
-    new THREE.Vector3(-104, 5.5, -60),
-    new THREE.Vector3(-112, 8.5, -68),
-    new THREE.Vector3(-120, 11.5, -74),
-    new THREE.Vector3(-128, 14.8, -80),
+// ============================================================================
+// Tuyến đường mòn sinh thái DK2: Cuối sân -> Vườn Lan -> Ao cá -> Đồi chuồng gà (Mục 6)
+// ============================================================================
+function buildDK2EcoTrail() {
+  const trailGroup = new THREE.Group();
+
+  // 10 điểm uốn lượn tự nhiên theo địa hình kết nối liên hoàn 4 điểm đến
+  const trailPoints = [
+    new THREE.Vector3(-92, 0.2, -48),    // 1. Chân đồi / Cuối sân xe thành phẩm DK2
+    new THREE.Vector3(-96, 3.8, -58),    // 2. Leo dốc thoai thoải
+    new THREE.Vector3(-101, 7.8, -68),   // 3. Sườn dốc xanh
+    new THREE.Vector3(-105, 12.0, -78),  // 4. Lưng chừng đỉnh đồi
+    new THREE.Vector3(-108, 15.6, -88),  // 5. Đến sảnh Vườn Lan trên đồi
+    new THREE.Vector3(-118, 16.6, -84),  // 6. Lối dạo sỏi nối Vườn Lan qua Ao Cá
+    new THREE.Vector3(-126, 17.2, -78),  // 7. Đến bờ Ao Cá đồi sinh thái & sàn gỗ
+    new THREE.Vector3(-133, 15.5, -64),  // 8. Uốn qua yên ngựa sườn núi
+    new THREE.Vector3(-137, 11.8, -50),  // 9. Xuống dốc thoai thoải sang Đồi mới
+    new THREE.Vector3(-140, 8.8, -36),   // 10. Đến khu chuồng gà & đồng cỏ thả đồi
   ];
-  const curve = new THREE.CatmullRomCurve3(curvePoints);
-  const hillRoad = new THREE.Mesh(
-    new THREE.TubeGeometry(curve, 32, 1.8, 4, false),
-    new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.85 })
-  );
-  hillRoad.receiveShadow = true;
-  scene.add(hillRoad);
+
+  const trailCurve = new THREE.CatmullRomCurve3(trailPoints);
+
+  // Thân đường mòn lát sỏi dăm & đá phiến tự nhiên (Rustic Stone/Gravel Path)
+  const trailGeo = new THREE.TubeGeometry(trailCurve, 120, 1.25, 4, false);
+  const trailMat = new THREE.MeshStandardMaterial({
+    color: 0xd6d3d1, // Đá phiến xám sáng tự nhiên
+    roughness: 0.92,
+    flatShading: true,
+  });
+  const trailMesh = new THREE.Mesh(trailGeo, trailMat);
+  trailMesh.scale.set(1.0, 0.16, 1.0); // Dẹt phẳng như mặt đường mòn thực tế
+  trailMesh.receiveShadow = true;
+  trailGroup.add(trailMesh);
+
+  // Bờ viền cọc gỗ Rustic & Cọc đèn solar dẫn đường ban đêm
+  const stakeMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
+  const lanternMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+  const sampleCount = 36;
+
+  for (let s = 0; s <= sampleCount; s++) {
+    const t = s / sampleCount;
+    const pt = trailCurve.getPointAt(t);
+    const tan = trailCurve.getTangentAt(t);
+    const norm = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+
+    // Cọc đèn thấp năng lượng mặt trời dẫn đường ban đêm mỗi 3 nhịp
+    if (s % 3 === 0) {
+      const lampPos = pt.clone().add(norm.clone().multiplyScalar(1.5));
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.65, 5), stakeMat);
+      post.position.set(lampPos.x, lampPos.y + 0.32, lampPos.z);
+      trailGroup.add(post);
+
+      const lampHead = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12), lanternMat);
+      lampHead.position.set(lampPos.x, lampPos.y + 0.65, lampPos.z);
+      trailGroup.add(lampHead);
+    }
+  }
+
+  // 3 Biển chỉ dẫn sinh thái bằng gỗ (Directional Trail Signposts)
+  const signLocations = [
+    { pt: new THREE.Vector3(-92, 0.2, -46), rotY: 0 },
+    { pt: new THREE.Vector3(-110, 15.6, -85), rotY: Math.PI / 4 },
+    { pt: new THREE.Vector3(-128, 17.2, -76), rotY: -Math.PI / 3 },
+  ];
+
+  signLocations.forEach((sg) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.4, 6), stakeMat);
+    post.position.set(sg.pt.x, sg.pt.y + 0.7, sg.pt.z);
+    post.castShadow = true;
+    trailGroup.add(post);
+
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.45, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
+    );
+    board.position.set(sg.pt.x, sg.pt.y + 1.25, sg.pt.z);
+    board.rotation.y = sg.rotY;
+    board.castShadow = true;
+    trailGroup.add(board);
+  });
+
+  scene.add(trailGroup);
 }
 
 function buildVuonLanDK2() {
@@ -2645,19 +2723,27 @@ function isForestExcludedZone(x, z) {
   // Khuôn viên nhà máy DK1 (Xưởng B, Văn phòng A, Nhà C, Nhà ăn, Sân bóng chuyền, Bãi đỗ)
   if (x > 15 && x < 83 && z > -68 && z < -10) return true;
   // Khuôn viên nhà máy DK2 (Tòa nhà HQ, Kho linh kiện, Sân xe thành phẩm, Sân thử)
-  if (x > -112 && x < -24 && z > -78 && z < -16) return true;
-  // Vườn Lan & Sinh thái trên đồi DK2 (-130, -82, size 22x22 + hiên đón)
-  if (Math.abs(x - (-130)) < 16.5 && Math.abs(z - (-82)) < 16.5) return true;
+  if (x > -92 && x < -20 && z > -78 && z < -10) return true;
+  // Vườn Lan & Sinh thái trên đồi DK2 vị trí mới (-108, -88)
+  if (Math.hypot(x - (-108), z - (-88)) < 16.0) return true;
+  // Ao cá đồi sinh thái DK2 vị trí mới cạnh Vườn Lan (-132, -76)
+  if (Math.hypot(x - (-132), z - (-76)) < 21.5) return true;
+  // Bãi nuôi đàn gà trên Đồi mới DK2 (-138, -34)
+  if (Math.hypot(x - (-138), z - (-34)) < 16.0) return true;
+  // Tuyến đường mòn sinh thái DK2 (Hành lang đi bộ không bị cây chắn)
+  const trailWaypoints = [
+    [-92, -48], [-97, -58], [-102, -70], [-106, -80],
+    [-118, -84], [-126, -78], [-133, -62], [-137, -48]
+  ];
+  for (let i = 0; i < trailWaypoints.length; i++) {
+    if (Math.hypot(x - trailWaypoints[i][0], z - trailWaypoints[i][1]) < 2.5) return true;
+  }
   // Lòng đường ĐT234 (chỉ trồng cây cảnh 2 bên vỉa hè)
   if (x > -14.5 && x < -5.5 && z > -96 && z < 25) return true;
   // Lòng sông sâu
   if (x > 86 && x < 94 && z > -105 && z < 65) return true;
   // Đồng cỏ chăn thả đàn cừu sinh thái
   if (Math.hypot(x - 108, z - (-45)) < 15.5) return true;
-  // Ao cá đồi sinh thái và sàn gỗ câu cá DK2 (Mở rộng hồ theo yêu cầu)
-  if (Math.hypot(x - (-98), z - (-56)) < 21.5) return true;
-  // Bãi nuôi đàn gà thả đồi và máng ăn DK2
-  if (Math.hypot(x - (-112), z - (-36)) < 12.5) return true;
   // Hành lang an toàn đường ray tàu hỏa
   if (isNearRailwayTrack(x, z, 3.2)) return true;
 
@@ -3096,10 +3182,10 @@ function buildCourtyardGreenery() {
     { x: 28, y: 0, z: -5.5, type: 'cypress' },
 
     // 4. Trước sảnh Tòa nhà Điều hành DK2 (HQ)
-    { x: -38, y: 0, z: -19.5, type: 'cypress' },
-    { x: -33, y: 0, z: -19.5, type: 'topiary' },
-    { x: -27, y: 0, z: -19.5, type: 'topiary' },
-    { x: -22, y: 0, z: -19.5, type: 'cypress' },
+    { x: -44, y: 0, z: -23.5, type: 'cypress' },
+    { x: -39, y: 0, z: -23.5, type: 'topiary' },
+    { x: -33, y: 0, z: -23.5, type: 'topiary' },
+    { x: -28, y: 0, z: -23.5, type: 'cypress' },
 
     // 5. Góc sân kiểm định xe DK2
     { x: -62, y: 0, z: -19.5, type: 'shrub' },
@@ -3174,9 +3260,9 @@ function buildBuildingContactShadows() {
     // Nhà ăn CBNV
     { x: 23.0, z: -12.0, w: 14.2, d: 11.2 },
     // Nhà điều hành DK2 (HQ)
-    { x: -35.0, z: -32.0, w: 26.8, d: 20.8 },
-    // Kho D2.1
-    { x: -78.0, z: -68.0, w: 36.8, d: 16.8 },
+    { x: -36.0, z: -32.0, w: 26.8, d: 20.8 },
+    // Kho D2.1 (Đã dịch chuyển theo mũi tên)
+    { x: -50.0, z: -68.0, w: 64.0, d: 15.0 },
   ];
 
   buildings.forEach((b) => {
@@ -3195,14 +3281,14 @@ function buildLogisticsAndEquipment() {
   // Forklift 1 tại Cửa bốc dỡ Nhà B
   createForklift(55, 0, -32, 0, 'forklift1', 'Xe nâng Komatsu #01 (Xưởng B)');
 
-  // Forklift 2 tại Kho Linh Kiện D2.1
-  createForklift(-72, 0, -60, Math.PI / 2, 'forklift2', 'Xe nâng Komatsu #02 (Kho D2.1)');
+  // Forklift 2 tại Cửa Kho Linh Kiện D2.1 (Vị trí mới theo kho đã dịch chuyển)
+  createForklift(-48, 0, -60, Math.PI / 2, 'forklift2', 'Xe nâng Komatsu #02 (Kho D2.1)');
 
   // Cargo Pallets & Component Crates
   createPalletStack(58, 0, -31);
   createPalletStack(61, 0, -31);
-  createPalletStack(-86, 0, -58);
-  createPalletStack(-82, 0, -58);
+  createPalletStack(-58, 0, -58);
+  createPalletStack(-54, 0, -58);
 
   // Automatic Boom Barriers at Gate 1 & Gate 2
   createGateBarrier(77.5, 0, -20, 0, 'barrierDK1', 'Barie kiểm soát Cổng 1');
@@ -3747,7 +3833,7 @@ function buildFlagsAndStreetlights() {
   createFlagpole(25, 0, -23, 0xef4444);
 
   // Flagpole 2: Trước Nhà điều hành DK2
-  createFlagpole(-34, 0, -20, 0xffb703);
+  createFlagpole(-42, 0, -22, 0xffb703);
 
   // Streetlights along DT234 & Campuses
   const lightPositions = [
@@ -3958,7 +4044,7 @@ function buildPeopleAndCharacters() {
 
   // 7. Nghệ nhân cây cảnh Vườn Lan (Bác Bùi Văn Thắng)
   const caretaker = createCharacter({ shirtColor: 0x16a34a, pantsColor: 0x475569, hatColor: 0xfef08a });
-  caretaker.position.set(-126, 16.0, -80);
+  caretaker.position.set(-106, 15.5, -86);
   caretaker.rotation.y = Math.PI * 0.8;
   caretaker.userData = {
     id: 'orchidGardener',
@@ -3970,9 +4056,9 @@ function buildPeopleAndCharacters() {
   scene.add(caretaker);
   interactiveObjects.push(caretaker);
 
-  // 8. Hai Cán bộ văn phòng thư giãn bên hồ cá Koi trước Nhà điều hành
+  // 8. Hai Cán bộ văn phòng thư giãn bên hồ cá Koi trước Nhà điều hành (Vị trí mới)
   const staff1 = createCharacter({ shirtColor: 0xffffff, pantsColor: 0x1e293b, hatColor: 0xffffff });
-  staff1.position.set(-20.5, 0, -29);
+  staff1.position.set(-22.5, 0, -34.0);
   staff1.rotation.y = -Math.PI / 4;
   staff1.userData = {
     id: 'officeStaff1',
@@ -3985,7 +4071,7 @@ function buildPeopleAndCharacters() {
   interactiveObjects.push(staff1);
 
   const staff2 = createCharacter({ shirtColor: 0x3b82f6, pantsColor: 0x1e293b, hatColor: 0x3b82f6 });
-  staff2.position.set(-19.5, 0, -30.2);
+  staff2.position.set(-21.5, 0, -35.2);
   staff2.rotation.y = Math.PI * 0.75;
   staff2.userData = {
     id: 'officeStaff2',
@@ -4677,20 +4763,20 @@ function buildVolleyballCourt() {
 // Ao cá đồi sinh thái DK2 (Theo mũi tên ảnh 2 - Tăng kích thước lớn & Nước cách điệu)
 // ============================================================================
 function buildDK2HillPond() {
-  const pondBaseX = -98;
-  const pondBaseZ = -56;
-  const pondBaseY = getDK2HillSurfaceY(pondBaseX, pondBaseZ) + 0.6; // ~ 9.2m
+  const hpCfg = CONFIG.WATER.hillPond;
+  const pondBaseX = hpCfg.position ? hpCfg.position.x : -132.0;
+  const pondBaseZ = hpCfg.position ? hpCfg.position.z : -76.0;
+  const pondBaseY = getDK2HillSurfaceY(pondBaseX, pondBaseZ) + 0.6; // ~ 17.4m trên đỉnh đồi cạnh Vườn Lan
   const pondGroup = new THREE.Group();
   pondGroup.position.set(pondBaseX, pondBaseY, pondBaseZ);
   pondGroup.userData = {
     id: 'aoCaDK2',
-    title: 'Ao cá đồi sinh thái DK2 (Hồ sinh thái mở rộng)',
+    title: 'Ao cá đồi sinh thái DK2 (Cạnh Vườn Lan)',
     type: 'landscape',
-    desc: 'Hồ cá sinh thái tự nhiên trên sườn đồi bậc thang DK2 được mở rộng quy mô lớn, nguồn nước trong xanh mát lành nuôi thả các loài cá Koi và cá chép Nhật. Điểm dừng chân thư giãn có sàn gỗ ngắm toàn cảnh khuôn viên nhà máy.',
+    desc: 'Hồ cá sinh thái tự nhiên được dịch chuyển lên sườn đồi cao cạnh Vườn Lan theo hướng mũi tên, nguồn nước trong xanh mát lành nuôi thả các loài cá Koi và cá chép Nhật. Điểm dừng chân thư giãn có sàn gỗ ngắm toàn cảnh nhà máy từ trên cao.',
     zone: 'DK2',
   };
 
-  const hpCfg = CONFIG.WATER.hillPond;
   const radiusX = hpCfg.radiusX; // 16.5m
   const radiusZ = hpCfg.radiusZ; // 12.0m
 
@@ -4897,19 +4983,19 @@ function buildDK2HillPond() {
 }
 
 // ============================================================================
-// Đàn gà thả đồi sinh thái DK2 (Theo mũi tên ảnh 2)
+// Đàn gà thả đồi sinh thái DK2 (Dịch chuyển sang Đồi mới theo hướng mũi tên)
 // ============================================================================
 function buildFreeRangeChickens() {
-  const flockBaseX = -112;
-  const flockBaseZ = -36;
-  const flockBaseY = getDK2HillSurfaceY(flockBaseX, flockBaseZ) + 0.1; // ~ 2.8m
+  const flockBaseX = -138;
+  const flockBaseZ = -34;
+  const flockBaseY = getDK2HillSurfaceY(flockBaseX, flockBaseZ) + 0.1; // ~ 8.5m trên Đồi mới
   const flockGroup = new THREE.Group();
   flockGroup.position.set(flockBaseX, flockBaseY, flockBaseZ);
   flockGroup.userData = {
     id: 'doiGaDK2',
-    title: 'Đàn gà thả đồi sinh thái DK2',
+    title: 'Đàn gà thả đồi mới DK2 (Đồi sinh thái)',
     type: 'livestock',
-    desc: 'Mô hình nông nghiệp sinh thái tuần hoàn trên sườn đồi bậc thang DK2. Đàn gà thả tự nhiên trên thảm cỏ xanh, tận dụng không gian cảnh quan và tạo hệ sinh thái xanh thân thiện môi trường.',
+    desc: 'Mô hình nông nghiệp sinh thái tuần hoàn trên ngọn đồi mới DK2 theo hướng mũi tên. Đàn gà thả tự nhiên trên thảm cỏ xanh, có chuồng gỗ ấm áp và máng ăn thóc vàng óng.',
     zone: 'DK2',
   };
 
@@ -5850,14 +5936,14 @@ function createBuildingLabels() {
     { text: '🌾 Cối xay gió sinh thái', pos: new THREE.Vector3(55, 34.0, -108), id: 'windmill' },
 
     // DK2
-    { text: 'Nhà điều hành DK2 (HQ)', pos: new THREE.Vector3(-28, 13.0, -28), id: 'nhaDieuHanhDK2' },
-    { text: 'Kho Linh kiện D2.1', pos: new THREE.Vector3(-78, 8.0, -68), id: 'khoLinhKienDK2' },
+    { text: 'Nhà điều hành DK2 (HQ)', pos: new THREE.Vector3(-36, 13.0, -32), id: 'nhaDieuHanhDK2' },
+    { text: 'Kho Linh kiện D2.1', pos: new THREE.Vector3(-50, 8.0, -68), id: 'khoLinhKienDK2' },
     { text: '🏍️ Sân kiểm định xe DK2', pos: new THREE.Vector3(-75, 2.5, -15), id: 'xuongDK2' },
     { text: 'Sân xe thành phẩm DK2', pos: new THREE.Vector3(-78, 2.0, -45), id: 'sanThanhPhamDK2' },
-    { text: 'Vườn Lan trên đồi', pos: new THREE.Vector3(-130, 22.0, -82), id: 'vuonLanDK2' },
-    { text: '🐟 Ao cá đồi sinh thái', pos: new THREE.Vector3(-98, 11.5, -56), id: 'aoCaDK2' },
-    { text: '🐓 Đàn gà thả đồi', pos: new THREE.Vector3(-112, 5.2, -36), id: 'doiGaDK2' },
-    { text: 'Hồ sinh thái tròn', pos: new THREE.Vector3(-108, 3.0, -65), id: 'hoTronDK2' },
+    { text: 'Vườn Lan trên đồi', pos: new THREE.Vector3(-108, 21.0, -88), id: 'vuonLanDK2' },
+    { text: '🐟 Ao cá đồi sinh thái', pos: new THREE.Vector3(-132, 22.0, -76), id: 'aoCaDK2' },
+    { text: '🐓 Đàn gà thả đồi (Đồi mới)', pos: new THREE.Vector3(-138, 12.0, -34), id: 'doiGaDK2' },
+    { text: '🌿 Đường mòn sinh thái DK2', pos: new THREE.Vector3(-96, 5.5, -60), id: 'ecoTrailDK2' },
   ];
 
   labelsData.forEach((item) => {
@@ -5991,10 +6077,10 @@ function showBuildingModal(buildingKey) {
     area.innerText = '253 m² sàn';
     roof.innerText = 'Mái phủ kín dàn pin mặt trời Solar';
   } else if (buildingKey === 'khoLinhKienDK2') {
-    desc.innerText = 'Dãy kho linh kiện D2.1 dài 78m chạy dọc phía Bắc sân, mái tôn xanh dương đặc trưng và các cửa cuốn phân loại kho (Kho HC, Kho AQ).';
-    dim.innerText = '78.0m × 11.0m';
+    desc.innerText = 'Dãy kho linh kiện D2.1 dài 62m chạy dọc phía Bắc sân, mái tôn xanh dương đặc trưng và các cửa cuốn phân loại kho (Kho HC, Kho AQ).';
+    dim.innerText = '62.0m × 11.0m';
     height.innerText = '6.5m (1 tầng)';
-    area.innerText = '1.080 m²';
+    area.innerText = '~682 m²';
     roof.innerText = 'Mái tôn màu xanh dương tươi';
   } else if (buildingKey === 'xuongDK2') {
     desc.innerText = 'Xưởng sản xuất và kho liên kết phía Nam phân khu DK2, phục vụ đóng gói và logistics.';

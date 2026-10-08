@@ -183,7 +183,7 @@ export const CONFIG = {
       width: 22.0,
       height: 11.5,
       depth: 12.0,
-      position: { x: -28.0, y: 11.5 / 2, z: -28.0 },
+      position: { x: -36.0, y: 11.5 / 2, z: -32.0 }, // Dịch sang Tây để không lấn đường nhựa DT234 và ao cá Koi
       wallColor: 0x475569,
       baseWallColor: 0xf8fafc,
       roofColor: 0x1e293b,
@@ -195,10 +195,10 @@ export const CONFIG = {
     khoLinhKienDK2: {
       name: 'Kho Linh kiện D2.1',
       zone: 'DK2',
-      width: 78.0,
+      width: 62.0,
       height: 6.5,
       depth: 11.0,
-      position: { x: -78.0, y: 6.5 / 2, z: -68.0 },
+      position: { x: -50.0, y: 6.5 / 2, z: -68.0 }, // Dịch sang phía Đông theo mũi tên, không lấn vào chân đồi
       wallColor: 0x64748b,
       roofColor: 0x0284c7, // Mái tôn màu xanh dương tươi
       stories: 1,
@@ -226,22 +226,13 @@ export const CONFIG = {
       courtColor: 0x22c55e, // Ô sân xanh lá tươi
     },
 
-    hoTronDK2: {
-      name: 'Hồ cảnh quan tròn DK2',
-      zone: 'DK2',
-      radius: 6.0,
-      height: 1.6,
-      position: { x: -108.0, y: -0.6, z: -65.0 },
-      waterColor: 0x38bdf8,
-    },
-
     vuonLanDK2: {
       name: 'Vườn Lan & Sinh thái trên đồi',
       zone: 'DK2',
-      width: 22.0,
+      width: 20.0,
       height: 5.5,
-      depth: 22.0,
-      position: { x: -130.0, y: 16.0, z: -82.0 },
+      depth: 20.0,
+      position: { x: -108.0, y: 15.5, z: -88.0 }, // Dịch theo hướng mũi tên xuống triền sườn đồi
       canopyColor: 0x38bdf8,
       opacity: 0.65,
       frameColor: 0x1e293b,
@@ -286,7 +277,8 @@ export const CONFIG = {
     waveFrequency: 0.35,
     opacity: 0.90,
     hillPond: {
-      radiusX: 16.5,        // Tăng kích thước ao cá trên đồi DK2
+      position: { x: -132.0, z: -76.0 }, // Dịch chuyển lên đỉnh đồi cạnh Vườn Lan theo hướng mũi tên
+      radiusX: 16.5,                     // Kích thước ao cá lớn
       radiusZ: 12.0,
       terraceRadius: 18.5,
       terraceHeight: 3.6,
@@ -314,6 +306,13 @@ export const CONFIG = {
       radius: 54,
       height: 25,
       color: 0x16a34a,
+    },
+    // Đồi mới cho chuồng gà và đàn gà thả đồi (Theo khoanh tròn đỏ trên ảnh)
+    dk2NewHill: {
+      position: { x: -142, y: 0, z: -38 },
+      radius: 34,
+      height: 15,
+      color: 0x22c55e,
     },
   },
 
@@ -369,14 +368,14 @@ export const CONFIG = {
       name: 'Xưởng chính Nhà B (DK1)',
     },
     nhaDieuHanh: {
-      pos: { x: -10, y: 35, z: -5 },
-      target: { x: -28, y: 6, z: -28 },
+      pos: { x: -16, y: 35, z: -10 },
+      target: { x: -36, y: 6, z: -32 },
       name: 'Nhà điều hành DK2 (HQ)',
     },
     vuonLan: {
-      pos: { x: -95, y: 50, z: -45 },
-      target: { x: -130, y: 16, z: -82 },
-      name: 'Vườn Lan trên đồi (DK2)',
+      pos: { x: -85, y: 46, z: -55 },
+      target: { x: -118, y: 16, z: -82 },
+      name: 'Vườn Lan & Ao cá trên đồi (DK2)',
     },
     testTrack: {
       pos: { x: 80, y: 40, z: -75 },
