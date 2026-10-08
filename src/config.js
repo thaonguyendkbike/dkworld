@@ -202,16 +202,14 @@ export const CONFIG = {
     },
 
     xuongDK2: {
-      name: 'Xưởng sản xuất phía Nam DK2',
+      name: 'Sân kiểm định & Xe thành phẩm DK2',
       zone: 'DK2',
-      width: 85.0,
-      height: 8.0,
-      depth: 16.0,
-      position: { x: -75.0, y: 8.0 / 2, z: -15.0 },
-      wallColor: 0x475569,
-      roofColor: 0x334155,
-      stories: 2,
-      area: '2.170 m²',
+      width: 88.0,
+      height: 0.1,
+      depth: 22.0,
+      position: { x: -75.0, y: 0.05, z: -15.0 },
+      yardColor: 0x94a3b8,
+      area: '1.936 m²',
     },
 
     sanThanhPhamDK2: {
@@ -371,6 +369,21 @@ export const CONFIG = {
       pos: { x: 20, y: 15, z: -15 },
       target: { x: 28, y: 2, z: -24 },
       name: 'Trạm sạc xe điện thông minh',
+    },
+    volleyball: {
+      pos: { x: 56, y: 14, z: 4 },
+      target: { x: 44, y: 1.5, z: -12 },
+      name: 'Sân bóng chuyền DK1',
+    },
+    aoCaDK2: {
+      pos: { x: -92, y: 18, z: -45 },
+      target: { x: -110, y: 5.5, z: -63 },
+      name: 'Ao cá đồi sinh thái DK2',
+    },
+    doiGaDK2: {
+      pos: { x: -105, y: 16, z: -28 },
+      target: { x: -125, y: 4.5, z: -48 },
+      name: 'Đàn gà thả đồi DK2',
     },
   },
 

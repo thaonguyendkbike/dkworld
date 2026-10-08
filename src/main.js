@@ -35,6 +35,17 @@ let flagMeshes = [];
 let roofVentilators = [];
 let birdFlockGroup, birdMeshes = [];
 
+// Volleyball match & court
+let volleyballMesh;
+let volleyballPlayers = [];
+let volleyballRallyProgress = 0;
+let volleyballCourtGroup;
+
+// DK2 Hillside Eco-Pond & Chickens
+let hillPondKoiFishes = [];
+let hillPondWater;
+let hillChickens = [];
+
 // Interactive Objects, Doors & Activities
 let interactiveObjects = [];
 let shutterDoors = [];
@@ -1815,27 +1826,122 @@ function buildXuongDK2() {
   const cfg = CONFIG.BUILDINGS.xuongDK2;
   const group = new THREE.Group();
   group.position.set(cfg.position.x, 0, cfg.position.z);
-  group.userData = { id: 'xuongDK2', config: cfg };
+  group.userData = {
+    id: 'xuongDK2',
+    config: cfg,
+    title: 'Sân kiểm định & Xe thành phẩm DK2',
+    type: 'yard',
+    desc: 'Sân bê tông rộng 88m × 22m mở rộng từ việc chuyển đổi nhà xưởng cũ, phục vụ bãi kiểm định chất lượng KCS, chạy thử xe và tập kết các lô xe máy điện DK Bike trước khi xuất kho.',
+    zone: 'DK2',
+  };
 
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width, cfg.height, cfg.depth),
-    new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.65 })
-  );
-  body.position.y = cfg.height / 2;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  group.add(body);
+  // 1. Paved concrete surface slab with expansion joints
+  const yardGeo = new THREE.PlaneGeometry(cfg.width, cfg.depth);
+  const yardMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 });
+  const yard = new THREE.Mesh(yardGeo, yardMat);
+  yard.rotation.x = -Math.PI / 2;
+  yard.position.y = 0.04;
+  yard.receiveShadow = true;
+  group.add(yard);
 
-  const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width + 0.8, 0.8, cfg.depth + 0.8),
-    new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.5 })
+  // Concrete grid expansion joints
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0x64748b });
+  for (let lx = -cfg.width / 2 + 8; lx < cfg.width / 2; lx += 11) {
+    const joint = new THREE.Mesh(new THREE.PlaneGeometry(0.08, cfg.depth), lineMat);
+    joint.rotation.x = -Math.PI / 2;
+    joint.position.set(lx, 0.045, 0);
+    group.add(joint);
+  }
+
+  // 2. Painted logistics markings: yellow borders, diagonal test tracks, parking bays
+  const yellowPaintMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  const whitePaintMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+
+  // Border lines
+  const borderTop = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 2, 0.2), yellowPaintMat);
+  borderTop.rotation.x = -Math.PI / 2;
+  borderTop.position.set(0, 0.05, -cfg.depth / 2 + 1);
+  group.add(borderTop);
+
+  const borderBot = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 2, 0.2), yellowPaintMat);
+  borderBot.rotation.x = -Math.PI / 2;
+  borderBot.position.set(0, 0.05, cfg.depth / 2 - 1);
+  group.add(borderBot);
+
+  // Speed / brake testing lane (Làn kiểm định tốc độ & phanh)
+  const testTrackGreen = new THREE.Mesh(
+    new THREE.PlaneGeometry(cfg.width - 4, 3.2),
+    new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7 })
   );
-  roof.position.y = cfg.height + 0.4;
-  roof.castShadow = true;
-  group.add(roof);
+  testTrackGreen.rotation.x = -Math.PI / 2;
+  testTrackGreen.position.set(0, 0.046, -6.5);
+  group.add(testTrackGreen);
+
+  // Center dashed line for test lane
+  for (let dx = -cfg.width / 2 + 4; dx < cfg.width / 2 - 4; dx += 4) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.15), whitePaintMat);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(dx, 0.052, -6.5);
+    group.add(dash);
+  }
+
+  // Finished vehicle diagonal parking bays & parked DK Bikes
+  const bikeColors = [0xffb703, 0xef4444, 0x06b6d4, 0x10b981, 0x6366f1, 0xf1f5f9, 0x1e293b, 0xf97316];
+  for (let slot = 0; slot < 26; slot++) {
+    const sx = -cfg.width / 2 + 6 + slot * 3.0;
+    const sz = 2.0;
+
+    // White parking divider line
+    const slotLine = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 4.0), whitePaintMat);
+    slotLine.rotation.x = -Math.PI / 2;
+    slotLine.position.set(sx - 1.3, 0.05, sz);
+    group.add(slotLine);
+
+    // Park a DK Bike in each bay
+    const bColor = bikeColors[slot % bikeColors.length];
+    const parkedBike = createDetailedDKBike(bColor, `DK Bike Thành Phẩm Lô #${slot + 1}`);
+    parkedBike.position.set(sx, 0.05, sz);
+    parkedBike.rotation.y = Math.PI / 2;
+    group.add(parkedBike);
+  }
+
+  // Second row of parked bikes (DK Creer E & DK Xman)
+  for (let slot = 0; slot < 18; slot++) {
+    const sx = -cfg.width / 2 + 10 + slot * 4.0;
+    const sz = 7.5;
+    const bColor = bikeColors[(slot + 3) % bikeColors.length];
+    const parkedBike = createDetailedDKBike(bColor, `DK Creer E Xuất Xưởng #${slot + 1}`);
+    parkedBike.position.set(sx, 0.05, sz);
+    parkedBike.rotation.y = Math.PI / 2;
+    group.add(parkedBike);
+  }
+
+  // 4 corner industrial LED floodlight poles
+  [
+    { x: -cfg.width / 2 + 2, z: -cfg.depth / 2 + 2 },
+    { x: cfg.width / 2 - 2, z: -cfg.depth / 2 + 2 },
+    { x: -cfg.width / 2 + 2, z: cfg.depth / 2 - 2 },
+    { x: cfg.width / 2 - 2, z: cfg.depth / 2 - 2 },
+  ].forEach((lp) => {
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.18, 6.0, 6),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6 })
+    );
+    pole.position.set(lp.x, 3.0, lp.z);
+    pole.castShadow = true;
+    group.add(pole);
+
+    const headLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 0.35, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfef08a, emissiveIntensity: 0.3 })
+    );
+    headLight.position.set(lp.x, 6.1, lp.z);
+    headLight.rotation.x = Math.PI / 6;
+    group.add(headLight);
+  });
 
   scene.add(group);
-  buildingMeshes.push(body);
+  interactiveObjects.push(group);
 }
 
 function buildSanThanhPhamDK2() {
@@ -1912,6 +2018,12 @@ function buildDK2HillAndOrchidGarden() {
 
   // Orchid Greenhouse
   buildVuonLanDK2();
+
+  // Hillside Eco-Fish Pond (Ao cá đồi sinh thái theo ảnh 2)
+  buildDK2HillPond();
+
+  // Free-Range Hillside Chickens (Đàn gà thả đồi theo ảnh 2)
+  buildFreeRangeChickens();
 }
 
 function buildWindingHillRoad() {
@@ -2242,8 +2354,11 @@ function buildLandscaping() {
 
   let pIdx = 0;
   for (let p = 0; p < pineCount; p++) {
-    const px = (p % 2 === 0 ? 55 : 135) + (Math.random() - 0.5) * 45;
-    const pz = -110 + (p / pineCount) * 160 + (Math.random() - 0.5) * 15;
+    let px = (p % 2 === 0 ? 55 : 135) + (Math.random() - 0.5) * 45;
+    let pz = -110 + (p / pineCount) * 160 + (Math.random() - 0.5) * 15;
+    if (px > 31 && px < 57 && pz > -20 && pz < -4) {
+      px += 18;
+    }
     const py = 0.5 + Math.random() * 6;
     const ps = 0.75 + Math.random() * 0.45;
 
@@ -3129,79 +3244,1024 @@ function buildPeopleAndCharacters() {
   };
   scene.add(staff2);
   interactiveObjects.push(staff2);
+
+  // 9. Sân bóng chuyền ngoài trời & Các cầu thủ (theo khoanh đỏ ảnh 1)
+  buildVolleyballCourt();
 }
 
-function createCharacter({ shirtColor, pantsColor, hatColor, holdingTablet = false, isDriver = false }) {
+function createCharacter({
+  shirtColor = 0x0284c7,
+  pantsColor = 0x1e293b,
+  hatColor = 0xfacc15,
+  hatType = 'auto',
+  skinColor = 0xfbd38d,
+  hairColor = 0x271c19,
+  holdingTablet = false,
+  isDriver = false,
+  role = 'worker',
+  pose = 'idle',
+  jerseyNumber = null,
+  hasVest = false,
+  shoeColor = null,
+}) {
   const charGroup = new THREE.Group();
 
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xfcd34d, roughness: 0.6 });
+  // Materials
+  const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.65 });
   const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.7 });
   const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.8 });
-  const hatMat = new THREE.MeshStandardMaterial({ color: hatColor, roughness: 0.4 });
+  const hatMat = new THREE.MeshStandardMaterial({ color: hatColor || 0xfacc15, roughness: 0.4 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85 });
+  const darkDetailMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+  const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const silverMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.8 });
+  const shoeMat = new THREE.MeshStandardMaterial({ color: shoeColor || (role === 'athlete' ? 0xffffff : 0x0f172a), roughness: 0.85 });
 
-  // Head
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
-  head.position.y = 1.5;
+  // 1. HEAD & FACE
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 1.48, 0);
+
+  // Faceted stylized head
+  const headGeo = new THREE.BoxGeometry(0.24, 0.25, 0.24);
+  const head = new THREE.Mesh(headGeo, skinMat);
   head.castShadow = true;
-  charGroup.add(head);
+  headGroup.add(head);
 
-  // Safety Helmet / Cap
-  const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.14, 8), hatMat);
-  helmet.position.y = 1.62;
-  charGroup.add(helmet);
+  // Expressive dark eyes
+  const eyeGeo = new THREE.BoxGeometry(0.04, 0.045, 0.02);
+  const leftEye = new THREE.Mesh(eyeGeo, darkDetailMat);
+  leftEye.position.set(-0.065, 0.025, 0.125);
+  headGroup.add(leftEye);
 
-  // Torso
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.55, 0.25), shirtMat);
-  torso.position.y = 1.1;
-  torso.castShadow = true;
-  charGroup.add(torso);
+  const rightEye = new THREE.Mesh(eyeGeo, darkDetailMat);
+  rightEye.position.set(0.065, 0.025, 0.125);
+  headGroup.add(rightEye);
 
-  // Legs
-  const legGeo = new THREE.BoxGeometry(0.16, 0.65, 0.18);
-  const leftLeg = new THREE.Mesh(legGeo, pantsMat);
-  leftLeg.position.set(-0.11, 0.45, 0);
-  leftLeg.castShadow = true;
+  // Eye highlights
+  const hlGeo = new THREE.BoxGeometry(0.015, 0.015, 0.02);
+  const hlLeft = new THREE.Mesh(hlGeo, whiteMat);
+  hlLeft.position.set(-0.075, 0.035, 0.128);
+  headGroup.add(hlLeft);
+  const hlRight = new THREE.Mesh(hlGeo, whiteMat);
+  hlRight.position.set(0.055, 0.035, 0.128);
+  headGroup.add(hlRight);
+
+  // Stylized nose
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.04), skinMat);
+  nose.position.set(0, -0.01, 0.135);
+  headGroup.add(nose);
+
+  // Smile / mouth line
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.02), darkDetailMat);
+  mouth.position.set(0, -0.065, 0.125);
+  headGroup.add(mouth);
+
+  // Ears
+  const earGeo = new THREE.BoxGeometry(0.03, 0.06, 0.04);
+  const leftEar = new THREE.Mesh(earGeo, skinMat);
+  leftEar.position.set(-0.13, 0.01, 0);
+  headGroup.add(leftEar);
+  const rightEar = new THREE.Mesh(earGeo, skinMat);
+  rightEar.position.set(0.13, 0.01, 0);
+  headGroup.add(rightEar);
+
+  // Hair (base sculpted hair)
+  const hair = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.11, 0.26), hairMat);
+  hair.position.set(0, 0.10, -0.01);
+  headGroup.add(hair);
+
+  // Sideburns
+  const sbGeo = new THREE.BoxGeometry(0.02, 0.08, 0.04);
+  const sbLeft = new THREE.Mesh(sbGeo, hairMat);
+  sbLeft.position.set(-0.125, 0.04, 0.04);
+  headGroup.add(sbLeft);
+  const sbRight = new THREE.Mesh(sbGeo, hairMat);
+  sbRight.position.set(0.125, 0.04, 0.04);
+  headGroup.add(sbRight);
+
+  // Headwear logic
+  let resolvedHat = hatType;
+  if (resolvedHat === 'auto') {
+    if (role === 'athlete') resolvedHat = 'headband';
+    else if (role === 'farmer') resolvedHat = 'conical';
+    else if (hatColor) resolvedHat = 'helmet';
+    else resolvedHat = 'hair';
+  }
+
+  if (resolvedHat === 'helmet') {
+    // Industrial safety helmet with brim and reflective strip
+    const helmetCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.165, 0.12, 8), hatMat);
+    helmetCrown.position.set(0, 0.16, 0);
+    helmetCrown.castShadow = true;
+    headGroup.add(helmetCrown);
+
+    const helmetBrim = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.19, 0.19, 0.025, 8, 1, false, 0, Math.PI * 1.1),
+      hatMat
+    );
+    helmetBrim.position.set(0, 0.11, 0.02);
+    headGroup.add(helmetBrim);
+
+    // Reflective strip around helmet
+    const strip = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.02, 8), silverMat);
+    strip.position.set(0, 0.145, 0);
+    headGroup.add(strip);
+  } else if (resolvedHat === 'cap') {
+    // Baseball cap with visor
+    const capCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.10, 8), hatMat);
+    capCrown.position.set(0, 0.14, 0);
+    headGroup.add(capCrown);
+
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.12), hatMat);
+    visor.position.set(0, 0.10, 0.14);
+    visor.rotation.x = Math.PI / 12;
+    headGroup.add(visor);
+  } else if (resolvedHat === 'conical') {
+    // Nón lá Việt Nam
+    const coneHat = new THREE.Mesh(
+      new THREE.ConeGeometry(0.38, 0.17, 12),
+      new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.9 })
+    );
+    coneHat.position.set(0, 0.20, 0);
+    coneHat.castShadow = true;
+    headGroup.add(coneHat);
+  } else if (resolvedHat === 'headband') {
+    // Athletic sweatband
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.035, 8), whiteMat);
+    band.position.set(0, 0.07, 0);
+    headGroup.add(band);
+  }
+
+  charGroup.add(headGroup);
+  charGroup.userData.headGroup = headGroup;
+
+  // 2. NECK & COLLAR
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.10, 6), skinMat);
+  neck.position.set(0, 1.33, 0);
+  charGroup.add(neck);
+
+  // 3. TORSO
+  const torsoGroup = new THREE.Group();
+  torsoGroup.position.set(0, 1.05, 0);
+
+  // Tapered upper chest
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.32, 0.24), shirtMat);
+  chest.position.set(0, 0.12, 0);
+  chest.castShadow = true;
+  torsoGroup.add(chest);
+
+  // Tapered abdomen / waist
+  const waist = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 0.22), shirtMat);
+  waist.position.set(0, -0.12, 0);
+  waist.castShadow = true;
+  torsoGroup.add(waist);
+
+  // Safety reflective vest (for workers or high-vis personnel)
+  if (hasVest || role === 'worker' || role === 'kcs') {
+    const vestMat = new THREE.MeshStandardMaterial({ color: 0x84cc16, roughness: 0.6 }); // Fluorescent lime
+    const vestChest = new THREE.Mesh(new THREE.BoxGeometry(0.446, 0.30, 0.246), vestMat);
+    vestChest.position.set(0, 0.12, 0);
+    torsoGroup.add(vestChest);
+
+    // Silver reflective strips on vest
+    const refBand1 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.03, 0.25), silverMat);
+    refBand1.position.set(0, 0.16, 0);
+    torsoGroup.add(refBand1);
+
+    const refBand2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.03, 0.25), silverMat);
+    refBand2.position.set(0, 0.06, 0);
+    torsoGroup.add(refBand2);
+  }
+
+  // Athlete Jersey number badge
+  if (role === 'athlete' && jerseyNumber) {
+    const numBadge = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.16, 0.14),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    numBadge.position.set(0, 0.14, 0.123);
+    torsoGroup.add(numBadge);
+
+    const numBack = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.20, 0.16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    numBack.rotation.y = Math.PI;
+    numBack.position.set(0, 0.14, -0.123);
+    torsoGroup.add(numBack);
+  }
+
+  // Belt with metallic buckle
+  const belt = new THREE.Mesh(
+    new THREE.BoxGeometry(0.39, 0.06, 0.23),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
+  );
+  belt.position.set(0, -0.22, 0);
+  torsoGroup.add(belt);
+
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.065, 0.02), silverMat);
+  buckle.position.set(0, -0.22, 0.12);
+  torsoGroup.add(buckle);
+
+  charGroup.add(torsoGroup);
+
+  // 4. LEGS & SHOES (Pivoted at hips y = 0.82)
+  const createLeg = (offsetX) => {
+    const legGroup = new THREE.Group();
+    legGroup.position.set(offsetX, 0.82, 0);
+
+    const isAthlete = role === 'athlete';
+
+    // Thigh (Pants or athletic shorts)
+    const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.40, 0.18), pantsMat);
+    thigh.position.set(0, -0.20, 0);
+    thigh.castShadow = true;
+    legGroup.add(thigh);
+
+    // Shin / Lower leg
+    if (isAthlete) {
+      // Skin knee & calf
+      const shin = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.24, 0.15), skinMat);
+      shin.position.set(0, -0.46, 0);
+      legGroup.add(shin);
+
+      // White sport socks
+      const sock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.16), whiteMat);
+      sock.position.set(0, -0.62, 0);
+      legGroup.add(sock);
+    } else {
+      const shin = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.36, 0.17), pantsMat);
+      shin.position.set(0, -0.50, 0);
+      shin.castShadow = true;
+      legGroup.add(shin);
+    }
+
+    // Shoe
+    const shoeSole = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.27), whiteMat);
+    shoeSole.position.set(0, -0.78, 0.04);
+    legGroup.add(shoeSole);
+
+    const shoeUpper = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.10, 0.24), shoeMat);
+    shoeUpper.position.set(0, -0.71, 0.03);
+    shoeUpper.castShadow = true;
+    legGroup.add(shoeUpper);
+
+    return legGroup;
+  };
+
+  const leftLeg = createLeg(-0.11);
+  const rightLeg = createLeg(0.11);
   charGroup.add(leftLeg);
-  charGroup.userData.leftLeg = leftLeg;
-
-  const rightLeg = new THREE.Mesh(legGeo, pantsMat);
-  rightLeg.position.set(0.11, 0.45, 0);
-  rightLeg.castShadow = true;
   charGroup.add(rightLeg);
+  charGroup.userData.leftLeg = leftLeg;
   charGroup.userData.rightLeg = rightLeg;
 
-  // Arms
-  const armGeo = new THREE.BoxGeometry(0.12, 0.5, 0.12);
-  const leftArm = new THREE.Mesh(armGeo, shirtMat);
-  leftArm.position.set(-0.28, 1.05, 0);
-  charGroup.add(leftArm);
-  charGroup.userData.leftArm = leftArm;
+  // 5. ARMS & HANDS (Pivoted at shoulders y = 1.32)
+  const createArm = (offsetX, isLeft) => {
+    const armGroup = new THREE.Group();
+    armGroup.position.set(offsetX, 1.32, 0);
 
-  const rightArm = new THREE.Mesh(armGeo, shirtMat);
-  rightArm.position.set(0.28, 1.05, 0);
+    const isAthlete = role === 'athlete';
+
+    // Shoulder joint
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), isAthlete ? skinMat : shirtMat);
+    shoulder.position.set(0, 0, 0);
+    armGroup.add(shoulder);
+
+    // Upper arm
+    const upperArm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.24, 0.12),
+      isAthlete ? skinMat : shirtMat
+    );
+    upperArm.position.set(0, -0.12, 0);
+    upperArm.castShadow = true;
+    armGroup.add(upperArm);
+
+    // Forearm (skin tone)
+    const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.24, 0.10), skinMat);
+    forearm.position.set(0, -0.32, 0);
+    forearm.castShadow = true;
+    armGroup.add(forearm);
+
+    // Hand with palm and thumb
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.10, 0.08), skinMat);
+    hand.position.set(0, -0.47, 0);
+    armGroup.add(hand);
+
+    const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.04), skinMat);
+    thumb.position.set(isLeft ? 0.05 : -0.05, -0.45, 0.02);
+    armGroup.add(thumb);
+
+    return armGroup;
+  };
+
+  const leftArm = createArm(-0.25, true);
+  const rightArm = createArm(0.25, false);
+  charGroup.add(leftArm);
   charGroup.add(rightArm);
+  charGroup.userData.leftArm = leftArm;
   charGroup.userData.rightArm = rightArm;
 
-  // Tablet in hand
+  // 6. POSES & ACCESSORIES
   if (holdingTablet) {
     const tab = new THREE.Mesh(
-      new THREE.BoxGeometry(0.24, 0.04, 0.32),
+      new THREE.BoxGeometry(0.28, 0.03, 0.36),
       new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 })
     );
     tab.position.set(0, 1.05, 0.25);
     charGroup.add(tab);
-    rightArm.rotation.x = -Math.PI / 4;
-    leftArm.rotation.x = -Math.PI / 4;
+
+    // Glowing screen
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.32),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    screen.rotation.x = -Math.PI / 2;
+    screen.position.set(0, 1.07, 0.25);
+    charGroup.add(screen);
+
+    rightArm.rotation.x = -Math.PI / 3.5;
+    rightArm.rotation.y = -Math.PI / 8;
+    leftArm.rotation.x = -Math.PI / 3.5;
+    leftArm.rotation.y = Math.PI / 8;
   }
 
   if (isDriver) {
-    leftLeg.position.set(-0.11, 0.4, 0.15);
-    rightLeg.position.set(0.11, 0.4, 0.15);
-    leftArm.rotation.x = -Math.PI / 3;
-    rightArm.rotation.x = -Math.PI / 3;
+    leftLeg.rotation.x = -Math.PI / 2.6;
+    rightLeg.rotation.x = -Math.PI / 2.6;
+    leftArm.rotation.x = -Math.PI / 3.2;
+    rightArm.rotation.x = -Math.PI / 3.2;
+  }
+
+  if (pose === 'spike') {
+    rightArm.rotation.x = -2.6;
+    rightArm.rotation.z = -0.3;
+    leftArm.rotation.x = -1.2;
+    leftArm.rotation.z = 0.2;
+    leftLeg.rotation.x = 0.3;
+    rightLeg.rotation.x = 0.2;
+  } else if (pose === 'set') {
+    rightArm.rotation.x = -2.2;
+    rightArm.rotation.z = -0.3;
+    leftArm.rotation.x = -2.2;
+    leftArm.rotation.z = 0.3;
+    charGroup.position.y = 0.1;
+  } else if (pose === 'bump') {
+    leftLeg.rotation.x = -0.45;
+    rightLeg.rotation.x = -0.45;
+    leftArm.rotation.x = -0.95;
+    leftArm.rotation.z = 0.15;
+    rightArm.rotation.x = -0.95;
+    rightArm.rotation.z = -0.15;
+    charGroup.position.y = -0.15;
+  } else if (pose === 'block') {
+    rightArm.rotation.x = -2.9;
+    rightArm.rotation.z = -0.15;
+    leftArm.rotation.x = -2.9;
+    leftArm.rotation.z = 0.15;
+  } else if (pose === 'sitting') {
+    leftLeg.rotation.x = -Math.PI / 2;
+    rightLeg.rotation.x = -Math.PI / 2;
+    leftArm.rotation.x = -Math.PI / 4;
+    rightArm.rotation.x = -Math.PI / 4;
   }
 
   return charGroup;
+}
+
+// ============================================================================
+// Sân bóng chuyền ngoài trời & Các cầu thủ thi đấu (Ảnh 1)
+// ============================================================================
+function buildVolleyballCourt() {
+  volleyballCourtGroup = new THREE.Group();
+  volleyballCourtGroup.position.set(44, 0, -12);
+  volleyballCourtGroup.userData = {
+    id: 'volleyballCourt',
+    title: 'Sân bóng chuyền phong trào DK Bike',
+    type: 'sports',
+    desc: 'Sân bóng chuyền tiêu chuẩn mặt đệm acrylic ngoài trời phục vụ rèn luyện thể chất sau giờ làm việc cho CBNV nhà máy DK Bike. Đang diễn ra trận đấu giao hữu sôi nổi giữa Xưởng Lắp Ráp DK1 và Khối Kỹ Thuật R&D.',
+    zone: 'DK1',
+  };
+
+  // 1. Acrylic Court Base & Markings (Standard 18m x 9m court + 22m x 13m perimeter pad)
+  const padGeo = new THREE.PlaneGeometry(22, 13);
+  const padMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.8 }); // Royal Ocean Blue run-off
+  const pad = new THREE.Mesh(padGeo, padMat);
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.y = 0.035;
+  pad.receiveShadow = true;
+  volleyballCourtGroup.add(pad);
+
+  // Inner court (18m along X, 9m along Z) in vibrant Olympic terracotta orange
+  const courtGeo = new THREE.PlaneGeometry(18, 9);
+  const courtMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.75 });
+  const court = new THREE.Mesh(courtGeo, courtMat);
+  court.rotation.x = -Math.PI / 2;
+  court.position.y = 0.04;
+  court.receiveShadow = true;
+  volleyballCourtGroup.add(court);
+
+  // White boundary lines (0.12m width)
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+  
+  // End lines (x = -9 and x = 9)
+  [-9, 9].forEach((lx) => {
+    const endLine = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 9), lineMat);
+    endLine.rotation.x = -Math.PI / 2;
+    endLine.position.set(lx, 0.045, 0);
+    volleyballCourtGroup.add(endLine);
+  });
+
+  // Side lines (z = -4.5 and z = 4.5)
+  [-4.5, 4.5].forEach((lz) => {
+    const sideLine = new THREE.Mesh(new THREE.PlaneGeometry(18, 0.12), lineMat);
+    sideLine.rotation.x = -Math.PI / 2;
+    sideLine.position.set(0, 0.045, lz);
+    volleyballCourtGroup.add(sideLine);
+  });
+
+  // Center line under net (x = 0)
+  const centerLine = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 9), lineMat);
+  centerLine.rotation.x = -Math.PI / 2;
+  centerLine.position.set(0, 0.045, 0);
+  volleyballCourtGroup.add(centerLine);
+
+  // 3-meter attack lines (x = -3 and x = 3)
+  [-3, 3].forEach((ax) => {
+    const attackLine = new THREE.Mesh(new THREE.PlaneGeometry(0.10, 9), lineMat);
+    attackLine.rotation.x = -Math.PI / 2;
+    attackLine.position.set(ax, 0.045, 0);
+    volleyballCourtGroup.add(attackLine);
+  });
+
+  // 2. Net & Steel Posts
+  const postMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.6, roughness: 0.3 });
+  const postGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.7, 8);
+  [-5.2, 5.2].forEach((pz) => {
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(0, 1.35, pz);
+    post.castShadow = true;
+    volleyballCourtGroup.add(post);
+
+    // Post padding protector
+    const pPad = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.2, 8), postMat);
+    pPad.position.set(0, 0.6, pz);
+    volleyballCourtGroup.add(pPad);
+  });
+
+  // Net Mesh (height 1.0m, spans from z = -4.7 to 4.7, top at y = 2.43m)
+  const netMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.65,
+    roughness: 0.9,
+    side: THREE.DoubleSide,
+    wireframe: true,
+  });
+  const netMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.01, 1.0), netMat);
+  netMesh.scale.set(1, 1, 9.4);
+  netMesh.rotation.y = Math.PI / 2;
+  netMesh.position.set(0, 1.93, 0);
+  volleyballCourtGroup.add(netMesh);
+
+  // White top tape (băng viền mép trên 7cm)
+  const tapeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const topTape = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 9.4), tapeMat);
+  topTape.position.set(0, 2.43, 0);
+  volleyballCourtGroup.add(topTape);
+
+  const botTape = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 9.4), tapeMat);
+  botTape.position.set(0, 1.43, 0);
+  volleyballCourtGroup.add(botTape);
+
+  // Red/white striped antenna rods on top of net
+  [-4.5, 4.5].forEach((az) => {
+    const antenna = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    antenna.position.set(0, 2.83, az);
+    volleyballCourtGroup.add(antenna);
+  });
+
+  // 3. Referee High Chair (Ghế trọng tài đứng)
+  const refGroup = new THREE.Group();
+  refGroup.position.set(0, 0, 5.8);
+  const ladderMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.5 });
+  const standBase = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 1.0), ladderMat);
+  standBase.position.y = 0.05;
+  refGroup.add(standBase);
+  const standPlatform = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.8), ladderMat);
+  standPlatform.position.y = 1.9;
+  refGroup.add(standPlatform);
+  for (let c = 0; c < 4; c++) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), ladderMat);
+    leg.position.set((c % 2 === 0 ? 0.35 : -0.35), 0.95, (c < 2 ? 0.3 : -0.3));
+    refGroup.add(leg);
+  }
+  // Referee standing on chair
+  const refPerson = createCharacter({
+    shirtColor: 0xffffff,
+    pantsColor: 0x1e293b,
+    hatType: 'cap',
+    hatColor: 0xef4444,
+    role: 'athlete',
+  });
+  refPerson.position.set(0, 1.94, 0);
+  refPerson.rotation.y = -Math.PI / 2;
+  refGroup.add(refPerson);
+  volleyballCourtGroup.add(refGroup);
+
+  // 4. Scoreboard & Sideline Player Bench
+  const benchGroup = new THREE.Group();
+  benchGroup.position.set(0, 0, -6.5);
+  const benchWood = new THREE.Mesh(
+    new THREE.BoxGeometry(4.0, 0.1, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
+  );
+  benchWood.position.y = 0.45;
+  benchGroup.add(benchWood);
+  [-1.6, 1.6].forEach((bx) => {
+    const bLeg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.45), ladderMat);
+    bLeg.position.set(bx, 0.225, 0);
+    benchGroup.add(bLeg);
+  });
+  // Cheering teammates on bench
+  const sub1 = createCharacter({
+    shirtColor: 0xdc2626,
+    pantsColor: 0x1e293b,
+    hatType: 'headband',
+    role: 'athlete',
+    pose: 'sitting',
+  });
+  sub1.position.set(-1.0, 0.45, 0);
+  sub1.rotation.y = Math.PI / 2;
+  benchGroup.add(sub1);
+
+  const sub2 = createCharacter({
+    shirtColor: 0x06b6d4,
+    pantsColor: 0xffffff,
+    hatType: 'cap',
+    hatColor: 0x06b6d4,
+    role: 'athlete',
+    pose: 'sitting',
+  });
+  sub2.position.set(1.0, 0.45, 0);
+  sub2.rotation.y = Math.PI / 2;
+  benchGroup.add(sub2);
+
+  // Scoreboard: DK BIKE CUP 2026
+  const sbPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6), ladderMat);
+  sbPole.position.set(3.2, 1.1, 0);
+  benchGroup.add(sbPole);
+  const sbBoard = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.8, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 })
+  );
+  sbBoard.position.set(3.2, 1.8, 0);
+  benchGroup.add(sbBoard);
+  volleyballCourtGroup.add(benchGroup);
+
+  // 5. 6 ACTIVE PLAYERS IN THE MATCH
+  // Team A (DK1 Assembly Team - Red jerseys #7, #10, #3)
+  const pA1 = createCharacter({
+    shirtColor: 0xdc2626,
+    pantsColor: 0x1e293b,
+    hatType: 'headband',
+    role: 'athlete',
+    pose: 'spike',
+    jerseyNumber: '7',
+  });
+  pA1.position.set(-1.8, 0, -1.0); // Spiker near net
+  pA1.rotation.y = Math.PI / 2;
+  volleyballCourtGroup.add(pA1);
+  volleyballPlayers.push({ group: pA1, role: 'spikerA', rightArm: pA1.userData.rightArm });
+
+  const pA2 = createCharacter({
+    shirtColor: 0xdc2626,
+    pantsColor: 0x1e293b,
+    hatType: 'hair',
+    role: 'athlete',
+    pose: 'set',
+    jerseyNumber: '10',
+  });
+  pA2.position.set(-2.0, 0, 2.5); // Setter
+  pA2.rotation.y = Math.PI / 2.5;
+  volleyballCourtGroup.add(pA2);
+  volleyballPlayers.push({ group: pA2, role: 'setterA' });
+
+  const pA3 = createCharacter({
+    shirtColor: 0xdc2626,
+    pantsColor: 0x1e293b,
+    hatType: 'cap',
+    hatColor: 0xdc2626,
+    role: 'athlete',
+    pose: 'bump',
+    jerseyNumber: '3',
+  });
+  pA3.position.set(-6.5, 0, 0); // Libero / Defender
+  pA3.rotation.y = Math.PI / 2;
+  volleyballCourtGroup.add(pA3);
+  volleyballPlayers.push({ group: pA3, role: 'liberoA' });
+
+  // Team B (R&D Technical Team - Cyan jerseys #8, #5, #1)
+  const pB1 = createCharacter({
+    shirtColor: 0x06b6d4,
+    pantsColor: 0xffffff,
+    hatType: 'headband',
+    role: 'athlete',
+    pose: 'block',
+    jerseyNumber: '8',
+  });
+  pB1.position.set(1.8, 0, -1.0); // Blocker at net
+  pB1.rotation.y = -Math.PI / 2;
+  volleyballCourtGroup.add(pB1);
+  volleyballPlayers.push({ group: pB1, role: 'blockerB' });
+
+  const pB2 = createCharacter({
+    shirtColor: 0x06b6d4,
+    pantsColor: 0xffffff,
+    hatType: 'hair',
+    role: 'athlete',
+    pose: 'set',
+    jerseyNumber: '5',
+  });
+  pB2.position.set(2.5, 0, 2.5); // Setter / Spiker B
+  pB2.rotation.y = -Math.PI / 2.5;
+  volleyballCourtGroup.add(pB2);
+  volleyballPlayers.push({ group: pB2, role: 'spikerB' });
+
+  const pB3 = createCharacter({
+    shirtColor: 0x06b6d4,
+    pantsColor: 0xffffff,
+    hatType: 'cap',
+    hatColor: 0x06b6d4,
+    role: 'athlete',
+    pose: 'bump',
+    jerseyNumber: '1',
+  });
+  pB3.position.set(6.5, 0, 0); // Receiver / Defender
+  pB3.rotation.y = -Math.PI / 2;
+  volleyballCourtGroup.add(pB3);
+  volleyballPlayers.push({ group: pB3, role: 'defenderB' });
+
+  // 6. Tricolor Animated Volleyball
+  const ballGeo = new THREE.DodecahedronGeometry(0.18, 2);
+  const ballMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15,
+    roughness: 0.35,
+    metalness: 0.1,
+  });
+  volleyballMesh = new THREE.Mesh(ballGeo, ballMat);
+  volleyballMesh.position.set(44, 2.4, -12);
+  volleyballMesh.castShadow = true;
+  scene.add(volleyballMesh);
+
+  scene.add(volleyballCourtGroup);
+  interactiveObjects.push(volleyballCourtGroup);
+}
+
+// ============================================================================
+// Ao cá đồi sinh thái DK2 (Theo mũi tên ảnh 2)
+// ============================================================================
+function buildDK2HillPond() {
+  const pondGroup = new THREE.Group();
+  pondGroup.position.set(-110, 5.2, -63);
+  pondGroup.userData = {
+    id: 'aoCaDK2',
+    title: 'Ao cá đồi sinh thái DK2',
+    type: 'landscape',
+    desc: 'Hồ cá sinh thái tự nhiên trên sườn đồi bậc thang DK2, nguồn nước mát tự nhiên nuôi thả các loài cá Koi và cá chép cảnh. Điểm dừng chân thư giãn lý tưởng ngắm toàn cảnh nhà máy từ trên cao.',
+    zone: 'DK2',
+  };
+
+  // 1. Natural Granite Boulder Retaining Rim
+  const boulderMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.9, flatShading: true });
+  const mossMat = new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.85, flatShading: true });
+  const boulderGeo = new THREE.DodecahedronGeometry(0.9, 1);
+  const boulderCount = 26;
+  const radiusX = 8.5;
+  const radiusZ = 6.2;
+
+  for (let i = 0; i < boulderCount; i++) {
+    const angle = (i / boulderCount) * Math.PI * 2;
+    const bx = Math.cos(angle) * (radiusX + (Math.sin(angle * 3) * 0.6));
+    const bz = Math.sin(angle) * (radiusZ + (Math.cos(angle * 2) * 0.5));
+    const s = 0.75 + Math.random() * 0.45;
+
+    const boulder = new THREE.Mesh(boulderGeo, i % 3 === 0 ? mossMat : boulderMat);
+    boulder.position.set(bx, (Math.random() - 0.5) * 0.2, bz);
+    boulder.scale.set(s, s * 0.8, s);
+    boulder.rotation.set(Math.random(), Math.random(), Math.random());
+    boulder.castShadow = true;
+    boulder.receiveShadow = true;
+    pondGroup.add(boulder);
+  }
+
+  // 2. Crystal Emerald Water Surface
+  const waterGeo = new THREE.CircleGeometry(radiusX - 0.4, 32);
+  const waterMat = new THREE.MeshStandardMaterial({
+    color: 0x0284c7, // Vibrant azure mountain water
+    roughness: 0.08,
+    metalness: 0.65,
+    transparent: true,
+    opacity: 0.88,
+  });
+  hillPondWater = new THREE.Mesh(waterGeo, waterMat);
+  hillPondWater.rotation.x = -Math.PI / 2;
+  hillPondWater.scale.set(1.0, radiusZ / radiusX, 1.0);
+  hillPondWater.position.y = 0.08;
+  pondGroup.add(hillPondWater);
+
+  // 3. Floating Lotus Pads & Pink Blossoms
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7, flatShading: true });
+  const flowerMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.5 });
+  const centerMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+  for (let l = 0; l < 12; l++) {
+    const lang = (l / 12) * Math.PI * 2 + Math.random() * 0.4;
+    const lradX = (radiusX * 0.3) + Math.random() * (radiusX * 0.45);
+    const lradZ = (radiusZ * 0.3) + Math.random() * (radiusZ * 0.45);
+    const lx = Math.cos(lang) * lradX;
+    const lz = Math.sin(lang) * lradZ;
+
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.02, 7), leafMat);
+    pad.position.set(lx, 0.10, lz);
+    pad.rotation.y = Math.random() * Math.PI;
+    pondGroup.add(pad);
+
+    // 5 Lotus Flowers
+    if (l % 2 === 0) {
+      const fl = new THREE.Group();
+      fl.position.set(lx, 0.12, lz);
+      for (let p = 0; p < 6; p++) {
+        const petal = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.15, 4), flowerMat);
+        petal.rotation.z = Math.PI / 4;
+        petal.rotation.y = (p / 6) * Math.PI * 2;
+        fl.add(petal);
+      }
+      const stamen = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), centerMat);
+      stamen.position.y = 0.06;
+      fl.add(stamen);
+      pondGroup.add(fl);
+    }
+  }
+
+  // 4. Wooden Viewing Deck & Footbridge
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 });
+  const deckGroup = new THREE.Group();
+  deckGroup.position.set(radiusX * 0.55, 0.15, -radiusZ * 0.2);
+
+  // Deck floor
+  const deckFloor = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.08, 4.0), timberMat);
+  deckFloor.receiveShadow = true;
+  deckGroup.add(deckFloor);
+
+  // Deck pilings
+  const pileMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9 });
+  [
+    { x: -1.6, z: -1.8 },
+    { x: 1.6, z: -1.8 },
+    { x: -1.6, z: 1.8 },
+    { x: 1.6, z: 1.8 },
+  ].forEach((pp) => {
+    const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.4, 6), pileMat);
+    pile.position.set(pp.x, -0.65, pp.z);
+    deckGroup.add(pile);
+  });
+
+  // Deck railings
+  const railPostGeo = new THREE.BoxGeometry(0.06, 0.9, 0.06);
+  const railBarGeo = new THREE.BoxGeometry(0.04, 0.06, 4.0);
+  const railPost1 = new THREE.Mesh(railPostGeo, timberMat);
+  railPost1.position.set(-1.7, 0.45, -1.9);
+  deckGroup.add(railPost1);
+  const railPost2 = new THREE.Mesh(railPostGeo, timberMat);
+  railPost2.position.set(-1.7, 0.45, 1.9);
+  deckGroup.add(railPost2);
+  const handrail = new THREE.Mesh(railBarGeo, timberMat);
+  handrail.position.set(-1.7, 0.85, 0);
+  deckGroup.add(handrail);
+
+  // Friendly Caretaker in conical hat feeding fish
+  const feeder = createCharacter({
+    shirtColor: 0x16a34a,
+    pantsColor: 0x334155,
+    hatType: 'conical',
+    role: 'farmer',
+  });
+  feeder.position.set(-1.2, 0.04, 0);
+  feeder.rotation.y = -Math.PI / 2;
+  deckGroup.add(feeder);
+
+  pondGroup.add(deckGroup);
+
+  // 5. 8 Animated Low-Poly Koi Fish
+  const koiColors = [
+    { name: 'Kohaku', body: 0xffffff, spot: 0xef4444 }, // White & Red
+    { name: 'Sanke', body: 0xffffff, spot: 0x0f172a }, // White & Black
+    { name: 'Ogon', body: 0xf59e0b, spot: 0xfbbf24 }, // Golden
+    { name: 'Hi Utsuri', body: 0xdc2626, spot: 0x18181b }, // Red & Black
+  ];
+
+  for (let k = 0; k < 8; k++) {
+    const fGroup = new THREE.Group();
+    const colorInfo = koiColors[k % koiColors.length];
+    const bodyMat = new THREE.MeshStandardMaterial({ color: colorInfo.body, roughness: 0.35 });
+    const spotMat = new THREE.MeshStandardMaterial({ color: colorInfo.spot, roughness: 0.35 });
+
+    // Sleek koi body
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.52, 6), bodyMat);
+    body.rotation.x = Math.PI / 2;
+    fGroup.add(body);
+
+    // Color spot on back
+    const spot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.22), spotMat);
+    spot.position.set(0, 0.05, 0.05);
+    fGroup.add(spot);
+
+    // Fin & Tail
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.18), spotMat);
+    tail.position.set(0, 0, -0.32);
+    fGroup.add(tail);
+
+    const orbitRadiusX = 3.0 + (k % 4) * 1.1;
+    const orbitRadiusZ = 2.0 + (k % 4) * 0.8;
+    const speed = 0.5 + Math.random() * 0.3;
+    const initialAngle = (k / 8) * Math.PI * 2;
+
+    pondGroup.add(fGroup);
+    hillPondKoiFishes.push({
+      mesh: fGroup,
+      tail: tail,
+      centerX: 0,
+      centerZ: 0,
+      radiusX: orbitRadiusX,
+      radiusZ: orbitRadiusZ,
+      speed: speed,
+      angle: initialAngle,
+      baseY: -0.05 - (k % 3) * 0.04,
+      phase: k * 1.5,
+    });
+  }
+
+  scene.add(pondGroup);
+  interactiveObjects.push(pondGroup);
+}
+
+// ============================================================================
+// Đàn gà thả đồi sinh thái DK2 (Theo mũi tên ảnh 2)
+// ============================================================================
+function buildFreeRangeChickens() {
+  const flockGroup = new THREE.Group();
+  flockGroup.position.set(-122, 4.0, -48);
+  flockGroup.userData = {
+    id: 'doiGaDK2',
+    title: 'Đàn gà thả đồi sinh thái DK2',
+    type: 'livestock',
+    desc: 'Mô hình nông nghiệp sinh thái tuần hoàn trên sườn đồi bậc thang DK2. Đàn gà thả tự nhiên trên thảm cỏ xanh, tận dụng không gian cảnh quan và tạo hệ sinh thái xanh thân thiện môi trường.',
+    zone: 'DK2',
+  };
+
+  // 1. Rustic Wooden Chicken Coop / Shelter (Chuồng gà gỗ mái rơm)
+  const coopMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+  const strawMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85, flatShading: true });
+
+  const coopWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.8, 2.4), coopMat);
+  coopWall.position.set(-4.0, 0.9, -3.0);
+  coopWall.castShadow = true;
+  flockGroup.add(coopWall);
+
+  const coopRoof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.2, 4), strawMat);
+  coopRoof.rotation.y = Math.PI / 4;
+  coopRoof.position.set(-4.0, 2.3, -3.0);
+  coopRoof.castShadow = true;
+  flockGroup.add(coopRoof);
+
+  // Feeding trough with corn grains
+  const trough = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.2, 0.4), coopMat);
+  trough.position.set(-1.8, 0.1, -1.5);
+  flockGroup.add(trough);
+
+  const corn = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.08, 0.3),
+    new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+  );
+  corn.position.set(-1.8, 0.22, -1.5);
+  flockGroup.add(corn);
+
+  // 2. 12 Low-Poly Chickens & Roosters
+  const createChicken = (isRooster, isChick, colorHex) => {
+    const chk = new THREE.Group();
+    const scale = isChick ? 0.35 : (isRooster ? 1.15 : 0.9);
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.75, flatShading: true });
+    const redMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
+    const yellowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+    // Torso
+    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 1), bodyMat);
+    body.scale.set(1.0, 0.85, 1.3);
+    body.position.y = 0.32;
+    body.castShadow = true;
+    chk.add(body);
+
+    // Head & Neck group (rotates during pecking)
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.45, 0.24);
+
+    const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.14), bodyMat);
+    headGroup.add(headMesh);
+
+    // Beak
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 4), yellowMat);
+    beak.rotation.x = Math.PI / 2;
+    beak.position.set(0, -0.02, 0.12);
+    headGroup.add(beak);
+
+    // Red Comb
+    const comb = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, isRooster ? 0.14 : 0.06, isRooster ? 0.16 : 0.08),
+      redMat
+    );
+    comb.position.set(0, isRooster ? 0.12 : 0.08, 0.02);
+    headGroup.add(comb);
+
+    // Wattles under beak (for roosters)
+    if (isRooster) {
+      const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.08, 0.05), redMat);
+      wattle.position.set(0, -0.10, 0.08);
+      headGroup.add(wattle);
+    }
+
+    chk.add(headGroup);
+
+    // Tail Feathers
+    if (isRooster) {
+      // Magnificent arched sickle feathers
+      const tailFeatherMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
+      for (let tf = 0; tf < 3; tf++) {
+        const feather = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.12), tailFeatherMat);
+        feather.rotation.x = -Math.PI / 3 - tf * 0.15;
+        feather.rotation.y = (tf - 1) * 0.15;
+        feather.position.set((tf - 1) * 0.04, 0.42, -0.32);
+        chk.add(feather);
+      }
+    } else if (!isChick) {
+      const henTail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.10), bodyMat);
+      henTail.rotation.x = -Math.PI / 4;
+      henTail.position.set(0, 0.40, -0.28);
+      chk.add(henTail);
+    }
+
+    // Legs
+    const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.22, 4);
+    [-0.08, 0.08].forEach((lx) => {
+      const leg = new THREE.Mesh(legGeo, yellowMat);
+      leg.position.set(lx, 0.11, 0);
+      chk.add(leg);
+    });
+
+    chk.scale.set(scale, scale, scale);
+    return { mesh: chk, head: headGroup };
+  };
+
+  // Positions on the grassy hill slope
+  const chickenConfigs = [
+    // 2 Roosters (Gà trống dũng mãnh)
+    { isRooster: true, isChick: false, color: 0xd97706, x: 0.5, z: 0.8, rot: 0.5 },
+    { isRooster: true, isChick: false, color: 0x9a3412, x: -3.2, z: 1.2, rot: -1.2 },
+    // 6 Hens (Gà mái béo tốt)
+    { isRooster: false, isChick: false, color: 0xd97706, x: -1.0, z: -0.5, rot: 1.8 },
+    { isRooster: false, isChick: false, color: 0x78350f, x: 1.8, z: -1.2, rot: -0.4 },
+    { isRooster: false, isChick: false, color: 0xf8fafc, x: -0.5, z: 2.2, rot: 2.4 },
+    { isRooster: false, isChick: false, color: 0xb45309, x: 2.5, z: 1.5, rot: -2.1 },
+    { isRooster: false, isChick: false, color: 0xd97706, x: -2.4, z: -1.8, rot: 0.8 },
+    { isRooster: false, isChick: false, color: 0xf8fafc, x: 3.2, z: -0.2, rot: -1.5 },
+    // 4 Baby Chicks (Gà con lon ton)
+    { isRooster: false, isChick: true, color: 0xfde047, x: -1.4, z: -0.8, rot: 1.2 },
+    { isRooster: false, isChick: true, color: 0xfde047, x: -1.1, z: -1.0, rot: 0.4 },
+    { isRooster: false, isChick: true, color: 0xfde047, x: -0.7, z: -0.7, rot: -0.8 },
+    { isRooster: false, isChick: true, color: 0xfde047, x: -0.9, z: -0.2, rot: 2.0 },
+  ];
+
+  chickenConfigs.forEach((cfg, idx) => {
+    const chkObj = createChicken(cfg.isRooster, cfg.isChick, cfg.color);
+    chkObj.mesh.position.set(cfg.x, 0, cfg.z);
+    chkObj.mesh.rotation.y = cfg.rot;
+    flockGroup.add(chkObj.mesh);
+
+    hillChickens.push({
+      id: idx,
+      mesh: chkObj.mesh,
+      head: chkObj.head,
+      peckTimer: Math.random() * 10,
+      peckSpeed: 2.5 + Math.random() * 2.0,
+    });
+  });
+
+  scene.add(flockGroup);
+  interactiveObjects.push(flockGroup);
 }
 
 // ============================================================================
@@ -3780,6 +4840,93 @@ function updateAnimatedObjects(delta, time) {
       fish.tail.rotation.y = Math.sin(time * 0.015) * 0.45;
     }
   });
+
+  // 19. Trận đấu bóng chuyền phong trào DK1 (Ảnh 1)
+  if (volleyballMesh) {
+    volleyballRallyProgress = (volleyballRallyProgress + delta * 0.95) % 6.0;
+    const vp = volleyballRallyProgress;
+    let bx = 44, by = 2.4, bz = -12;
+
+    // 6-phase dynamic rally:
+    // 0.0 - 1.2: Dig/pass from Team A backcourt (37.5, -12) to Setter A2 (42.0, -9.5)
+    if (vp < 1.2) {
+      const t = vp / 1.2;
+      bx = THREE.MathUtils.lerp(37.5, 42.0, t);
+      bz = THREE.MathUtils.lerp(-12.0, -9.5, t);
+      by = 1.0 + Math.sin(t * Math.PI) * 2.2;
+    }
+    // 1.2 - 2.2: Setter A2 tosses high set to Spiker A1 (42.2, -13)
+    else if (vp < 2.2) {
+      const t = (vp - 1.2) / 1.0;
+      bx = THREE.MathUtils.lerp(42.0, 42.2, t);
+      bz = THREE.MathUtils.lerp(-9.5, -13.0, t);
+      by = 1.6 + Math.sin(t * Math.PI) * 2.6;
+    }
+    // 2.2 - 3.4: Spiker A1 smashes ball over net towards Team B backcourt (50.5, -12)
+    else if (vp < 3.4) {
+      const t = (vp - 2.2) / 1.2;
+      bx = THREE.MathUtils.lerp(42.2, 50.5, t);
+      bz = THREE.MathUtils.lerp(-13.0, -12.0, t);
+      by = 3.2 - t * 2.2 + Math.sin(t * Math.PI) * 0.8;
+      by = Math.max(0.6, by);
+    }
+    // 3.4 - 4.6: Team B Defender B3 digs ball up towards Setter B2 (46.5, -9.5)
+    else if (vp < 4.6) {
+      const t = (vp - 3.4) / 1.2;
+      bx = THREE.MathUtils.lerp(50.5, 46.5, t);
+      bz = THREE.MathUtils.lerp(-12.0, -9.5, t);
+      by = 0.8 + Math.sin(t * Math.PI) * 2.3;
+    }
+    // 4.6 - 6.0: Setter B2 attacks ball back to Team A court (37.5, -12)
+    else {
+      const t = (vp - 4.6) / 1.4;
+      bx = THREE.MathUtils.lerp(46.5, 37.5, t);
+      bz = THREE.MathUtils.lerp(-9.5, -12.0, t);
+      by = 2.8 - t * 1.8 + Math.sin(t * Math.PI) * 0.9;
+      by = Math.max(0.6, by);
+    }
+
+    volleyballMesh.position.set(bx, by, bz);
+    volleyballMesh.rotation.x += delta * 12;
+    volleyballMesh.rotation.y += delta * 15;
+
+    // Animate jumping players
+    volleyballPlayers.forEach((p) => {
+      if (p.role === 'spikerA') {
+        const jumpPhase = Math.sin(Math.max(0, Math.min(Math.PI, (vp - 1.9) * 5.0)));
+        p.group.position.y = jumpPhase * 0.85;
+        if (p.rightArm) p.rightArm.rotation.x = -2.6 + jumpPhase * 1.2;
+      } else if (p.role === 'blockerB') {
+        const jumpPhase = Math.sin(Math.max(0, Math.min(Math.PI, (vp - 2.1) * 4.5)));
+        p.group.position.y = jumpPhase * 0.8;
+      } else if (p.role === 'spikerB') {
+        const jumpPhase = Math.sin(Math.max(0, Math.min(Math.PI, (vp - 4.4) * 5.0)));
+        p.group.position.y = jumpPhase * 0.8;
+      }
+    });
+  }
+
+  // 20. Đàn cá Koi bơi lội trong ao cá đồi DK2 (Ảnh 2)
+  hillPondKoiFishes.forEach((fish) => {
+    fish.angle += delta * fish.speed;
+    const fx = fish.centerX + Math.cos(fish.angle) * fish.radiusX;
+    const fz = fish.centerZ + Math.sin(fish.angle) * fish.radiusZ;
+    fish.mesh.position.set(fx, fish.baseY, fz);
+    fish.mesh.rotation.y = -fish.angle + Math.PI / 2;
+    if (fish.tail) {
+      fish.tail.rotation.y = Math.sin(time * 0.012 + fish.phase) * 0.45;
+    }
+  });
+
+  // 21. Đàn gà đi bộ và mổ thóc trên đồi DK2 (Ảnh 2)
+  hillChickens.forEach((chk) => {
+    chk.peckTimer += delta * chk.peckSpeed;
+    const isPecking = Math.sin(chk.peckTimer) > 0.2;
+    if (chk.head) {
+      chk.head.rotation.x = isPecking ? 0.65 + Math.sin(chk.peckTimer * 4) * 0.25 : 0;
+    }
+    chk.mesh.rotation.y += Math.sin(time * 0.001 + chk.id) * 0.005;
+  });
 }
 
 
@@ -3887,6 +5034,7 @@ function createBuildingLabels() {
     { text: 'Mái che xe 3 bánh', pos: new THREE.Vector3(79.5, 5.0, -46), id: 'maiCheXe' },
     { text: '⚡ Trạm sạc nhanh EV', pos: new THREE.Vector3(26, 3.2, -24), id: 'chargerDK1' },
     { text: '🚪 Cửa xưởng & Bốc dỡ', pos: new THREE.Vector3(58, 5.2, -32), id: 'doorB1' },
+    { text: '🏐 Sân bóng chuyền DK1', pos: new THREE.Vector3(44, 3.8, -12), id: 'volleyballCourt' },
 
     // Tuyến đường sắt, Cầu vòm đỏ & Cảnh quan sinh thái mới (Theo ảnh mẫu)
     { text: '🚂 Tàu hơi nước & Đường sắt', pos: new THREE.Vector3(92, 5.5, -20), id: 'steamLoco' },
@@ -3899,8 +5047,11 @@ function createBuildingLabels() {
     // DK2
     { text: 'Nhà điều hành DK2 (HQ)', pos: new THREE.Vector3(-28, 13.0, -28), id: 'nhaDieuHanhDK2' },
     { text: 'Kho Linh kiện D2.1', pos: new THREE.Vector3(-78, 8.0, -68), id: 'khoLinhKienDK2' },
+    { text: '🏍️ Sân kiểm định xe DK2', pos: new THREE.Vector3(-75, 2.5, -15), id: 'xuongDK2' },
     { text: 'Sân xe thành phẩm DK2', pos: new THREE.Vector3(-78, 2.0, -45), id: 'sanThanhPhamDK2' },
     { text: 'Vườn Lan trên đồi', pos: new THREE.Vector3(-130, 22.0, -82), id: 'vuonLanDK2' },
+    { text: '🐟 Ao cá đồi sinh thái', pos: new THREE.Vector3(-110, 8.5, -63), id: 'aoCaDK2' },
+    { text: '🐓 Đàn gà thả đồi', pos: new THREE.Vector3(-122, 6.5, -48), id: 'doiGaDK2' },
     { text: 'Hồ sinh thái tròn', pos: new THREE.Vector3(-108, 3.0, -65), id: 'hoTronDK2' },
   ];
 
@@ -4140,6 +5291,26 @@ function showInteractiveModal(data) {
     height.innerText = 'Đỉnh đồi cao +25m';
     area.innerText = 'Cối xay gió phong cách Hà Lan';
     roof.innerText = 'Cánh quạt quay êm đềm trong gió';
+  } else if (data.type === 'sports') {
+    dim.innerText = 'Kích thước: 18.0m × 9.0m';
+    height.innerText = 'Lưới thi đấu cao: 2.43m';
+    area.innerText = 'Mặt sân đệm Acrylic thể thao';
+    roof.innerText = '6 cầu thủ đang thi đấu giao hữu sôi nổi';
+  } else if (data.type === 'landscape') {
+    dim.innerText = 'Ao cá đồi: 17.0m × 12.4m';
+    height.innerText = 'Cốt đồi cao: +5.2m';
+    area.innerText = 'Mặt nước xanh ngọc nuôi cá Koi & Sen';
+    roof.innerText = 'Có cầu sàn gỗ và nghệ nhân cho cá ăn';
+  } else if (data.type === 'livestock') {
+    dim.innerText = 'Đàn 12 chú gà thả tự nhiên';
+    height.innerText = '2 gà trống, 6 gà mái, 4 gà con';
+    area.innerText = 'Sườn đồi cỏ xanh ngát phân khu DK2';
+    roof.innerText = 'Có chuồng gỗ mái rơm và máng ngô ăn';
+  } else if (data.type === 'yard') {
+    dim.innerText = '88.0m × 22.0m';
+    height.innerText = 'Cốt mặt sân 0.00';
+    area.innerText = '1.936 m² bê tông phẳng';
+    roof.innerText = 'Làn kiểm định phanh & 44 ô đỗ xe thành phẩm';
   } else {
     dim.innerText = '--';
     height.innerText = '--';
