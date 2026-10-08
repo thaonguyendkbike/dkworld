@@ -37,11 +37,47 @@ let lotusLeaves = [];
 let riverFishGroup;
 let chimneySmokePuffs = [];
 
-// Animated Characters & People
+// Animated Characters & People (Khối 7: Người)
 let walkingWorkers = [];
+let wanderingPedestrians = [];
+let nightReflectiveMaterials = [];
+let securityFlashlights = [];
+let socialGroups = [];
 let flagMeshes = [];
 let roofVentilators = [];
 let birdFlockGroup, birdMeshes = [];
+
+// Waypoint Network Graph cho người đi bộ khắp khuôn viên DK1 & DK2 (Khối 7)
+const CAMPUS_WAYPOINTS = [
+  // Phân khu DK1
+  { id: 0, x: 74, y: 0, z: -18, neighbors: [1] },             // Cổng chính DK1
+  { id: 1, x: 62, y: 0, z: -22, neighbors: [0, 2, 6] },         // Sân trước Nhà B
+  { id: 2, x: 42, y: 0, z: -22, neighbors: [1, 3, 5] },         // Sân trước Nhà A
+  { id: 3, x: 26, y: 0, z: -20, neighbors: [2, 4, 7] },         // Trạm sạc EV & sảnh Nhà A
+  { id: 4, x: 22, y: 0, z: -12, neighbors: [3, 5] },            // Hiên Nhà Ăn CBNV
+  { id: 5, x: 38, y: 0, z: -12, neighbors: [2, 4, 6] },         // Lối đi bên sân bóng chuyền
+  { id: 6, x: 60, y: 0, z: -28, neighbors: [1, 5, 8] },         // Khu bốc dỡ Nhà B
+  { id: 7, x: 28, y: 0, z: -4, neighbors: [3, 9] },            // Đầu vạch đi bộ qua đường DK1 (Zebra)
+  { id: 8, x: 70, y: 0, z: -42, neighbors: [1, 6] },            // Sân kiểm định sau Xưởng B
+
+  // Tuyến băng qua ĐT234 sang DK2
+  { id: 9, x: 28, y: 0, z: 4, neighbors: [7, 10] },            // Giữa đường ĐT234
+  { id: 10, x: -18, y: 0, z: 4, neighbors: [9, 11] },          // Vỉa hè đối diện ĐT234
+
+  // Phân khu DK2
+  { id: 11, x: -18, y: 0, z: -18, neighbors: [10, 12] },        // Cổng chính DK2
+  { id: 12, x: -28, y: 0, z: -24, neighbors: [11, 13] },        // Sân trước Nhà Điều Hành HQ
+  { id: 13, x: -38, y: 0, z: -28, neighbors: [12, 14, 15] },    // Cạnh hồ cá Koi & sảnh đón DK2
+  { id: 14, x: -52, y: 0, z: -32, neighbors: [13, 16] },        // Trạm sạc trung tâm DK2
+  { id: 15, x: -38, y: 0, z: -50, neighbors: [13, 17] },        // Lối vào dãy Kho D2.1
+  { id: 16, x: -72, y: 0, z: -30, neighbors: [14, 17] },        // Sân xe thành phẩm DK2
+  { id: 17, x: -72, y: 0, z: -55, neighbors: [15, 16, 18] },    // Cửa kho D2.1
+  { id: 18, x: -92, y: 0.5, z: -58, neighbors: [17, 19, 20] },  // Chân dốc đường mòn sinh thái
+
+  // Đồi sinh thái DK2
+  { id: 19, x: -108, y: 15.8, z: -82, neighbors: [18] },        // Đỉnh đồi Vườn Lan & Ao cá
+  { id: 20, x: -142, y: 18.2, z: -38, neighbors: [18] },        // Đỉnh Đồi Gà & Tháp bồ câu
+];
 
 // Volleyball match & court
 let volleyballMesh;
@@ -4636,10 +4672,285 @@ function buildPeopleAndCharacters() {
   scene.add(staff2);
   interactiveObjects.push(staff2);
 
-  // 9. Sân bóng chuyền ngoài trời & Các cầu thủ (theo khoanh đỏ ảnh 1)
+  // 9. Khu vực hiên Nhà Ăn CBNV: Cụm bàn ghế ăn trưa ngoài trời & Thưởng trà (Khối 7)
+  const diningPatio = new THREE.Group();
+  diningPatio.position.set(21, 0, -8.5);
+
+  const tableWoodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.75 });
+  const benchWoodMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.7 });
+  const tableMetalMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7 });
+
+  // Bàn ăn gỗ ngoài trời
+  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.08, 1.2), tableWoodMat);
+  tableTop.position.set(0, 0.76, 0);
+  tableTop.castShadow = true;
+  diningPatio.add(tableTop);
+
+  // Chân bàn thép đen
+  [-1.0, 1.0].forEach((tx) => {
+    const tLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.76, 6), tableMetalMat);
+    tLeg.position.set(tx, 0.38, 0);
+    diningPatio.add(tLeg);
+  });
+
+  // 2 Băng ghế dài hai bên bàn
+  [-0.9, 0.9].forEach((bz) => {
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.06, 0.42), benchWoodMat);
+    bench.position.set(0, 0.44, bz);
+    bench.castShadow = true;
+    diningPatio.add(bench);
+
+    [-0.9, 0.9].forEach((bx) => {
+      const bLeg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.44, 0.38), tableMetalMat);
+      bLeg.position.set(bx, 0.22, bz);
+      diningPatio.add(bLeg);
+    });
+  });
+
+  // Đĩa thức ăn, khay cơm và tách trà trên bàn
+  const trayMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.3, metalness: 0.6 });
+  const cupMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 });
+  [-0.6, 0.2, 0.7].forEach((px) => {
+    const foodTray = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.28), trayMat);
+    foodTray.position.set(px, 0.81, -0.2);
+    diningPatio.add(foodTray);
+
+    const teaCup = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.08, 8), cupMat);
+    teaCup.position.set(px + 0.14, 0.84, 0.2);
+    diningPatio.add(teaCup);
+  });
+
+  // 3 Nhân sự ngồi ăn trưa & trò chuyện thư giãn
+  const eater1 = createCharacter({
+    shirtColor: 0x0284c7, // Công nhân DK Bike
+    pantsColor: 0x1e293b,
+    hatType: 'helmet',
+    hatColor: 0xfacc15,
+    role: 'worker',
+    pose: 'sitting',
+  });
+  eater1.position.set(-0.6, 0, -0.9);
+  eater1.rotation.y = 0;
+  diningPatio.add(eater1);
+
+  const eater2 = createCharacter({
+    shirtColor: 0xf8fafc, // Nhân viên văn phòng
+    pantsColor: 0x334155,
+    hatType: 'hair',
+    role: 'office',
+    pose: 'sitting',
+  });
+  eater2.position.set(0.4, 0, -0.9);
+  eater2.rotation.y = Math.PI / 12;
+  diningPatio.add(eater2);
+
+  const eater3 = createCharacter({
+    shirtColor: 0xea580c, // Kỹ thuật viên bảo trì
+    pantsColor: 0x1e293b,
+    hatType: 'cap',
+    hatColor: 0x0f172a,
+    role: 'technician',
+    pose: 'sitting',
+  });
+  eater3.position.set(-0.1, 0, 0.9);
+  eater3.rotation.y = Math.PI;
+  diningPatio.add(eater3);
+
+  scene.add(diningPatio);
+  socialGroups.push({ type: 'lunch', members: [eater1, eater2, eater3] });
+
+  // 10. Nhóm 3 Cán bộ thảo luận công việc tại sân trước Nhà A (Khối 7)
+  const convGroup = new THREE.Group();
+  convGroup.position.set(34, 0, -25);
+
+  const talker1 = createCharacter({
+    shirtColor: 0xf8fafc,
+    pantsColor: 0x1e293b,
+    role: 'office',
+    holdingTablet: true,
+  });
+  talker1.position.set(-0.6, 0, 0);
+  talker1.rotation.y = Math.PI / 3;
+  convGroup.add(talker1);
+
+  const talker2 = createCharacter({
+    shirtColor: 0x0284c7,
+    pantsColor: 0x1e293b,
+    role: 'worker',
+    hatType: 'helmet',
+    hatColor: 0xfacc15,
+  });
+  talker2.position.set(0.6, 0, -0.4);
+  talker2.rotation.y = -Math.PI / 1.5;
+  convGroup.add(talker2);
+
+  const talker3 = createCharacter({
+    shirtColor: 0x10b981,
+    pantsColor: 0x334155,
+    role: 'visitor',
+    hasBackpack: true,
+  });
+  talker3.position.set(0, 0, 0.6);
+  talker3.rotation.y = Math.PI;
+  convGroup.add(talker3);
+
+  scene.add(convGroup);
+  socialGroups.push({ type: 'conversation', members: [talker1, talker2, talker3] });
+
+  // 11. Đội ngũ công nhân bốc xếp tại cửa Xưởng B & Nhà C (Khối 7)
+  const loader1 = createCharacter({
+    shirtColor: 0xea580c,
+    pantsColor: 0x1e293b,
+    role: 'worker',
+    hasVest: true,
+  });
+  loader1.position.set(56, 0, -31);
+  loader1.rotation.y = -Math.PI / 4;
+  scene.add(loader1);
+
+  const loader2 = createCharacter({
+    shirtColor: 0x0284c7,
+    pantsColor: 0x1e293b,
+    role: 'worker',
+    hasVest: true,
+    holdingTablet: true,
+  });
+  loader2.position.set(70, 0, -31.5);
+  loader2.rotation.y = Math.PI * 0.6;
+  scene.add(loader2);
+
+  // 12. Nghệ nhân & Khách tham quan trên đồi sinh thái DK2 (Khối 7)
+  // Người cho cá Koi ăn trên sàn gỗ ao cá đồi
+  const koiFeeder = createCharacter({
+    shirtColor: 0x0284c7,
+    pantsColor: 0x475569,
+    role: 'worker',
+    hatType: 'cap',
+    hatColor: 0x0284c7,
+  });
+  koiFeeder.position.set(-129, 16.5, -78);
+  koiFeeder.rotation.y = Math.PI * 0.75;
+  scene.add(koiFeeder);
+
+  // Người chăm sóc đàn gà & chim bồ câu trên đồi gà
+  const chickenKeeper = createCharacter({
+    shirtColor: 0x16a34a,
+    pantsColor: 0x78350f,
+    hatType: 'conical', // Nón lá mộc mạc
+    role: 'farmer',
+  });
+  chickenKeeper.position.set(-141, 18.5, -39);
+  chickenKeeper.rotation.y = Math.PI * 0.4;
+  scene.add(chickenKeeper);
+
+  // 13. Khởi tạo 16 Người đi bộ năng động theo mạng lưới Waypoint Graph khắp khuôn viên
+  const wanderingCount = CONFIG.PEOPLE ? CONFIG.PEOPLE.wanderingCount : 16;
+  for (let i = 0; i < wanderingCount; i++) {
+    createRandomCampusPedestrian(i);
+  }
+
+  // 14. Sân bóng chuyền ngoài trời & Các cầu thủ (theo khoanh đỏ ảnh 1)
   buildVolleyballCourt();
 }
 
+// Khởi tạo người đi bộ ngẫu nhiên trên mạng lưới Waypoint Graph (Khối 7)
+function createRandomCampusPedestrian(pedId) {
+  const rand = Math.random();
+  let role = 'worker';
+  let shirtColor = 0x0284c7;
+  let pantsColor = 0x1e293b;
+  let hatType = 'helmet';
+  let hatColor = 0xfacc15;
+  let holdingTablet = false;
+  let hasBackpack = false;
+  let backpackColor = null;
+
+  if (rand < 0.38) {
+    role = 'worker';
+    shirtColor = Math.random() < 0.5 ? 0x0284c7 : 0xea580c;
+    pantsColor = 0x1e293b;
+    hatType = 'helmet';
+    hatColor = Math.random() < 0.7 ? 0xfacc15 : 0xffffff;
+  } else if (rand < 0.65) {
+    role = 'office';
+    shirtColor = Math.random() < 0.5 ? 0xf8fafc : 0xbae6fd;
+    pantsColor = Math.random() < 0.5 ? 0x1e293b : 0x334155;
+    hatType = 'hair';
+    hatColor = null;
+  } else if (rand < 0.80) {
+    role = 'technician';
+    shirtColor = 0xf97316;
+    pantsColor = 0x1e293b;
+    hatType = 'cap';
+    hatColor = 0x0f172a;
+    holdingTablet = Math.random() < 0.45;
+  } else if (rand < 0.90) {
+    role = 'security';
+    shirtColor = 0x1e3a8a;
+    pantsColor = 0x0f172a;
+    hatType = 'security';
+    hatColor = 0x1e3a8a;
+  } else {
+    role = 'visitor';
+    const visitorColors = [0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0x06b6d4];
+    shirtColor = visitorColors[Math.floor(Math.random() * visitorColors.length)];
+    pantsColor = Math.random() < 0.5 ? 0x1e293b : 0x3b82f6;
+    hatType = Math.random() < 0.5 ? 'cap' : 'hair';
+    hatColor = shirtColor;
+    hasBackpack = Math.random() < 0.6;
+    backpackColor = 0xd97706;
+  }
+
+  const skinColors = [0xfbd38d, 0xf6ad55, 0xed8936, 0xffedd5];
+  const skinColor = skinColors[Math.floor(Math.random() * skinColors.length)];
+  const hairColors = [0x171717, 0x271c19, 0x451a03];
+  const hairColor = hairColors[Math.floor(Math.random() * hairColors.length)];
+  const heightScale = 0.93 + Math.random() * 0.14;
+
+  const charMesh = createCharacter({
+    role,
+    shirtColor,
+    pantsColor,
+    hatType,
+    hatColor,
+    skinColor,
+    hairColor,
+    holdingTablet,
+    hasBackpack,
+    backpackColor,
+    heightScale,
+  });
+
+  // Chọn waypoint xuất phát ngẫu nhiên
+  const startWPIndex = Math.floor(Math.random() * CAMPUS_WAYPOINTS.length);
+  const startWP = CAMPUS_WAYPOINTS[startWPIndex];
+  const neighbors = startWP.neighbors;
+  const targetWPIndex = neighbors[Math.floor(Math.random() * neighbors.length)];
+
+  // Độ lệch nhẹ hai bên lề đường
+  const offsetX = (Math.random() - 0.5) * 1.2;
+  const offsetZ = (Math.random() - 0.5) * 1.2;
+
+  charMesh.position.set(startWP.x + offsetX, startWP.y || 0, startWP.z + offsetZ);
+  scene.add(charMesh);
+
+  wanderingPedestrians.push({
+    id: pedId,
+    mesh: charMesh,
+    role,
+    currentIndex: startWPIndex,
+    targetIndex: targetWPIndex,
+    lastIndex: startWPIndex,
+    offsetX,
+    offsetZ,
+    speed: 1.4 + Math.random() * 0.7,
+    stepAngle: Math.random() * Math.PI * 2,
+    pauseTimer: Math.random() < 0.25 ? 1.5 + Math.random() * 2.5 : 0,
+    holdingTablet,
+  });
+}
+
+// Hàm khởi tạo mô hình nhân vật Low-Poly dễ thương tỉ lệ chuẩn diorama (Khối 7)
 function createCharacter({
   shirtColor = 0x0284c7,
   pantsColor = 0x1e293b,
@@ -4654,6 +4965,9 @@ function createCharacter({
   jerseyNumber = null,
   hasVest = false,
   shoeColor = null,
+  hasBackpack = false,
+  backpackColor = null,
+  heightScale = 1.0,
 }) {
   const charGroup = new THREE.Group();
 
@@ -4667,6 +4981,24 @@ function createCharacter({
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const silverMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.8 });
   const shoeMat = new THREE.MeshStandardMaterial({ color: shoeColor || (role === 'athlete' ? 0xffffff : 0x0f172a), roughness: 0.85 });
+
+  // Đăng ký vật liệu phản quang áo bảo hộ / mũ
+  if (role === 'worker' || role === 'kcs' || hasVest) {
+    nightReflectiveMaterials.push(silverMat);
+  }
+
+  // 0. BLOB SHADOW DƯỚI CHÂN (Khối 7: Bóng đổ phẳng low-poly dễ thương)
+  const shadowGeo = new THREE.CircleGeometry(0.32, 10);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x0f172a,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+  });
+  const blobShadow = new THREE.Mesh(shadowGeo, shadowMat);
+  blobShadow.rotation.x = -Math.PI / 2;
+  blobShadow.position.y = 0.015;
+  charGroup.add(blobShadow);
 
   // 1. HEAD & FACE
   const headGroup = new THREE.Group();
@@ -4735,6 +5067,7 @@ function createCharacter({
   if (resolvedHat === 'auto') {
     if (role === 'athlete') resolvedHat = 'headband';
     else if (role === 'farmer') resolvedHat = 'conical';
+    else if (role === 'security') resolvedHat = 'security';
     else if (hatColor) resolvedHat = 'helmet';
     else resolvedHat = 'hair';
   }
@@ -4757,6 +5090,20 @@ function createCharacter({
     const strip = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.02, 8), silverMat);
     strip.position.set(0, 0.145, 0);
     headGroup.add(strip);
+  } else if (resolvedHat === 'security') {
+    // Mũ Kepi bảo vệ màu xanh đen viền bạc
+    const capCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.16, 0.09, 8), hatMat);
+    capCrown.position.set(0, 0.14, 0);
+    headGroup.add(capCrown);
+
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.12), darkDetailMat);
+    visor.position.set(0, 0.10, 0.14);
+    visor.rotation.x = Math.PI / 10;
+    headGroup.add(visor);
+
+    const badge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.02), silverMat);
+    badge.position.set(0, 0.14, 0.165);
+    headGroup.add(badge);
   } else if (resolvedHat === 'cap') {
     // Baseball cap with visor
     const capCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.10, 8), hatMat);
@@ -4810,6 +5157,8 @@ function createCharacter({
   // Safety reflective vest (for workers or high-vis personnel)
   if (hasVest || role === 'worker' || role === 'kcs') {
     const vestMat = new THREE.MeshStandardMaterial({ color: 0x84cc16, roughness: 0.6 }); // Fluorescent lime
+    nightReflectiveMaterials.push(vestMat);
+
     const vestChest = new THREE.Mesh(new THREE.BoxGeometry(0.446, 0.30, 0.246), vestMat);
     vestChest.position.set(0, 0.12, 0);
     torsoGroup.add(vestChest);
@@ -4822,6 +5171,30 @@ function createCharacter({
     const refBand2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.03, 0.25), silverMat);
     refBand2.position.set(0, 0.06, 0);
     torsoGroup.add(refBand2);
+  }
+
+  // Office tie / lanyard
+  if (role === 'office') {
+    const tieMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, 0.02), tieMat);
+    tie.position.set(0, 0.08, 0.125);
+    torsoGroup.add(tie);
+  }
+
+  // Security badge on chest
+  if (role === 'security') {
+    const sBadge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.02), silverMat);
+    sBadge.position.set(-0.11, 0.18, 0.125);
+    torsoGroup.add(sBadge);
+  }
+
+  // Visitor backpack
+  if (hasBackpack) {
+    const packMat = new THREE.MeshStandardMaterial({ color: backpackColor || 0xd97706, roughness: 0.7 });
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.32, 0.12), packMat);
+    pack.position.set(0, 0.08, -0.16);
+    pack.castShadow = true;
+    torsoGroup.add(pack);
   }
 
   // Athlete Jersey number badge
@@ -4863,7 +5236,7 @@ function createCharacter({
 
     const isAthlete = role === 'athlete';
 
-    // Thigh (Pants or athletic shorts)
+    // Thigh
     const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.40, 0.18), pantsMat);
     thigh.position.set(0, -0.20, 0);
     thigh.castShadow = true;
@@ -4871,12 +5244,10 @@ function createCharacter({
 
     // Shin / Lower leg
     if (isAthlete) {
-      // Skin knee & calf
       const shin = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.24, 0.15), skinMat);
       shin.position.set(0, -0.46, 0);
       legGroup.add(shin);
 
-      // White sport socks
       const sock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.16), whiteMat);
       sock.position.set(0, -0.62, 0);
       legGroup.add(sock);
@@ -4928,7 +5299,7 @@ function createCharacter({
     upperArm.castShadow = true;
     armGroup.add(upperArm);
 
-    // Forearm (skin tone)
+    // Forearm
     const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.24, 0.10), skinMat);
     forearm.position.set(0, -0.32, 0);
     forearm.castShadow = true;
@@ -4953,7 +5324,31 @@ function createCharacter({
   charGroup.userData.leftArm = leftArm;
   charGroup.userData.rightArm = rightArm;
 
-  // 6. POSES & ACCESSORIES
+  // 6. POSES, ACCESSORIES & FLASHLIGHT
+  if (role === 'security') {
+    // Đèn pin cầm tay phát sáng ban đêm
+    const flGroup = new THREE.Group();
+    const flBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.03, 0.22, 6),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.7 })
+    );
+    flBody.rotation.x = Math.PI / 2;
+    flGroup.add(flBody);
+
+    const flLens = new THREE.Mesh(new THREE.CircleGeometry(0.03, 6), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+    flLens.position.z = 0.115;
+    flGroup.add(flLens);
+
+    const flLight = new THREE.PointLight(0xfef08a, 0, 14, 1.8);
+    flLight.position.set(0, 0, 0.22);
+    flGroup.add(flLight);
+    securityFlashlights.push(flLight);
+
+    flGroup.position.set(0, -0.42, 0.1);
+    rightArm.add(flGroup);
+    rightArm.rotation.x = -Math.PI / 6;
+  }
+
   if (holdingTablet) {
     const tab = new THREE.Mesh(
       new THREE.BoxGeometry(0.28, 0.03, 0.36),
@@ -4962,7 +5357,6 @@ function createCharacter({
     tab.position.set(0, 1.05, 0.25);
     charGroup.add(tab);
 
-    // Glowing screen
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(0.24, 0.32),
       new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
@@ -5015,6 +5409,10 @@ function createCharacter({
     rightLeg.rotation.x = -Math.PI / 2;
     leftArm.rotation.x = -Math.PI / 4;
     rightArm.rotation.x = -Math.PI / 4;
+  }
+
+  if (heightScale && heightScale !== 1.0) {
+    charGroup.scale.set(heightScale, heightScale, heightScale);
   }
 
   return charGroup;
@@ -6623,7 +7021,8 @@ function updateAnimatedObjects(delta, time) {
     }
   });
 
-  // 10. Công nhân đi bộ tuần tra & cử động chân tay
+  // 10. Hoạt cảnh người đi bộ, công nhân tuần tra & nhóm sinh hoạt (Khối 7: Người)
+  // A. Công nhân tuần tra cố định (Nhà A & Cầu vượt)
   walkingWorkers.forEach((w) => {
     w.mesh.position[w.axis] += w.dir * w.speed * delta;
     if (w.mesh.position[w.axis] >= w.maxX) {
@@ -6640,6 +7039,97 @@ function updateAnimatedObjects(delta, time) {
     if (w.mesh.userData.rightLeg) w.mesh.userData.rightLeg.rotation.x = -swing;
     if (w.mesh.userData.leftArm) w.mesh.userData.leftArm.rotation.x = -swing;
     if (w.mesh.userData.rightArm) w.mesh.userData.rightArm.rotation.x = swing;
+  });
+
+  // B. Người đi bộ năng động theo mạng lưới Waypoint Graph khắp khuôn viên (Khối 7)
+  const truckZPos = animatedTruck ? animatedTruck.position.z : -100;
+  const isTruckNearCrossing = Math.abs(truckZPos - 0) < 18;
+
+  wanderingPedestrians.forEach((p) => {
+    // Nếu đang tạm dừng (pause look-around)
+    if (p.pauseTimer > 0) {
+      p.pauseTimer -= delta;
+      if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x *= 0.88;
+      if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x *= 0.88;
+      if (p.mesh.userData.headGroup) {
+        p.mesh.userData.headGroup.rotation.y = Math.sin(time * 0.0025 + p.id) * 0.32;
+      }
+      return;
+    }
+
+    const currentWP = CAMPUS_WAYPOINTS[p.targetIndex];
+    if (!currentWP) return;
+
+    // Nhường xe tải khi qua vạch kẻ đường ĐT234 (Waypoints 9, 10)
+    if ((currentWP.id === 9 || currentWP.id === 10) && isTruckNearCrossing) {
+      if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x *= 0.88;
+      if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x *= 0.88;
+      return;
+    }
+
+    const currentPos = p.mesh.position;
+    const targetX = currentWP.x + p.offsetX;
+    const targetZ = currentWP.z + p.offsetZ;
+    const dx = targetX - currentPos.x;
+    const dz = targetZ - currentPos.z;
+    const distSq = dx * dx + dz * dz;
+
+    if (distSq < 0.6) {
+      // Đã tới waypoint: chọn waypoint tiếp theo từ danh sách neighbors
+      p.currentIndex = p.targetIndex;
+      const neighbors = currentWP.neighbors;
+      let nextIndex = neighbors[Math.floor(Math.random() * neighbors.length)];
+      if (nextIndex === p.lastIndex && neighbors.length > 1) {
+        const otherNeighbors = neighbors.filter((n) => n !== p.lastIndex);
+        if (otherNeighbors.length > 0) {
+          nextIndex = otherNeighbors[Math.floor(Math.random() * otherNeighbors.length)];
+        }
+      }
+      p.lastIndex = p.currentIndex;
+      p.targetIndex = nextIndex;
+
+      // Xác suất 22% dừng lại nghỉ / xem cảnh 2 - 3.5 giây
+      if (Math.random() < 0.22) {
+        p.pauseTimer = 2.0 + Math.random() * 2.0;
+      }
+    } else {
+      // Bước đi tiến tới mục tiêu
+      const dist = Math.sqrt(distSq);
+      const moveDist = Math.min(p.speed * delta, dist);
+      currentPos.x += (dx / dist) * moveDist;
+      currentPos.z += (dz / dist) * moveDist;
+
+      // Cập nhật cao độ Y theo địa hình (đặc biệt khi leo đồi)
+      const targetY = currentWP.y || 0;
+      currentPos.y += (targetY - currentPos.y) * delta * 4.5;
+
+      // Xoay hướng mặt theo vector chuyển động
+      const targetAngle = Math.atan2(dx, dz);
+      let angleDiff = targetAngle - p.mesh.rotation.y;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      p.mesh.rotation.y += angleDiff * Math.min(delta * 7.5, 1.0);
+
+      // Cử động nhịp nhàng chân tay theo bước chạy
+      p.stepAngle += delta * (p.speed * 3.5);
+      const swing = Math.sin(p.stepAngle) * 0.46;
+      if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x = swing;
+      if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x = -swing;
+      if (!p.holdingTablet) {
+        if (p.mesh.userData.leftArm) p.mesh.userData.leftArm.rotation.x = -swing * 0.8;
+        if (p.mesh.userData.rightArm) p.mesh.userData.rightArm.rotation.x = swing * 0.8;
+      }
+    }
+  });
+
+  // C. Hoạt cảnh nhóm nói chuyện / ăn uống
+  socialGroups.forEach((sg) => {
+    if (sg.type === 'conversation') {
+      const talker = sg.members[Math.floor((time * 0.0006) % sg.members.length)];
+      if (talker && talker.userData && talker.userData.rightArm) {
+        talker.userData.rightArm.rotation.x = -0.6 + Math.sin(time * 0.005) * 0.22;
+      }
+    }
   });
 
   // 11. Cờ bay trong gió
@@ -6926,6 +7416,21 @@ function setEnvironment(time) {
   });
 
   logoLight.intensity = isNight ? 1.8 : (isSunset ? 0.8 : 0);
+
+  // Khối 7: Áo bảo hộ phản quang & Đèn pin bảo vệ ban đêm
+  nightReflectiveMaterials.forEach((mat) => {
+    if (isNight) {
+      mat.emissive.set(0x84cc16);
+      mat.emissiveIntensity = 0.85;
+    } else {
+      mat.emissive.set(0x000000);
+      mat.emissiveIntensity = 0;
+    }
+  });
+
+  securityFlashlights.forEach((light) => {
+    light.intensity = isNight ? 1.8 : 0;
+  });
 
   document.querySelectorAll('.toggle-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.time === time);

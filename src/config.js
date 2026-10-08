@@ -525,5 +525,12 @@ export const CONFIG = {
       zone: 'Vườn Lan Đỉnh Đồi DK2',
     },
   },
+
+  // Cấu hình mạng lưới người và nhân sự (Khối 7: Người)
+  PEOPLE: {
+    wanderingCount: 16, // Số lượng người đi lại tự do trên waypoint graph
+    totalCampusPeople: 34, // Tổng số nhân sự toàn khuôn viên (25-40 theo yêu cầu)
+    walkSpeed: { min: 1.4, max: 2.2 },
+  },
 };
 
