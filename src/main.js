@@ -5895,8 +5895,7 @@ function buildConnectingGateAndRoad() {
   // 5. CỘT ĐÈN CHIẾU SÁNG CAO ÁP TRÊN ĐƯỜNG KẾT NỐI (Streetlights)
   // --------------------------------------------------------------------------
   [1.0, 9.0].forEach((lx) => {
-    const lamp = createStreetLight(lx, 0, roadCenterZ - roadWidth / 2 - 1.2, 0);
-    group.add(lamp);
+    createStreetlight(lx, 0, roadCenterZ - roadWidth / 2 - 1.2);
   });
 
   group.add(gateGroup);
