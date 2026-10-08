@@ -537,6 +537,19 @@ export const CONFIG = {
   },
 
   // Cấu hình mạng lưới người và nhân sự (Khối 7: Người)
+    // Cấu hình hoạt cảnh Logistics, Xe nâng & Đội xe tải (Khối 9)
+  LOGISTICS: {
+    cycleDuration: 48.0, // Tổng thời gian 1 chu kỳ giao nhận & bốc xếp khép kín (giây)
+    truckSpeed: 5.8,     // Tốc độ xe tải 5T di chuyển (m/s)
+    forkliftSpeed: 2.8,  // Tốc độ di chuyển xe nâng Komatsu (m/s)
+    enablePedestrianSafety: true, // Tự động giảm tốc / dừng khi người đi bộ cắt ngang
+    dayFrequency: 1.0,   // Tần suất hoạt động ban ngày
+    nightFrequency: 0.65,// Giảm nhịp độ ca đêm, giữ xe đỗ bật đèn cảnh báo
+    activeTrucks: 1,
+    containerPosition: { x: 68, y: 0, z: -15, rotY: 0 },
+    smallTruckPosition: { x: -32, y: 0, z: -40, rotY: Math.PI / 2 },
+  },
+
   PEOPLE: {
     wanderingCount: 16, // Số lượng người đi lại tự do trên waypoint graph
     totalCampusPeople: 34, // Tổng số nhân sự toàn khuôn viên (25-40 theo yêu cầu)

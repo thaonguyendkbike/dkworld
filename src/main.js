@@ -22,6 +22,20 @@ let rainParticles;
 // Animated Vehicles & Logistics
 let animatedBike, bikeRiderGroup, bikeTrackAngle = 0;
 let animatedTruck, truckProgress = 0;
+// Khối 9: Logistics, Forklifts & Truck Fleet
+let activeLogisticsTruck = null;
+let activeForklift = null;
+let activeForkliftInitialPos = { x: 54.0, y: 0, z: -32.5, rotY: 0 };
+let logisticsCycleTime = 0;
+let guardGate1 = null;
+let guardSaluteAngle = 0;
+let truckInboundPallet = null;
+let truckOutboundPallet = null;
+let warehouseStoredPallet = null;
+let warehouseReadyPallet = null;
+let rotatingBeacons = [];
+let logisticsTruckLights = [];
+let logisticsSafetySlowdown = 1.0;
 let animatedTrain, trainProgress = 0;
 
 // Curved Railway, Steam Train & Puffy Smoke (Inspired by vibrant low-poly references)
@@ -3715,18 +3729,1018 @@ function buildBuildingContactShadows() {
 // ============================================================================
 // 11. Logistics Equipment, Pallets & Forklifts
 // ============================================================================
+
+// ============================================================================
+// KHỐI 9: XE NÂNG, XE TẢI & HOẠT CẢNH LOGISTICS KHÉP KÍN (LOGISTICS MASTER)
+// ============================================================================
+
+// 1. Tạo mô hình xe nâng điện chi tiết chuẩn công nghiệp (Komatsu Electric Forklift)
+function createDetailedForklift(x, y, z, rotY, id, name, options = {}) {
+  const flGroup = new THREE.Group();
+  flGroup.position.set(x, y, z);
+  flGroup.rotation.y = rotY;
+
+  // Materials
+  const orangeMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.35, metalness: 0.15 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.5 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.85 });
+  const amberBeaconMat = new THREE.MeshStandardMaterial({
+    color: 0xf59e0b,
+    emissive: 0xf59e0b,
+    emissiveIntensity: 0.95,
+    roughness: 0.2,
+  });
+
+  // A. Chassis Body (Thân xe nâng sơn cam công nghiệp)
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.95, 1.26), orangeMat);
+  chassis.position.set(0, 0.65, 0);
+  chassis.castShadow = true;
+  flGroup.add(chassis);
+
+  // Bậc lên xuống có vân chống trượt
+  const stepL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.18), darkMat);
+  stepL.position.set(-0.1, 0.25, 0.68);
+  flGroup.add(stepL);
+  const stepR = stepL.clone();
+  stepR.position.z = -0.68;
+  flGroup.add(stepR);
+
+  // B. Đối trọng đúc gang phía sau (Heavy Cast Iron Counterweight)
+  const counterWeight = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.88, 1.24), darkMat);
+  counterWeight.position.set(-0.88, 0.68, 0);
+  counterWeight.castShadow = true;
+  flGroup.add(counterWeight);
+
+  // Logo DK Logistics sau xe
+  const logoPlate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.22, 0.65),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 })
+  );
+  logoPlate.position.set(-1.25, 0.72, 0);
+  flGroup.add(logoPlate);
+
+  const logoText = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.12, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+  );
+  logoText.position.set(-1.26, 0.72, 0);
+  flGroup.add(logoText);
+
+  // C. Khung bảo vệ người lái (Overhead Guard / Roll Cage)
+  const cageGroup = new THREE.Group();
+  cageGroup.position.set(-0.15, 1.35, 0);
+
+  // 4 trụ thép chịu lực
+  const postGeo = new THREE.CylinderGeometry(0.042, 0.042, 1.32, 8);
+  const postPositions = [
+    [-0.55, 0.66, 0.52],
+    [-0.55, 0.66, -0.52],
+    [0.55, 0.66, 0.52],
+    [0.55, 0.66, -0.52],
+  ];
+  postPositions.forEach((pos) => {
+    const post = new THREE.Mesh(postGeo, steelMat);
+    post.position.set(...pos);
+    post.castShadow = true;
+    cageGroup.add(post);
+  });
+
+  // Mái che khung thép có lưới bảo vệ chống vật rơi
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.06, 1.15), steelMat);
+  roof.position.set(0, 1.34, 0);
+  roof.castShadow = true;
+  cageGroup.add(roof);
+
+  // Các thanh song sắt an toàn trên nóc
+  for (let sx = -0.45; sx <= 0.45; sx += 0.18) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.04, 1.05), darkMat);
+    bar.position.set(sx, 1.37, 0);
+    cageGroup.add(bar);
+  }
+
+  // Đèn xoay cảnh báo màu hổ phách trên nóc (Amber Rotating Strobe Beacon)
+  const beaconBase = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.08, 8), darkMat);
+  beaconBase.position.set(0, 1.41, 0);
+  cageGroup.add(beaconBase);
+
+  const beaconDome = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.15, 8), amberBeaconMat);
+  beaconDome.position.set(0, 1.51, 0);
+  cageGroup.add(beaconDome);
+
+  const beaconLight = new THREE.PointLight(0xf59e0b, 0.75, 8);
+  beaconLight.position.set(0, 1.55, 0);
+  cageGroup.add(beaconLight);
+
+  rotatingBeacons.push({ mesh: beaconDome, light: beaconLight });
+
+  // 2 Đèn pha làm việc phía trước gắn trên khung bảo vệ
+  [-0.48, 0.48].forEach((wz) => {
+    const workLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.12, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xffedd5, emissive: 0xfef08a, emissiveIntensity: 0.8 })
+    );
+    workLight.position.set(0.58, 1.15, wz);
+    cageGroup.add(workLight);
+  });
+
+  flGroup.add(cageGroup);
+
+  // D. Buồng lái, ghế ngồi & tài xế
+  const seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.52), darkMat);
+  seatBase.position.set(-0.25, 0.72, 0);
+  flGroup.add(seatBase);
+
+  const seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.52, 0.48), darkMat);
+  seatBack.position.set(-0.48, 1.05, 0);
+  flGroup.add(seatBack);
+
+  // Vô lăng nghiêng & cần gạt thủy lực
+  const steeringCol = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.55, 6), steelMat);
+  steeringCol.rotation.z = -Math.PI / 6;
+  steeringCol.position.set(0.18, 0.95, 0);
+  flGroup.add(steeringCol);
+
+  const wheelRim = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 6, 12), darkMat);
+  wheelRim.rotation.y = Math.PI / 2;
+  wheelRim.rotation.x = Math.PI / 6;
+  wheelRim.position.set(0.3, 1.15, 0);
+  flGroup.add(wheelRim);
+
+  // Tài xế ngồi lái xe nâng
+  const driver = createCharacter({
+    shirtColor: 0xea580c,
+    pantsColor: 0x1e293b,
+    hatColor: 0xfacc15,
+    isDriver: true,
+  });
+  driver.position.set(-0.24, 0.75, 0);
+  flGroup.add(driver);
+
+  // E. Khung nâng (Mast) 2 tầng chữ I & Ty thủy lực mạ chrome
+  const mastGroup = new THREE.Group();
+  mastGroup.position.set(1.05, 0, 0);
+
+  // 2 Trụ ray chữ I đứng cố định
+  [-0.45, 0.45].forEach((mz) => {
+    const mastColumn = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.55, 0.14), steelMat);
+    mastColumn.position.set(0, 1.45, mz);
+    mastColumn.castShadow = true;
+    mastGroup.add(mastColumn);
+  });
+
+  // Thanh giằng ngang liên kết khung mast
+  [1.0, 1.8, 2.6].forEach((hy) => {
+    const tieBar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.85), steelMat);
+    tieBar.position.set(0, hy, 0);
+    mastGroup.add(tieBar);
+  });
+
+  // Ty đẩy thủy lực mạ chrome sáng bóng
+  const ramCylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 2.1, 8), chromeMat);
+  ramCylinder.position.set(-0.02, 1.35, 0);
+  mastGroup.add(ramCylinder);
+
+  flGroup.add(mastGroup);
+
+  // F. Cụm giá nâng di động (Sliding Carriage & Forged Forks)
+  const liftGroup = new THREE.Group();
+  liftGroup.position.set(1.15, 0.22, 0);
+
+  const carriage = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.54, 0.98), darkMat);
+  carriage.position.set(0, 0.28, 0);
+  liftGroup.add(carriage);
+
+  // Càng nâng thép tôi cứng hình chữ L
+  [-0.26, 0.26].forEach((fz) => {
+    // Đoạn đứng móc vào giá
+    const forkUp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.52, 0.14), darkMat);
+    forkUp.position.set(0.04, 0.28, fz);
+    liftGroup.add(forkUp);
+
+    // Lưỡi càng ngang vát nhọn phía trước
+    const forkBlade = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.065, 0.14), darkMat);
+    forkBlade.position.set(0.68, 0.04, fz);
+    liftGroup.add(forkBlade);
+  });
+
+  // Pallet hàng gắn trên càng nâng (nếu là xe tĩnh hoặc xe chu kỳ có tải)
+  let cargoPalletOnFork = null;
+  if (!options.isActiveCycle) {
+    cargoPalletOnFork = createForkliftPalletCargo();
+    liftGroup.add(cargoPalletOnFork);
+  }
+
+  flGroup.add(liftGroup);
+
+  // G. Bánh xe công nghiệp đặc (Solid Industrial Rubber Tires)
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95 });
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4 });
+
+  // Bánh trước chịu tải lớn
+  [-0.64, 0.64].forEach((wz) => {
+    const fWheel = new THREE.Group();
+    fWheel.position.set(0.65, 0.35, wz);
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.26, 12), tireMat);
+    tire.rotation.x = Math.PI / 2;
+    fWheel.add(tire);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.27, 8), hubMat);
+    hub.rotation.x = Math.PI / 2;
+    fWheel.add(hub);
+    flGroup.add(fWheel);
+  });
+
+  // Bánh sau đánh lái
+  [-0.58, 0.58].forEach((wz) => {
+    const rWheel = new THREE.Group();
+    rWheel.position.set(-0.68, 0.3, wz);
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.22, 12), tireMat);
+    tire.rotation.x = Math.PI / 2;
+    rWheel.add(tire);
+    flGroup.add(rWheel);
+  });
+
+  // Metadata tương tác
+  const flData = {
+    id: id,
+    title: name,
+    type: 'forklift',
+    desc: 'Xe nâng điện công nghiệp Komatsu 2.5 tấn tích hợp đèn xoay cảnh báo, phục vụ bốc xếp pallet linh kiện và xe thành phẩm.',
+    zone: id.includes('2') ? 'DK2' : 'DK1',
+  };
+  flGroup.userData = flData;
+  chassis.userData = flData;
+  scene.add(flGroup);
+  interactiveObjects.push(chassis);
+
+  const forkliftObj = {
+    group: flGroup,
+    liftGroup,
+    initialY: 0.22,
+    id,
+    isActiveCycle: !!options.isActiveCycle,
+    initialPos: { x, y, z, rotY },
+    beaconMesh: beaconDome,
+    beaconLight,
+    carriedPallet: cargoPalletOnFork,
+  };
+
+  if (options.isActiveCycle) {
+    activeForklift = forkliftObj;
+    activeForkliftInitialPos = { x, y, z, rotY };
+  } else {
+    animatedForklifts.push(forkliftObj);
+  }
+
+  return forkliftObj;
+}
+
+// Helper: Tạo pallet hàng gắn trên càng nâng
+function createForkliftPalletCargo(labelType = 'components') {
+  const pGroup = new THREE.Group();
+  pGroup.position.set(0.68, 0.08, 0);
+
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 });
+  const boxMat = new THREE.MeshStandardMaterial({
+    color: labelType === 'ebikes' ? 0x0284c7 : 0xd97706,
+    roughness: 0.65,
+  });
+
+  // Pallet gỗ
+  const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 1.05), woodMat);
+  pallet.position.y = 0.06;
+  pallet.castShadow = true;
+  pGroup.add(pallet);
+
+  // Thùng kiện hàng
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.72, 0.95), boxMat);
+  box.position.y = 0.48;
+  box.castShadow = true;
+  pGroup.add(box);
+
+  // Tem nhãn DK BIKE
+  const tagMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  const tag1 = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.22), tagMat);
+  tag1.position.set(0, 0.52, 0.48);
+  pGroup.add(tag1);
+
+  return pGroup;
+}
+
+// 2. Tạo xe tải thùng 5 tấn DK Logistics hoàn chỉnh (5-Ton Box Truck with Opening Doors)
+function create5TonLogisticsTruck(colorHex = 0x0284c7, name = 'Xe tải logistics 5 tấn DK Bike (5T)') {
+  const truckGroup = new THREE.Group();
+
+  // Materials
+  const cabColorMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.35, metalness: 0.2 });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
+  const darkChassisMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.15, metalness: 0.9 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95 });
+  const redBrakeMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: 0x991b1b, emissiveIntensity: 0.5 });
+  const amberTurnMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.6 });
+
+  // A. Chassis sắt xi dầm thép chữ U (Chassis Rails)
+  const chassisFrame = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.28, 7.2), darkChassisMat);
+  chassisFrame.position.set(0, 0.85, -0.6);
+  chassisFrame.castShadow = true;
+  truckGroup.add(chassisFrame);
+
+  // Bình nhiên liệu và bình ắc quy bên hông
+  const fuelTank = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.25, 12), chromeMat);
+  fuelTank.rotation.z = Math.PI / 2;
+  fuelTank.position.set(1.08, 0.72, -1.2);
+  truckGroup.add(fuelTank);
+
+  const batteryBox = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.85), darkChassisMat);
+  batteryBox.position.set(-1.08, 0.72, -1.2);
+  truckGroup.add(batteryBox);
+
+  // Thanh chắn chống va quẹt hông (Side Underrun Guards)
+  [-1.15, 1.15].forEach((sx) => {
+    const sideRail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 2.6), whiteMat);
+    sideRail.position.set(sx, 0.55, -1.2);
+    truckGroup.add(sideRail);
+  });
+
+  // B. Cabin xe tải hiện đại (Forward-Control Truck Cabin)
+  const cabGroup = new THREE.Group();
+  cabGroup.position.set(0, 1.9, 1.9);
+
+  // Khối thân cabin
+  const cabBody = new THREE.Mesh(new THREE.BoxGeometry(2.35, 1.95, 2.05), cabColorMat);
+  cabBody.position.set(0, 0, 0);
+  cabBody.castShadow = true;
+  cabGroup.add(cabBody);
+
+  // Kính chắn gió cong phía trước
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.95, 0.12), glassMat);
+  windshield.position.set(0, 0.38, 1.02);
+  cabGroup.add(windshield);
+
+  // Kính cửa sổ hai bên
+  [-1.18, 1.18].forEach((wx) => {
+    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.72, 0.85), glassMat);
+    sideWin.position.set(wx, 0.38, 0.1);
+    cabGroup.add(sideWin);
+  });
+
+  // Cản trước và lưới tản nhiệt chrome
+  const frontBumper = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.5, 0.35), darkChassisMat);
+  frontBumper.position.set(0, -0.85, 1.12);
+  frontBumper.castShadow = true;
+  cabGroup.add(frontBumper);
+
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.45, 0.08), chromeMat);
+  grille.position.set(0, -0.32, 1.05);
+  cabGroup.add(grille);
+
+  // Biểu tượng mạ chrome DK ở mũi xe
+  const dkEmblem = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12), chromeMat);
+  dkEmblem.rotation.x = Math.PI / 2;
+  dkEmblem.position.set(0, -0.22, 1.1);
+  cabGroup.add(dkEmblem);
+
+  // Cụm đèn pha LED halogen & Đèn gầm
+  [-0.92, 0.92].forEach((hx) => {
+    const headlight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.22, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfef08a, emissiveIntensity: 0.9 })
+    );
+    headlight.position.set(hx, -0.75, 1.25);
+    cabGroup.add(headlight);
+  });
+
+  // Gương chiếu hậu đôi hai bên
+  [-1.35, 1.35].forEach((mx) => {
+    const mirrorBracket = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.04), darkChassisMat);
+    mirrorBracket.position.set(mx > 0 ? 1.25 : -1.25, 0.45, 0.75);
+    cabGroup.add(mirrorBracket);
+
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.2), darkChassisMat);
+    mirror.position.set(mx, 0.45, 0.75);
+    cabGroup.add(mirror);
+  });
+
+  // Mui lướt gió khí động học trên nóc (Roof Air Deflector)
+  const roofSpoiler = new THREE.Mesh(new THREE.BoxGeometry(2.32, 0.65, 1.55), whiteMat);
+  roofSpoiler.position.set(0, 1.25, -0.15);
+  roofSpoiler.rotation.x = -Math.PI / 10;
+  roofSpoiler.castShadow = true;
+  cabGroup.add(roofSpoiler);
+
+  // Biển hiệu "DK BIKE LOGISTICS" trên mui gió
+  const spoilerSign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 0.32),
+    new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+  );
+  spoilerSign.rotation.x = -Math.PI / 10;
+  spoilerSign.position.set(0, 1.28, 0.58);
+  cabGroup.add(spoilerSign);
+
+  truckGroup.add(cabGroup);
+
+  // C. Thùng tải hàng cách nhiệt composite (Insulated Cargo Box)
+  const cargoBoxGroup = new THREE.Group();
+  cargoBoxGroup.position.set(0, 2.3, -1.55);
+
+  const cargoBox = new THREE.Mesh(new THREE.BoxGeometry(2.42, 2.35, 4.95), whiteMat);
+  cargoBox.position.set(0, 0, 0);
+  cargoBox.castShadow = true;
+  cargoBoxGroup.add(cargoBox);
+
+  // Viền nhôm bo góc thùng
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3 });
+  const topTrim = new THREE.Mesh(new THREE.BoxGeometry(2.46, 0.08, 5.0), trimMat);
+  topTrim.position.set(0, 1.18, 0);
+  cargoBoxGroup.add(topTrim);
+
+  // Dải phản quang an toàn đỏ-trắng chân thùng
+  [-1.22, 1.22].forEach((sx) => {
+    const reflexStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.12, 4.8),
+      new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x991b1b, emissiveIntensity: 0.4 })
+    );
+    reflexStrip.position.set(sx, -1.05, 0);
+    cargoBoxGroup.add(reflexStrip);
+
+    // Decal thương hiệu DK Bike bên hông thùng
+    const decal = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.6, 1.1),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+    );
+    decal.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    decal.position.set(sx > 0 ? 1.225 : -1.225, 0.15, 0);
+    cargoBoxGroup.add(decal);
+  });
+
+  // D. Cửa thùng phía sau mở được (Opening Rear Cargo Doors with Hinges)
+  // Bản lề cửa trái (xoay quanh trục Y mép ngoài x = -1.18)
+  const doorPivotLeft = new THREE.Group();
+  doorPivotLeft.position.set(-1.18, 0, -2.48);
+
+  const doorLeafL = new THREE.Mesh(new THREE.BoxGeometry(1.16, 2.26, 0.07), whiteMat);
+  doorLeafL.position.set(0.58, 0, 0);
+  doorLeafL.castShadow = true;
+  doorPivotLeft.add(doorLeafL);
+
+  // Thanh khóa cửa mạ kẽm (Cam lock rod)
+  const lockRodL = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2, 6), chromeMat);
+  lockRodL.position.set(0.95, 0, 0.05);
+  doorPivotLeft.add(lockRodL);
+
+  cargoBoxGroup.add(doorPivotLeft);
+
+  // Bản lề cửa phải (xoay quanh trục Y mép ngoài x = 1.18)
+  const doorPivotRight = new THREE.Group();
+  doorPivotRight.position.set(1.18, 0, -2.48);
+
+  const doorLeafR = new THREE.Mesh(new THREE.BoxGeometry(1.16, 2.26, 0.07), whiteMat);
+  doorLeafR.position.set(-0.58, 0, 0);
+  doorLeafR.castShadow = true;
+  doorPivotRight.add(doorLeafR);
+
+  const lockRodR = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2, 6), chromeMat);
+  lockRodR.position.set(-0.95, 0, 0.05);
+  doorPivotRight.add(lockRodR);
+
+  cargoBoxGroup.add(doorPivotRight);
+
+  // E. Pallet kiện hàng trên sàn thùng xe (Truck Bed Cargo Pallet)
+  const truckPalletSlot = new THREE.Group();
+  truckPalletSlot.position.set(0, -1.02, -1.2);
+  cargoBoxGroup.add(truckPalletSlot);
+
+  truckGroup.add(cargoBoxGroup);
+
+  // F. Bánh xe: 1 trục trước dẫn hướng & 2 trục sau chịu tải kép (Dual-Tire Rear Axles)
+  const frontWheels = [];
+
+  // 2 bánh trước
+  [-1.05, 1.05].forEach((wx) => {
+    const fwGroup = new THREE.Group();
+    fwGroup.position.set(wx, 0.48, 1.9);
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.32, 16), tireMat);
+    tire.rotation.z = Math.PI / 2;
+    tire.castShadow = true;
+    fwGroup.add(tire);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.33, 8), darkChassisMat);
+    hub.rotation.z = Math.PI / 2;
+    fwGroup.add(hub);
+    truckGroup.add(fwGroup);
+    frontWheels.push(fwGroup);
+  });
+
+  // 4 cụm bánh kép phía sau (8 lốp)
+  [-1.0, -2.3].forEach((axleZ) => {
+    [-1.05, 1.05].forEach((wx) => {
+      const dualWheel = new THREE.Group();
+      dualWheel.position.set(wx, 0.48, axleZ);
+
+      // 2 lốp áp sát nhau
+      [-0.12, 0.12].forEach((offset) => {
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.22, 16), tireMat);
+        tire.rotation.z = Math.PI / 2;
+        tire.position.x = offset;
+        tire.castShadow = true;
+        dualWheel.add(tire);
+      });
+
+      truckGroup.add(dualWheel);
+    });
+  });
+
+  // Chắn bùn sau có chữ DK BIKE
+  [-1.15, 1.15].forEach((fx) => {
+    const mudFlap = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.38), darkChassisMat);
+    mudFlap.position.set(fx, 0.45, -3.8);
+    truckGroup.add(mudFlap);
+  });
+
+  // Đèn hậu & đèn lùi
+  [-0.95, 0.95].forEach((rx) => {
+    const tailLight = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.08), redBrakeMat);
+    tailLight.position.set(rx, 0.65, -4.18);
+    truckGroup.add(tailLight);
+  });
+
+  // Headlight spot for night
+  const headSpotL = new THREE.SpotLight(0xffedd5, 0, 35, Math.PI / 5, 0.3, 1.5);
+  headSpotL.position.set(-0.8, 1.1, 3.2);
+  headSpotL.target.position.set(-0.8, 0, 20);
+  truckGroup.add(headSpotL);
+  truckGroup.add(headSpotL.target);
+
+  const headSpotR = headSpotL.clone();
+  headSpotR.position.x = 0.8;
+  headSpotR.target.position.x = 0.8;
+  truckGroup.add(headSpotR);
+  truckGroup.add(headSpotR.target);
+  logisticsTruckLights.push(headSpotL, headSpotR);
+
+  // Metadata tương tác
+  const truckData = {
+    id: 'logisticsTruck5T',
+    title: name,
+    type: 'truck',
+    desc: 'Xe tải thùng 5 tấn DK Bike Logistics chuyên dụng chuyên chở phụ tùng động cơ, pin lithium và giao xe điện thành phẩm xuất xưởng.',
+    zone: 'DK1',
+  };
+  truckGroup.userData = truckData;
+  cabBody.userData = truckData;
+  interactiveObjects.push(cabBody);
+
+  return {
+    truckGroup,
+    doorPivotLeft,
+    doorPivotRight,
+    truckPalletSlot,
+    frontWheels,
+    headSpotL,
+    headSpotR,
+  };
+}
+
+// 3. Tạo xe đầu kéo container 40ft DK Logistics (40ft Heavy Tractor Container Truck)
+function create40ftContainerTruck(x, y, z, rotY, id, name) {
+  const cGroup = new THREE.Group();
+  cGroup.position.set(x, y, z);
+  cGroup.rotation.y = rotY;
+
+  const cabMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.2 }); // Đầu kéo đỏ mạnh mẽ
+  const trailerMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 });
+  const containerMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5, metalness: 0.1 }); // Container xanh dương DK
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.15, metalness: 0.9 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95 });
+
+  // A. Đầu kéo Heavy-Duty 6x4 Prime Mover Tractor
+  const cabTractor = new THREE.Group();
+  cabTractor.position.set(0, 0, 4.2);
+
+  // Khung cabin đầu kéo cao
+  const mainCab = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.7, 2.6), cabMat);
+  mainCab.position.set(0, 2.3, 0);
+  mainCab.castShadow = true;
+  cabTractor.add(mainCab);
+
+  // Kính chắn gió
+  const windshield = new THREE.Mesh(
+    new THREE.BoxGeometry(2.35, 1.05, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 })
+  );
+  windshield.position.set(0, 2.65, 1.31);
+  cabTractor.add(windshield);
+
+  // Mũi xe tản nhiệt chrome cỡ lớn
+  const frontGrille = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.25, 0.12), chromeMat);
+  frontGrille.position.set(0, 1.5, 1.32);
+  cabTractor.add(frontGrille);
+
+  // Ống xả thẳng đứng mạ chrome kiểu Mỹ
+  const exhaustPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.2, 8), chromeMat);
+  exhaustPipe.position.set(1.22, 3.0, -1.1);
+  cabTractor.add(exhaustPipe);
+
+  // Bánh xe đầu kéo (2 trước + 4 bánh kép sau)
+  [-1.1, 1.1].forEach((wx) => {
+    const fw = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.35, 16), darkMat);
+    fw.rotation.z = Math.PI / 2;
+    fw.position.set(wx, 0.52, 1.0);
+    cabTractor.add(fw);
+  });
+
+  [-0.6, -1.8].forEach((axZ) => {
+    [-1.1, 1.1].forEach((wx) => {
+      const rw = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.42, 16), darkMat);
+      rw.rotation.z = Math.PI / 2;
+      rw.position.set(wx, 0.52, axZ);
+      cabTractor.add(rw);
+    });
+  });
+
+  cGroup.add(cabTractor);
+
+  // B. Rơ-moóc xương 40ft (40ft Skeletal Semi-Trailer)
+  const trailerGroup = new THREE.Group();
+  trailerGroup.position.set(0, 1.2, -2.6);
+
+  const chassisBeam = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.28, 12.4), trailerMat);
+  chassisBeam.position.set(0, 0, 0);
+  chassisBeam.castShadow = true;
+  trailerGroup.add(chassisBeam);
+
+  // Chân chống rơ-moóc (Landing Gear Legs)
+  [-0.95, 0.95].forEach((lx) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.12), trailerMat);
+    leg.position.set(lx, -0.65, 3.2);
+    trailerGroup.add(leg);
+  });
+
+  // 3 trục bánh rơ-moóc (Triple Trailer Axles)
+  [-3.8, -4.9, -6.0].forEach((tz) => {
+    [-1.1, 1.1].forEach((tx) => {
+      const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 16), darkMat);
+      tw.rotation.z = Math.PI / 2;
+      tw.position.set(tx, -0.68, tz);
+      tw.castShadow = true;
+      trailerGroup.add(tw);
+    });
+  });
+
+  // C. Vỏ Container 40ft High Cube (40-Foot ISO Shipping Container)
+  const container = new THREE.Mesh(new THREE.BoxGeometry(2.44, 2.65, 12.2), containerMat);
+  container.position.set(0, 1.48, 0);
+  container.castShadow = true;
+  trailerGroup.add(container);
+
+  // Gân sóng tôn dập nổi hai bên hông container
+  for (let rz = -5.8; rz <= 5.8; rz += 0.42) {
+    [-1.24, 1.24].forEach((rx) => {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.5, 0.14), containerMat);
+      rib.position.set(rx, 1.48, rz);
+      trailerGroup.add(rib);
+    });
+  }
+
+  // Dải chữ thương hiệu DK BIKE GLOBAL LOGISTICS trên container
+  const bannerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  [-1.25, 1.25].forEach((bx) => {
+    const banner = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 0.85), bannerMat);
+    banner.rotation.y = bx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    banner.position.set(bx, 1.9, 0);
+    trailerGroup.add(banner);
+
+    const bannerText = new THREE.Mesh(
+      new THREE.PlaneGeometry(7.8, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+    );
+    bannerText.rotation.y = bx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    bannerText.position.set(bx > 0 ? bx + 0.01 : bx - 0.01, 1.9, 0);
+    trailerGroup.add(bannerText);
+  });
+
+  // Cửa đôi sau container có 4 thanh khóa
+  [-0.6, -0.2, 0.2, 0.6].forEach((kx) => {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.5, 6), chromeMat);
+    rod.position.set(kx, 1.48, -6.13);
+    trailerGroup.add(rod);
+  });
+
+  cGroup.add(trailerGroup);
+
+  // Metadata
+  const contData = {
+    id,
+    title: name,
+    type: 'containerTruck',
+    desc: 'Xe đầu kéo container 40 feet chuyên phục vụ vận chuyển linh kiện nhập khẩu CKD/SKD và xuất khẩu nguyên container thành phẩm DK Bike ra cảng Hải Phòng.',
+    zone: 'DK1',
+  };
+  cGroup.userData = contData;
+  mainCab.userData = contData;
+  scene.add(cGroup);
+  interactiveObjects.push(mainCab);
+
+  return cGroup;
+}
+
+// 4. Tạo xe tải nhỏ 1.5 tấn giao hàng nhanh (1.5-Ton Light Delivery Truck)
+function create1Point5TonDeliveryTruck(x, y, z, rotY, id, name) {
+  const dGroup = new THREE.Group();
+  dGroup.position.set(x, y, z);
+  dGroup.rotation.y = rotY;
+
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 });
+  const blueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+
+  // Cabin nhỏ kiểu Kia Bongo / Hyundai Porter
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.85, 1.65, 1.55), whiteMat);
+  cab.position.set(0, 1.35, 1.25);
+  cab.castShadow = true;
+  dGroup.add(cab);
+
+  // Kính lái
+  const windshield = new THREE.Mesh(
+    new THREE.BoxGeometry(1.7, 0.75, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1 })
+  );
+  windshield.position.set(0, 1.55, 2.03);
+  dGroup.add(windshield);
+
+  // Thùng hàng phía sau
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.85, 3.2), blueMat);
+  box.position.set(0, 1.6, -1.05);
+  box.castShadow = true;
+  dGroup.add(box);
+
+  // Logo DK Express trên thùng
+  [-0.96, 0.96].forEach((bx) => {
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 0.65),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 })
+    );
+    sign.rotation.y = bx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    sign.position.set(bx, 1.65, -1.05);
+    dGroup.add(sign);
+  });
+
+  // Bánh xe (4 bánh đơn)
+  const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.24, 12);
+  const wPositions = [
+    [-0.85, 0.38, 1.25],
+    [0.85, 0.38, 1.25],
+    [-0.85, 0.38, -1.6],
+    [0.85, 0.38, -1.6],
+  ];
+  wPositions.forEach((pos) => {
+    const w = new THREE.Mesh(wheelGeo, darkMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(...pos);
+    w.castShadow = true;
+    dGroup.add(w);
+  });
+
+  const truckData = {
+    id,
+    title: name,
+    type: 'lightTruck',
+    desc: 'Xe tải giao hàng nhanh 1.5 tấn phục vụ chuyển phát phụ tùng khẩn cấp và giao xe cho các đại lý khu vực lân cận.',
+    zone: 'DK2',
+  };
+  dGroup.userData = truckData;
+  cab.userData = truckData;
+  scene.add(dGroup);
+  interactiveObjects.push(cab);
+
+  return dGroup;
+}
+
+// 5. Tạo xe đẩy pallet thủ công có người kéo (Hand Pallet Jack & Operator)
+function createHandPalletJack(x, y, z, rotY, id, name) {
+  const pjGroup = new THREE.Group();
+  pjGroup.position.set(x, y, z);
+  pjGroup.rotation.y = rotY;
+
+  const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.2 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+
+  // Thân máy bơm thủy lực
+  const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.42, 8), darkMat);
+  pump.position.set(0, 0.32, 0);
+  pjGroup.add(pump);
+
+  // Cần đẩy chữ T nghiêng
+  const tiller = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.95, 6), redMat);
+  tiller.rotation.x = -Math.PI / 5;
+  tiller.position.set(0, 0.75, 0.32);
+  pjGroup.add(tiller);
+
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.38, 6), darkMat);
+  handle.rotation.z = Math.PI / 2;
+  handle.position.set(0, 1.15, 0.58);
+  pjGroup.add(handle);
+
+  // Càng nâng thép đỏ
+  [-0.22, 0.22].forEach((fx) => {
+    const fork = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 1.25), redMat);
+    fork.position.set(fx, 0.12, -0.68);
+    pjGroup.add(fork);
+  });
+
+  // Pallet hàng và thùng phụ tùng trên xe đẩy
+  const pallet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 0.1, 1.1),
+    new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 })
+  );
+  pallet.position.set(0, 0.2, -0.68);
+  pjGroup.add(pallet);
+
+  const crate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.85, 0.55, 0.9),
+    new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.65 })
+  );
+  crate.position.set(0, 0.52, -0.68);
+  crate.castShadow = true;
+  pjGroup.add(crate);
+
+  // Nhân viên kho cầm tay lái xe kéo
+  const worker = createCharacter({
+    shirtColor: 0xea580c,
+    pantsColor: 0x1e293b,
+    hatColor: 0xfacc15,
+  });
+  worker.position.set(0, 0, 0.95);
+  worker.rotation.y = Math.PI;
+  pjGroup.add(worker);
+
+  const pjData = {
+    id,
+    title: name,
+    type: 'palletJack',
+    desc: 'Xe nâng tay thủy lực 2.5 tấn phục vụ di chuyển linh kiện nội bộ giữa dây chuyền lắp ráp và cửa xuất hàng.',
+    zone: 'DK1',
+  };
+  pjGroup.userData = pjData;
+  crate.userData = pjData;
+  scene.add(pjGroup);
+  interactiveObjects.push(crate);
+
+  return pjGroup;
+}
+
+// 6. Tạo đoàn xe kéo nhỏ chở hàng nội bộ (Electric Tugger Cart Train)
+function createTuggerCartTrain(x, y, z, rotY, id, name) {
+  const trainGroup = new THREE.Group();
+  trainGroup.position.set(x, y, z);
+  trainGroup.rotation.y = rotY;
+
+  const yellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+
+  // Xe đầu kéo điện 3 bánh
+  const tugger = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.65, 1.8), yellowMat);
+  body.position.set(0, 0.45, 0);
+  tugger.add(body);
+
+  const driver = createCharacter({ shirtColor: 0x0284c7, pantsColor: 0x1e293b, hatColor: 0x0284c7, isDriver: true });
+  driver.position.set(0, 0.45, -0.2);
+  tugger.add(driver);
+  trainGroup.add(tugger);
+
+  // 2 Rơ-moóc sàn phẳng chở thùng pin
+  [-2.4, -4.6].forEach((cz) => {
+    const cart = new THREE.Group();
+    cart.position.set(0, 0, cz);
+
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 1.8), darkMat);
+    platform.position.y = 0.28;
+    cart.add(platform);
+
+    // Thùng pin lithium và động cơ
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.5, 1.5),
+      new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.6 })
+    );
+    box.position.set(0, 0.6, 0);
+    cart.add(box);
+
+    trainGroup.add(cart);
+  });
+
+  const trainData = {
+    id,
+    title: name,
+    type: 'tuggerTrain',
+    desc: 'Xe đầu kéo điện nội bộ vận chuyển các khay pin Lithium-ion và động cơ điện BLDC giữa kho tổng và xưởng sản xuất.',
+    zone: 'DK2',
+  };
+  trainGroup.userData = trainData;
+  body.userData = trainData;
+  scene.add(trainGroup);
+  interactiveObjects.push(body);
+
+  return trainGroup;
+}
+
+// 7. Tạo giá đỡ khung xe máy điện chưa lắp ráp (CKD/SKD Bike Frames Cantilever Rack)
+function createUnassembledFrameRack(x, y, z, rotY, id, name) {
+  const rackGroup = new THREE.Group();
+  rackGroup.position.set(x, y, z);
+  rackGroup.rotation.y = rotY;
+
+  const orangeMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.4 }); // Cột kệ cam công nghiệp
+  const blueMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.5 }); // Tay đỡ kệ xanh
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.6 }); // Khung xe sơn tĩnh điện đen mờ
+
+  // 3 Cột thép chịu lực
+  [-1.4, 0, 1.4].forEach((cx) => {
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.6, 0.14), orangeMat);
+    col.position.set(cx, 1.3, 0);
+    rackGroup.add(col);
+
+    // Chân đế chữ I
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.15, 1.4), orangeMat);
+    base.position.set(cx, 0.08, 0);
+    rackGroup.add(base);
+
+    // 3 Tầng tay đỡ tay vươn (Cantilever Arms)
+    [0.75, 1.45, 2.15].forEach((ay) => {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 1.2), blueMat);
+      arm.position.set(cx, ay, 0);
+      rackGroup.add(arm);
+    });
+  });
+
+  // Các khung xe máy điện hàn thô (CKD Chassis Tubes) xếp ngay ngắn trên các tầng
+  [0.85, 1.55, 2.25].forEach((fy) => {
+    [-0.9, 0.5].forEach((fx) => {
+      const bikeFrame = new THREE.Group();
+      bikeFrame.position.set(fx, fy, 0);
+
+      // Cổ phốt & Dóng nghiêng chính
+      const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.95, 8), frameMat);
+      spine.rotation.x = Math.PI / 4;
+      bikeFrame.add(spine);
+
+      // Khung đuôi gắp xe
+      const rearSubframe = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.65), frameMat);
+      rearSubframe.position.set(0, -0.15, -0.32);
+      bikeFrame.add(rearSubframe);
+
+      rackGroup.add(bikeFrame);
+    });
+  });
+
+  const rackData = {
+    id,
+    title: name,
+    type: 'frameRack',
+    desc: 'Kệ lưu trữ khung xe máy điện hàn sẵn (CKD/SKD) tiêu chuẩn chất lượng cao trước khi chuyển vào dây chuyền sơn tĩnh điện và lắp ráp.',
+    zone: x > 0 ? 'DK1' : 'DK2',
+  };
+  rackGroup.userData = rackData;
+  scene.add(rackGroup);
+
+  return rackGroup;
+}
+
 function buildLogisticsAndEquipment() {
-  // Forklift 1 tại Cửa bốc dỡ Nhà B
-  createForklift(55, 0, -32, 0, 'forklift1', 'Xe nâng Komatsu #01 (Xưởng B)');
+  // 1. Xe nâng điện Komatsu hiện đại (Khối 9: Mast thủy lực, càng nâng, cabin & đèn xoay amber)
+  // Xe nâng 1 tham gia chu kỳ bốc dỡ tại Xưởng B
+  createDetailedForklift(54.0, 0, -32.5, 0, 'forklift1', 'Xe nâng điện Komatsu FB25 #01 (Xưởng B)', { isActiveCycle: true });
 
-  // Forklift 2 tại Cửa Kho Linh Kiện D2.1 (Vị trí mới theo kho đã dịch chuyển)
-  createForklift(-48, 0, -60, Math.PI / 2, 'forklift2', 'Xe nâng Komatsu #02 (Kho D2.1)');
+  // Xe nâng 2 túc trực bốc dỡ tại Cửa Kho Linh Kiện D2.1
+  createDetailedForklift(-48.0, 0, -60.0, Math.PI / 2, 'forklift2', 'Xe nâng điện Komatsu FB25 #02 (Kho D2.1)', { isActiveCycle: false });
 
-  // Cargo Pallets & Component Crates
+  // 2. Xe đầu kéo container 40ft DK Logistics đỗ tại bãi chờ logistics Cổng 1
+  create40ftContainerTruck(68.0, 0, -15.0, 0, 'containerHauler1', 'Xe đầu kéo container 40ft DK Logistics');
+
+  // 3. Xe tải giao hàng nhanh 1.5 tấn DK Express tại sân DK2
+  create1Point5TonDeliveryTruck(-32.0, 0, -40.0, Math.PI / 2, 'deliveryTruck1', 'Xe tải giao hàng nhanh 1.5T DK Express');
+
+  // 4. Xe đẩy pallet thủy lực thủ công & nhân viên bốc hàng
+  createHandPalletJack(62.0, 0, -29.0, -Math.PI / 3, 'palletJack1', 'Xe đẩy pallet thủy lực & Nhân viên kho');
+
+  // 5. Đoàn xe kéo nhỏ chở linh kiện nội bộ phân khu DK2
+  createTuggerCartTrain(-42.0, 0, -56.0, 0, 'tuggerTrain1', 'Đoàn xe kéo nhỏ nội bộ DK2');
+
+  // 6. Kệ cantilever chữ A lưu trữ khung xe máy điện hàn sẵn (CKD/SKD)
+  createUnassembledFrameRack(64.0, 0, -35.0, Math.PI / 2, 'frameRack1', 'Khu vực khung xe máy điện chờ lắp ráp (CKD/SKD)');
+  createUnassembledFrameRack(-52.0, 0, -62.0, 0, 'frameRack2', 'Kệ khung xe đạp điện chưa lắp ráp Kho D2.1');
+
+  // 7. Các chồng pallet gỗ & thùng carton phụ tùng xuất xưởng
   createPalletStack(58, 0, -31);
   createPalletStack(61, 0, -31);
   createPalletStack(-58, 0, -58);
   createPalletStack(-54, 0, -58);
+
+  // Khởi tạo pallet hàng thành phẩm xe điện sẵn trong xưởng B
+  warehouseReadyPallet = createForkliftPalletCargo('ebikes');
+  warehouseReadyPallet.position.set(53.0, 0.05, -31.5);
+  scene.add(warehouseReadyPallet);
 
   // Automatic Boom Barriers at Gate 1 & Gate 2
   createGateBarrier(77.5, 0, -20, 0, 'barrierDK1', 'Barie kiểm soát Cổng 1');
@@ -3935,7 +4949,7 @@ function createGateBarrier(x, y, z, rotY, id, name) {
 
   scene.add(gGroup);
   interactiveObjects.push(post);
-  animatedBarriers.push({ armPivot, currentAngle: 0, targetAngle: 0, x, z });
+  animatedBarriers.push({ armPivot, currentAngle: 0, targetAngle: 0, x, z, id });
 }
 
 // Trạm sạc xe máy điện thông minh (DK EV Charging Hubs)
@@ -5039,6 +6053,7 @@ function buildPeopleAndCharacters() {
 
   // 4. Bảo vệ Cổng DK1 (Hoàng Văn Minh)
   const guard1 = createCharacter({ shirtColor: 0x1e293b, pantsColor: 0x0f172a, hatColor: 0x1e293b });
+  guardGate1 = guard1;
   guard1.position.set(74.5, 0, -21.5);
   guard1.rotation.y = -Math.PI / 2;
   guard1.userData = {
@@ -7427,29 +8442,377 @@ function setupAnimatedVehicles() {
     },
   ];
 
-  // 5. Xe tải lớn di chuyển trên đường ĐT234
-  animatedTruck = new THREE.Group();
-  const truckCab = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 2.0, 1.8),
-    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 })
-  );
-  truckCab.position.set(0, 1.1, 0);
-  truckCab.castShadow = true;
-  animatedTruck.add(truckCab);
-
-  const truckCargo = new THREE.Mesh(
-    new THREE.BoxGeometry(4.0, 2.4, 2.0),
-    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 })
-  );
-  truckCargo.position.set(0, 1.4, -3.2);
-  truckCargo.castShadow = true;
-  animatedTruck.add(truckCargo);
-
-  animatedTruck.position.set(CONFIG.ROAD_DT234.positionX - 1.5, 0.1, -110);
+    // 5. Xe tải thùng 5 tấn DK Logistics (Khối 9: Cửa mở được, phục vụ chu kỳ bốc xếp khép kín)
+  activeLogisticsTruck = create5TonLogisticsTruck(0x0284c7, 'Xe tải logistics 5 tấn DK Bike (5T)');
+  animatedTruck = activeLogisticsTruck.truckGroup;
   scene.add(animatedTruck);
+
+  // Pallet hàng nhập ban đầu trên sàn xe
+  ensureTruckInboundPalletLoaded();
 }
 
 // Đoàn tàu hơi nước cổ điển đỏ rực rỡ, các toa xe màu sắc & Dải khói mây trắng khổng lồ (như ảnh 1)
+
+// ============================================================================
+// CHU TRÌNH LOGISTICS LIÊN TỤC KHÉP KÍN (CONTINUOUS LOGISTICS STATE MACHINE)
+// ============================================================================
+function updateLogisticsCycle(delta, time, isNight) {
+  if (!activeLogisticsTruck || !activeForklift) return;
+
+  const cycleDuration = (CONFIG.LOGISTICS && CONFIG.LOGISTICS.cycleDuration) ? CONFIG.LOGISTICS.cycleDuration : 48.0;
+  const dayFreq = (CONFIG.LOGISTICS && CONFIG.LOGISTICS.dayFrequency) ? CONFIG.LOGISTICS.dayFrequency : 1.0;
+  const nightFreq = (CONFIG.LOGISTICS && CONFIG.LOGISTICS.nightFrequency) ? CONFIG.LOGISTICS.nightFrequency : 0.65;
+  const freq = isNight ? nightFreq : dayFreq;
+
+  // 1. Kiểm tra an toàn người đi bộ cắt ngang đường xe tải / xe nâng
+  let pedestrianBlocked = false;
+  if (CONFIG.LOGISTICS && CONFIG.LOGISTICS.enablePedestrianSafety && wanderingPedestrians.length > 0) {
+    const truckPos = activeLogisticsTruck.truckGroup.position;
+    for (let i = 0; i < wanderingPedestrians.length; i++) {
+      const p = wanderingPedestrians[i];
+      if (p.mesh) {
+        const dx = p.mesh.position.x - truckPos.x;
+        const dz = p.mesh.position.z - truckPos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < 4.2) {
+          pedestrianBlocked = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Giảm tốc mượt mà khi có người đi bộ
+  const targetSlowdown = pedestrianBlocked ? 0.05 : 1.0;
+  logisticsSafetySlowdown += (targetSlowdown - logisticsSafetySlowdown) * delta * 3.5;
+
+  // Tăng thời gian chu kỳ
+  logisticsCycleTime += delta * freq * logisticsSafetySlowdown;
+  const ct = logisticsCycleTime % cycleDuration; // 0.0 -> 48.0s
+
+  const truck = activeLogisticsTruck.truckGroup;
+  const doorL = activeLogisticsTruck.doorPivotLeft;
+  const doorR = activeLogisticsTruck.doorPivotRight;
+  const fl = activeForklift.group;
+  const flLift = activeForklift.liftGroup;
+  const doorB1 = shutterDoors.find((d) => d.id === 'doorB1');
+
+  // Xoay đèn cảnh báo amber trên nóc xe nâng và xe tải
+  rotatingBeacons.forEach((b) => {
+    if (b.mesh) b.mesh.rotation.y += delta * 14;
+    if (b.light) b.light.intensity = (isNight ? 1.1 : 0.75) * (0.8 + Math.sin(time * 0.015) * 0.2);
+  });
+
+  // Đèn pha xe tải ban đêm
+  if (activeLogisticsTruck.headSpotL && activeLogisticsTruck.headSpotR) {
+    const headIntensity = isNight ? 1.6 : 0.0;
+    activeLogisticsTruck.headSpotL.intensity = headIntensity;
+    activeLogisticsTruck.headSpotR.intensity = headIntensity;
+  }
+
+  // Helper hàm nội suy mượt mà
+  const lerp = THREE.MathUtils.lerp;
+  const smooth = (t) => THREE.MathUtils.smoothstep(t, 0, 1);
+
+  // =========================================================================
+  // GIAI ĐOẠN 1: XE TẢI TIẾN VÀO CỔNG 1 (0.0s - 7.0s)
+  // =========================================================================
+  if (ct < 7.0) {
+    const t = smooth(ct / 7.0);
+    // Từ đường ĐT234 (80, 0, 12) rẽ vào Cổng 1 (77.5, 0, -14) -> (74, 0, -20)
+    if (t < 0.5) {
+      const subT = t / 0.5;
+      truck.position.x = lerp(80.0, 77.5, subT);
+      truck.position.z = lerp(12.0, -14.0, subT);
+      truck.rotation.y = lerp(-Math.PI, -Math.PI * 0.8, subT);
+    } else {
+      const subT = (t - 0.5) / 0.5;
+      truck.position.x = lerp(77.5, 74.0, subT);
+      truck.position.z = lerp(-14.0, -20.0, subT);
+      truck.rotation.y = lerp(-Math.PI * 0.8, -Math.PI / 2, subT);
+    }
+
+    // Barie Cổng 1 tự động nâng lên chào đón xe tải
+    const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
+    if (barrier1) barrier1.targetAngle = Math.PI / 2.3;
+
+    // Bảo vệ Cổng 1 giơ tay chào điều lệnh nghiêm trang
+    guardSaluteAngle += (1.0 - guardSaluteAngle) * delta * 4;
+
+    // Đóng cửa thùng xe tải & đóng cửa cuốn xưởng B
+    doorL.rotation.y = 0;
+    doorR.rotation.y = 0;
+    if (doorB1) doorB1.targetProgress = 0.0;
+
+    // Xe nâng ở vị trí chờ bên trong Xưởng B
+    fl.position.set(54.0, 0, -32.5);
+    fl.rotation.y = 0;
+    flLift.position.y = activeForklift.initialY;
+
+    // Pallet hàng nhập nằm sẵn trên thùng xe tải
+    ensureTruckInboundPalletLoaded();
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 2: CHẠY TỚI SÂN BỐC DỠ XƯỞNG B (7.0s - 13.0s)
+  // =========================================================================
+  else if (ct < 13.0) {
+    const t = smooth((ct - 7.0) / 6.0);
+    // Qua cổng vào đường nội bộ: (74, -20) -> (62, -20) -> cua vào trước cửa xưởng (58, -23)
+    if (t < 0.6) {
+      const subT = t / 0.6;
+      truck.position.x = lerp(74.0, 62.0, subT);
+      truck.position.z = -20.0;
+      truck.rotation.y = -Math.PI / 2;
+    } else {
+      const subT = (t - 0.6) / 0.4;
+      truck.position.x = lerp(62.0, 58.0, subT);
+      truck.position.z = lerp(-20.0, -23.0, subT);
+      truck.rotation.y = lerp(-Math.PI / 2, -Math.PI, subT);
+    }
+
+    // Barie hạ xuống & bảo vệ hạ tay sau khi xe qua
+    const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
+    if (barrier1) barrier1.targetAngle = 0;
+    guardSaluteAngle += (0.0 - guardSaluteAngle) * delta * 3;
+
+    doorL.rotation.y = 0;
+    doorR.rotation.y = 0;
+    if (doorB1) doorB1.targetProgress = 0.0;
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 3: LÙI SÁT CỬA BỐC DỠ, MỞ CỬA THÙNG & CUỐN CỬA XƯỞNG (13.0s - 18.0s)
+  // =========================================================================
+  else if (ct < 18.0) {
+    const t = smooth((ct - 13.0) / 5.0);
+    // Xe tải lùi từ (58, -23) đuôi hướng về phía Bắc sát Cửa B1 (58, -30.5)
+    truck.position.x = 58.0;
+    truck.position.z = lerp(-23.0, -30.5, t);
+    truck.rotation.y = 0; // Đuôi xe quay về phía Z âm (sát cửa cuốn)
+
+    // Cửa cuốn Xưởng B cuộn mở lên
+    if (doorB1) doorB1.targetProgress = Math.min(1.0, t * 1.3);
+
+    // Cửa thùng xe tải mở 2 cánh ra 110 độ
+    const doorAngle = smooth(Math.max(0, (t - 0.3) / 0.7)) * 1.95;
+    doorL.rotation.y = -doorAngle;
+    doorR.rotation.y = doorAngle;
+
+    fl.position.set(54.0, 0, -32.5);
+    flLift.position.y = activeForklift.initialY;
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 4: XE NÂNG RA BỐC DỠ PALLET HÀNG NHẬP VÀO KHO (18.0s - 28.0s)
+  // =========================================================================
+  else if (ct < 28.0) {
+    const t = (ct - 18.0) / 10.0;
+    truck.position.set(58.0, 0, -30.5);
+    truck.rotation.y = 0;
+    doorL.rotation.y = -1.95;
+    doorR.rotation.y = 1.95;
+    if (doorB1) doorB1.targetProgress = 1.0;
+
+    // t: 0.0 -> 0.3: Xe nâng từ (54, -32.5) tiến ra sau thùng xe (58, -31.8)
+    if (t < 0.3) {
+      const subT = smooth(t / 0.3);
+      fl.position.x = lerp(54.0, 58.0, subT);
+      fl.position.z = lerp(-32.5, -31.8, subT);
+      fl.rotation.y = lerp(0, -Math.PI / 2, subT);
+      flLift.position.y = activeForklift.initialY + 0.3; // Nâng càng ngang sàn xe tải
+    }
+    // t: 0.3 -> 0.5: Luồn càng vào pallet và nâng bổng pallet lên
+    else if (t < 0.5) {
+      const subT = smooth((t - 0.3) / 0.2);
+      fl.position.set(58.0, 0, -31.8);
+      fl.rotation.y = -Math.PI / 2;
+      flLift.position.y = activeForklift.initialY + 0.3 + subT * 0.35; // Nâng lên khỏi sàn xe
+
+      // Gắn pallet hàng vào càng nâng
+      attachInboundPalletToForklift();
+    }
+    // t: 0.5 -> 0.8: Xe nâng lùi vào trong Xưởng B (53.5, -34.0)
+    else if (t < 0.8) {
+      const subT = smooth((t - 0.5) / 0.3);
+      fl.position.x = lerp(58.0, 53.5, subT);
+      fl.position.z = lerp(-31.8, -34.0, subT);
+      fl.rotation.y = lerp(-Math.PI / 2, 0, subT);
+      flLift.position.y = activeForklift.initialY + 0.65;
+    }
+    // t: 0.8 -> 1.0: Hạ pallet đặt lên sàn kho Xưởng B
+    else {
+      const subT = smooth((t - 0.8) / 0.2);
+      fl.position.set(53.5, 0, -34.0);
+      fl.rotation.y = 0;
+      flLift.position.y = activeForklift.initialY + (1 - subT) * 0.65;
+
+      // Đặt pallet vào kho
+      if (subT > 0.8) detachInboundPalletToWarehouse();
+    }
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 5: XE NÂNG CHUYỂN HÀNG THÀNH PHẨM XUẤT XƯỞNG LÊN XE TẢI (28.0s - 38.0s)
+  // =========================================================================
+  else if (ct < 38.0) {
+    const t = (ct - 28.0) / 10.0;
+    truck.position.set(58.0, 0, -30.5);
+    truck.rotation.y = 0;
+    doorL.rotation.y = -1.95;
+    doorR.rotation.y = 1.95;
+    if (doorB1) doorB1.targetProgress = 1.0;
+
+    // t: 0.0 -> 0.3: Xe nâng xoay qua kệ hàng thành phẩm (53.0, -31.5) & xúc pallet xe điện
+    if (t < 0.3) {
+      const subT = smooth(t / 0.3);
+      fl.position.x = lerp(53.5, 53.0, subT);
+      fl.position.z = lerp(-34.0, -31.5, subT);
+      fl.rotation.y = lerp(0, Math.PI / 2, subT);
+      flLift.position.y = activeForklift.initialY + subT * 0.45;
+      attachOutboundPalletToForklift();
+    }
+    // t: 0.3 -> 0.6: Chở pallet thành phẩm tiến ra đuôi xe tải (58, -31.8)
+    else if (t < 0.6) {
+      const subT = smooth((t - 0.3) / 0.3);
+      fl.position.x = lerp(53.0, 58.0, subT);
+      fl.position.z = lerp(-31.5, -31.8, subT);
+      fl.rotation.y = lerp(Math.PI / 2, -Math.PI / 2, subT);
+      flLift.position.y = activeForklift.initialY + 0.6;
+    }
+    // t: 0.6 -> 0.8: Đặt pallet thành phẩm vào thùng xe tải
+    else if (t < 0.8) {
+      const subT = smooth((t - 0.6) / 0.2);
+      fl.position.set(58.0, 0, -31.8);
+      fl.rotation.y = -Math.PI / 2;
+      flLift.position.y = activeForklift.initialY + 0.6 - subT * 0.3; // Đặt chạm sàn xe
+
+      if (subT > 0.8) attachOutboundPalletToTruck();
+    }
+    // t: 0.8 -> 1.0: Xe nâng lùi về vị trí nghỉ bên trong Xưởng B
+    else {
+      const subT = smooth((t - 0.8) / 0.2);
+      fl.position.x = lerp(58.0, 54.0, subT);
+      fl.position.z = lerp(-31.8, -32.5, subT);
+      fl.rotation.y = lerp(-Math.PI / 2, 0, subT);
+      flLift.position.y = activeForklift.initialY;
+    }
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 6: ĐÓNG CỬA THÙNG & HẠ CỬA CUỐN XƯỞNG B (38.0s - 42.0s)
+  // =========================================================================
+  else if (ct < 42.0) {
+    const t = smooth((ct - 38.0) / 4.0);
+    truck.position.set(58.0, 0, -30.5);
+    truck.rotation.y = 0;
+
+    // 2 Cánh cửa thùng xe tải khép chặt
+    doorL.rotation.y = -1.95 * (1 - t);
+    doorR.rotation.y = 1.95 * (1 - t);
+
+    // Cửa cuốn Xưởng B cuộn hạ xuống
+    if (doorB1) doorB1.targetProgress = 1.0 - t;
+
+    fl.position.set(54.0, 0, -32.5);
+    fl.rotation.y = 0;
+    flLift.position.y = activeForklift.initialY;
+  }
+  // =========================================================================
+  // GIAI ĐOẠN 7: XE TẢI RỜI BÃI BỐC DỠ, XUẤT CỔNG 1 RA ĐT234 (42.0s - 48.0s)
+  // =========================================================================
+  else {
+    const t = smooth((ct - 42.0) / 6.0);
+    doorL.rotation.y = 0;
+    doorR.rotation.y = 0;
+    if (doorB1) doorB1.targetProgress = 0.0;
+
+    // Xe tải tiến ra khỏi xưởng: (58, -30.5) -> (58, -23) -> cua ra đường nội bộ (68, -20) -> Cổng 1 (74, -20) -> ĐT234 (80, 5)
+    if (t < 0.3) {
+      const subT = t / 0.3;
+      truck.position.x = 58.0;
+      truck.position.z = lerp(-30.5, -23.0, subT);
+      truck.rotation.y = 0;
+    } else if (t < 0.6) {
+      const subT = (t - 0.3) / 0.3;
+      truck.position.x = lerp(58.0, 68.0, subT);
+      truck.position.z = lerp(-23.0, -20.0, subT);
+      truck.rotation.y = lerp(0, Math.PI / 2, subT);
+    } else {
+      const subT = (t - 0.6) / 0.4;
+      truck.position.x = lerp(68.0, 80.0, subT);
+      truck.position.z = lerp(-20.0, 5.0, subT);
+      truck.rotation.y = lerp(Math.PI / 2, Math.PI, subT);
+    }
+
+    // Barie Cổng 1 mở lên & bảo vệ chào khi xe tải xuất xưởng
+    const barrier1 = animatedBarriers.find((b) => b.id === 'barrierDK1');
+    if (barrier1) barrier1.targetAngle = t < 0.85 ? Math.PI / 2.3 : 0;
+    guardSaluteAngle += ((t < 0.85 ? 1.0 : 0.0) - guardSaluteAngle) * delta * 4;
+  }
+
+  // Cập nhật tư thế chào của Bảo vệ Cổng DK1
+  if (guardGate1 && guardGate1.userData.rightArm) {
+    guardGate1.userData.rightArm.rotation.x = -guardSaluteAngle * (Math.PI / 1.7);
+    guardGate1.userData.rightArm.rotation.z = -guardSaluteAngle * (Math.PI / 4);
+  }
+}
+
+// Helpers chuyển giao Pallet giữa Xe tải, Xe nâng và Kho xưởng
+function ensureTruckInboundPalletLoaded() {
+  if (!truckInboundPallet) {
+    truckInboundPallet = createForkliftPalletCargo('components');
+  }
+  if (activeLogisticsTruck && activeLogisticsTruck.truckPalletSlot) {
+    if (truckInboundPallet.parent !== activeLogisticsTruck.truckPalletSlot) {
+      activeLogisticsTruck.truckPalletSlot.add(truckInboundPallet);
+      truckInboundPallet.position.set(0, 0, 0);
+      truckInboundPallet.rotation.set(0, 0, 0);
+    }
+  }
+}
+
+function attachInboundPalletToForklift() {
+  if (truckInboundPallet && activeForklift && activeForklift.liftGroup) {
+    if (truckInboundPallet.parent !== activeForklift.liftGroup) {
+      activeForklift.liftGroup.add(truckInboundPallet);
+      truckInboundPallet.position.set(0.68, 0.08, 0);
+      truckInboundPallet.rotation.set(0, 0, 0);
+    }
+  }
+}
+
+function detachInboundPalletToWarehouse() {
+  if (truckInboundPallet) {
+    if (!warehouseStoredPallet) {
+      warehouseStoredPallet = truckInboundPallet;
+    }
+    if (warehouseStoredPallet.parent !== scene) {
+      scene.add(warehouseStoredPallet);
+      warehouseStoredPallet.position.set(53.5, 0.05, -34.0);
+      warehouseStoredPallet.rotation.set(0, 0, 0);
+    }
+  }
+}
+
+function attachOutboundPalletToForklift() {
+  if (!truckOutboundPallet) {
+    truckOutboundPallet = createForkliftPalletCargo('ebikes');
+  }
+  if (activeForklift && activeForklift.liftGroup) {
+    if (truckOutboundPallet.parent !== activeForklift.liftGroup) {
+      activeForklift.liftGroup.add(truckOutboundPallet);
+      truckOutboundPallet.position.set(0.68, 0.08, 0);
+      truckOutboundPallet.rotation.set(0, 0, 0);
+    }
+  }
+}
+
+function attachOutboundPalletToTruck() {
+  if (truckOutboundPallet && activeLogisticsTruck && activeLogisticsTruck.truckPalletSlot) {
+    if (truckOutboundPallet.parent !== activeLogisticsTruck.truckPalletSlot) {
+      activeLogisticsTruck.truckPalletSlot.add(truckOutboundPallet);
+      truckOutboundPallet.position.set(0, 0, 0);
+      truckOutboundPallet.rotation.set(0, 0, 0);
+    }
+  }
+}
+
 function setupTrain() {
   animatedTrain = new THREE.Group();
   trainCars = [];
@@ -7831,12 +9194,8 @@ function updateAnimatedObjects(delta, time) {
     hl.intensity = isNight ? 1.4 : 0.0;
   });
 
-  // 2. Xe tải di chuyển trên ĐT234
-  if (animatedTruck) {
-    truckProgress += delta * 14;
-    if (truckProgress > 150) truckProgress = 0;
-    animatedTruck.position.z = -120 + truckProgress;
-  }
+    // 2. Hoạt cảnh Logistics khép kín: Xe tải 5T, Xe nâng Komatsu, Cửa cuốn & Barie tự động (Khối 9)
+  updateLogisticsCycle(delta, time, isNight);
 
   // 3. Đoàn tàu hơi nước uốn lượn cong trên đường ray & Dải khói mây trắng khổng lồ (như ảnh 1)
   if (railwayCurve && trainCars.length > 0) {
@@ -8082,14 +9441,14 @@ function updateAnimatedObjects(delta, time) {
     }
   });
 
-  // 16. Barie cổng tự động: Cần chắn mở lên khi xe tải chạy qua (Animated Barriers)
-  const truckZ = animatedTruck ? animatedTruck.position.z : -100;
-  const isNearGate1 = Math.abs(truckZ - (-20)) < 16;
-  const isNearGate2 = Math.abs(truckZ - (-28)) < 16;
-
+    // 16. Barie cổng tự động: Cần chắn xoay mượt mà theo targetAngle (Animated Barriers)
   animatedBarriers.forEach((b) => {
-    const shouldOpen = (b.id === 'barrierDK1' && isNearGate1) || (b.id === 'barrierDK2' && isNearGate2);
-    b.targetAngle = shouldOpen ? Math.PI / 2.3 : 0;
+    // Nếu là Cổng 2, mở khi xe bán tải DK2 đến gần
+    if (b.id === 'barrierDK2') {
+      const isNearGate2 = animatedTruck && Math.abs(animatedTruck.position.x - (-20)) < 12;
+      b.targetAngle = isNearGate2 ? Math.PI / 2.3 : 0;
+    }
+    // Cổng 1 (barrierDK1) được điều khiển chính xác theo chu trình Logistics trong updateLogisticsCycle()
     b.currentAngle += (b.targetAngle - b.currentAngle) * delta * 4;
     b.armPivot.rotation.z = b.currentAngle;
   });
