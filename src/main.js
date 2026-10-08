@@ -16,6 +16,18 @@ let animatedBike, bikeRiderGroup, bikeTrackAngle = 0;
 let animatedTruck, truckProgress = 0;
 let animatedTrain, trainProgress = 0;
 
+// Curved Railway, Steam Train & Puffy Smoke (Inspired by vibrant low-poly references)
+let railwayCurve;
+let trainCars = [];
+let trainSmokeTrail = [];
+let windmillBlades;
+let railwayGateArms = [];
+let skyClouds = [];
+let fluffySheeps = [];
+let rowingBoat;
+let riverFishGroup;
+let chimneySmokePuffs = [];
+
 // Animated Characters & People
 let walkingWorkers = [];
 let flagMeshes = [];
@@ -111,6 +123,7 @@ function init() {
 
   // Grounds & Roads
   buildGroundsAndRoadDT234();
+  buildVastTerrainAndClouds();
 
   // DK1 Campus Core
   buildRetainingWall();
@@ -352,6 +365,156 @@ function buildPylonSign(x, y, z, brand, sub, colorHex, id) {
   interactiveObjects.push(tower);
 }
 
+// ============================================================================
+// 3b. Đại cảnh Thảo nguyên xanh, Đồi nhấp nhô, Cối xay gió & Mây trời (Vibrant Low-Poly)
+// ============================================================================
+function buildVastTerrainAndClouds() {
+  // 1. Thảm cỏ xanh mướt mát đại cảnh bao la
+  const meadowGeo = new THREE.BoxGeometry(540, 2.0, 480);
+  const meadowMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.GROUND.grassColor,
+    roughness: 0.88,
+    metalness: 0.05,
+    flatShading: true,
+  });
+  const meadow = new THREE.Mesh(meadowGeo, meadowMat);
+  meadow.position.set(-15, -2.0, -40);
+  meadow.receiveShadow = true;
+  scene.add(meadow);
+
+  // 2. Dãy đồi xanh nhấp nhô phía sau (Mạn Đông & Đông-Bắc tạo thung lũng như ảnh 1 & 2)
+  const hillsData = [
+    { x: 125, y: 11, z: -80, radius: 52, height: 26, color: 0x22c55e },
+    { x: 142, y: 9, z: -25, radius: 48, height: 22, color: 0x16a34a },
+    { x: 132, y: 8, z: 38, radius: 45, height: 20, color: 0x4ade80 },
+    { x: 55, y: 12, z: -108, radius: 54, height: 28, color: 0x22c55e }, // Đồi Bắc đặt cối xay gió
+  ];
+
+  hillsData.forEach((h) => {
+    const hillMesh = new THREE.Mesh(
+      new THREE.ConeGeometry(h.radius, h.height, 9),
+      new THREE.MeshStandardMaterial({ color: h.color, roughness: 0.9, flatShading: true })
+    );
+    hillMesh.position.set(h.x, h.y, h.z);
+    hillMesh.receiveShadow = true;
+    scene.add(hillMesh);
+  });
+
+  // 3. Cối xay gió phong cách Hà Lan trên đỉnh đồi (Dutch Windmill - như ảnh 1)
+  const windmillGroup = new THREE.Group();
+  windmillGroup.position.set(55, 25.5, -108);
+
+  // Tháp thân nón cụt trắng
+  const millTower = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2, 3.8, 9.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7, flatShading: true })
+  );
+  millTower.castShadow = true;
+  windmillGroup.add(millTower);
+
+  // Mái nón chóp đỏ rực rỡ
+  const millRoof = new THREE.Mesh(
+    new THREE.ConeGeometry(2.8, 2.8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6, flatShading: true })
+  );
+  millRoof.position.y = 5.8;
+  millRoof.castShadow = true;
+  windmillGroup.add(millRoof);
+
+  // Cửa sổ & Cửa ra vào cối xay gió
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+  const millDoor = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.6, 0.2), doorMat);
+  millDoor.position.set(0, -3.2, 3.6);
+  windmillGroup.add(millDoor);
+
+  // Trục cánh quạt và 4 cánh quạt gỗ chữ thập
+  const bladePivot = new THREE.Group();
+  bladePivot.position.set(0, 5.0, 2.5);
+
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.35, 0.6, 8),
+    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 })
+  );
+  hub.rotation.x = Math.PI / 2;
+  bladePivot.add(hub);
+
+  windmillBlades = new THREE.Group();
+  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.5 });
+  const frameWoodMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 });
+
+  for (let b = 0; b < 4; b++) {
+    const bArm = new THREE.Group();
+    bArm.rotation.z = (b * Math.PI) / 2;
+
+    const spar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 5.8, 0.1), frameWoodMat);
+    spar.position.y = 2.9;
+    bArm.add(spar);
+
+    const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.85, 4.2, 0.05), bladeMat);
+    cloth.position.set(0.45, 3.4, 0.02);
+    cloth.castShadow = true;
+    bArm.add(cloth);
+
+    windmillBlades.add(bArm);
+  }
+  bladePivot.add(windmillBlades);
+  windmillGroup.add(bladePivot);
+
+  windmillGroup.userData = {
+    id: 'windmill',
+    title: 'Cối xay gió cảnh quan sinh thái',
+    type: 'landmark',
+    desc: 'Điểm nhấn cảnh quan trên đỉnh đồi sinh thái xanh phía Bắc, biểu tượng năng lượng gió thân thiện môi trường của DK Bike.',
+    zone: 'Đồi Sinh Thái Bắc',
+  };
+  millTower.userData = windmillGroup.userData;
+  scene.add(windmillGroup);
+  interactiveObjects.push(millTower);
+
+  // 4. Mây trời low-poly bồng bềnh lơ lửng trên không (Sky Clouds)
+  skyClouds = [];
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.4,
+    flatShading: true,
+  });
+
+  const cloudConfigs = [
+    { x: -140, y: 88, z: -100, scale: 1.4, speed: 2.5 },
+    { x: -70, y: 95, z: -60, scale: 1.8, speed: 3.2 },
+    { x: 10, y: 82, z: -120, scale: 1.2, speed: 2.2 },
+    { x: 80, y: 100, z: -50, scale: 1.6, speed: 2.8 },
+    { x: 130, y: 90, z: -80, scale: 1.5, speed: 3.0 },
+    { x: -110, y: 78, z: 20, scale: 1.3, speed: 2.0 },
+    { x: 30, y: 92, z: 40, scale: 1.7, speed: 3.4 },
+    { x: 120, y: 85, z: 15, scale: 1.4, speed: 2.6 },
+  ];
+
+  cloudConfigs.forEach((c) => {
+    const cGroup = new THREE.Group();
+    cGroup.position.set(c.x, c.y, c.z);
+
+    // Ghép 4-5 khối tròn đa diện tạo cụm mây xốp
+    const puffs = [
+      { x: 0, y: 0, z: 0, r: 4.0 },
+      { x: 3.2, y: -0.5, z: 0.4, r: 3.2 },
+      { x: -3.0, y: -0.4, z: -0.3, r: 3.0 },
+      { x: 1.2, y: 1.5, z: 0, r: 3.4 },
+      { x: -1.4, y: 1.2, z: 0.2, r: 2.8 },
+    ];
+
+    puffs.forEach((p) => {
+      const puffMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(p.r, 1), cloudMat);
+      puffMesh.position.set(p.x, p.y, p.z);
+      cGroup.add(puffMesh);
+    });
+
+    cGroup.scale.setScalar(c.scale);
+    cGroup.userData = { speed: c.speed, initialX: c.x };
+    scene.add(cGroup);
+    skyClouds.push(cGroup);
+  });
+}
 
 // ============================================================================
 // 4. DK1: Retaining Wall, Canal & Railway
@@ -378,80 +541,572 @@ function buildRetainingWall() {
   }
 }
 
+// Tuyến đường sắt cong, Cầu vòm đỏ, Ga xe lửa DK Station, Sông máng & Đàn cừu (Toàn diện theo 3 ảnh mẫu)
 function buildCanalAndRailway() {
+  // --------------------------------------------------------------------------
+  // A. Sông máng nước uốn lượn xanh ngọc trong vắt, bãi cát ven bờ (như ảnh 2)
+  // --------------------------------------------------------------------------
   const canalConfig = CONFIG.CANAL;
+  const canalLength = 175;
+
+  // Lòng sông đáy cát vàng
   const canalBed = new THREE.Mesh(
-    new THREE.BoxGeometry(canalConfig.width + 1.0, 2.0, canalConfig.length),
-    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
+    new THREE.BoxGeometry(canalConfig.width + 5.0, 1.8, canalLength),
+    new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.9 })
   );
-  canalBed.position.set(canalConfig.positionX, -2.5, -42);
+  canalBed.position.set(89.0, -2.4, -35);
   scene.add(canalBed);
 
+  // Mặt nước xanh ngọc trong veo
   waterCanalMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(canalConfig.width, canalConfig.length),
+    new THREE.PlaneGeometry(canalConfig.width + 3.0, canalLength),
     new THREE.MeshStandardMaterial({
       color: canalConfig.waterColor,
-      roughness: 0.15,
-      metalness: 0.6,
+      roughness: 0.12,
+      metalness: 0.5,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.88,
     })
   );
   waterCanalMesh.rotation.x = -Math.PI / 2;
-  waterCanalMesh.position.set(canalConfig.positionX, -1.6, -42);
+  waterCanalMesh.position.set(89.0, -1.4, -35);
   waterCanalMesh.receiveShadow = true;
   scene.add(waterCanalMesh);
 
-  // Canal bridge
-  const bridge = new THREE.Mesh(
-    new THREE.BoxGeometry(canalConfig.width + 2, 0.3, 3.5),
-    new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+  // Dải bãi cát vàng thoai thoải viền 2 bên bờ sông (như ảnh 2)
+  const sandMat = new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.95, flatShading: true });
+  const sandLeft = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, canalLength), sandMat);
+  sandLeft.position.set(82.2, -1.2, -35);
+  scene.add(sandLeft);
+
+  const sandRight = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.4, canalLength), sandMat);
+  sandRight.position.set(95.6, -1.2, -35);
+  scene.add(sandRight);
+
+  // Thuyền gỗ mộc mạc có người chèo đò đứng giữa dòng sông (như ảnh 2)
+  const boatGroup = new THREE.Group();
+  boatGroup.position.set(89.5, -1.3, -8);
+
+  const boatHull = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.6, 4.2),
+    new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
   );
-  bridge.position.set(canalConfig.positionX, -1.3, -30);
-  bridge.castShadow = true;
-  scene.add(bridge);
+  boatHull.castShadow = true;
+  boatGroup.add(boatHull);
 
-  // Railway
-  const railConfig = CONFIG.RAILWAY;
-  const ballast = new THREE.Mesh(
-    new THREE.BoxGeometry(4.0, 0.4, railConfig.length),
-    new THREE.MeshStandardMaterial({ color: railConfig.ballastColor, roughness: 0.95 })
+  // Người chèo đò
+  const boatman = createCharacter({ shirtColor: 0xef4444, pantsColor: 0x1e293b, hatColor: 0xfef08a, isDriver: true });
+  boatman.position.set(0, 0.25, 0.4);
+  boatGroup.add(boatman);
+
+  // Mái chèo gỗ
+  const oar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.04, 2.8),
+    new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.7 })
   );
-  ballast.position.set(railConfig.positionX, -0.6, -42);
-  ballast.receiveShadow = true;
-  scene.add(ballast);
+  oar.rotation.z = Math.PI / 4;
+  oar.position.set(0.6, 0.7, 0.2);
+  boatGroup.add(oar);
 
-  const railMat = new THREE.MeshStandardMaterial({ color: railConfig.railColor, roughness: 0.3, metalness: 0.8 });
-  const rail1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, railConfig.length), railMat);
-  rail1.position.set(railConfig.positionX - railConfig.railGauge / 2, -0.3, -42);
-  rail1.castShadow = true;
-  scene.add(rail1);
+  boatGroup.userData = {
+    id: 'rowingBoat',
+    title: 'Thuyền nan du ngoạn sinh thái trên sông',
+    type: 'boat',
+    desc: 'Hoạt động chèo thuyền thư giãn trên dòng sông máng nước trong vắt bao quanh khuôn viên DK Bike.',
+    zone: 'Sông Máng Nước',
+  };
+  boatHull.userData = boatGroup.userData;
+  scene.add(boatGroup);
+  interactiveObjects.push(boatHull);
+  rowingBoat = boatGroup;
 
-  const rail2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, railConfig.length), railMat);
-  rail2.position.set(railConfig.positionX + railConfig.railGauge / 2, -0.3, -42);
-  rail2.castShadow = true;
-  scene.add(rail2);
+  // Lá sen tròn to khuyết chữ V (Lily Pads) nổi bồng bềnh quanh thuyền (như ảnh 2)
+  const lilyMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.6, side: THREE.DoubleSide });
+  const lilyFlowerMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 });
+  lotusLeaves = [];
 
-  // Sleepers
-  const sleeperCount = 65;
-  const sleeperInstanced = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(2.4, 0.15, 0.4),
-    new THREE.MeshStandardMaterial({ color: 0x3f3731, roughness: 0.9 }),
-    sleeperCount
+  const lilyPositions = [
+    { x: 88.0, z: -5.0, s: 1.1 },
+    { x: 91.2, z: -6.5, s: 0.9 },
+    { x: 87.5, z: -11.0, s: 1.3 },
+    { x: 90.8, z: -12.5, s: 1.0 },
+    { x: 89.2, z: -15.0, s: 1.4 },
+    { x: 87.0, z: -2.0, s: 0.8 },
+    { x: 91.5, z: -1.0, s: 1.2 },
+  ];
+
+  lilyPositions.forEach((lp, lIdx) => {
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.85 * lp.s, 12, 0.4, Math.PI * 1.85), lilyMat);
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(lp.x, -1.35, lp.z);
+    scene.add(pad);
+    lotusLeaves.push(pad);
+
+    if (lIdx % 2 === 0) {
+      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25 * lp.s), lilyFlowerMat);
+      flower.position.set(lp.x + 0.1, -1.25, lp.z - 0.1);
+      scene.add(flower);
+    }
+  });
+
+  // Đàn cá xanh bơi lội dưới sông (như ảnh 2)
+  riverFishGroup = new THREE.Group();
+  riverFishGroup.position.set(89.0, -1.5, -9);
+  const fishMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 });
+
+  for (let f = 0; f < 8; f++) {
+    const fMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 5), fishMat);
+    fMesh.rotation.x = Math.PI / 2;
+    const fAngle = (f / 8) * Math.PI * 2;
+    fMesh.position.set(Math.cos(fAngle) * 1.6, 0, Math.sin(fAngle) * 1.6);
+    fMesh.rotation.y = -fAngle + Math.PI / 2;
+    riverFishGroup.add(fMesh);
+  }
+  scene.add(riverFishGroup);
+
+  // Cầu gỗ mộc bắc qua khúc sông ở mạn Nam
+  const woodBridge = new THREE.Mesh(
+    new THREE.BoxGeometry(canalConfig.width + 3.5, 0.35, 3.2),
+    new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 })
   );
+  woodBridge.position.set(89.0, -0.9, 18);
+  woodBridge.castShadow = true;
+  scene.add(woodBridge);
+
+  // --------------------------------------------------------------------------
+  // B. Tuyến đường sắt cong uốn lượn (Curved Railway) bằng CatmullRomCurve3
+  // --------------------------------------------------------------------------
+  const railCurvePoints = [
+    new THREE.Vector3(122, 0.3, -118),
+    new THREE.Vector3(108, 0.5, -88),
+    new THREE.Vector3(97, 1.8, -62), // Bắt đầu lên Cầu vòm đỏ
+    new THREE.Vector3(93.5, 1.8, -48), // Giữa Cầu vòm đỏ bắc qua sông máng
+    new THREE.Vector3(90.5, 0.8, -32), // Xuống cầu
+    new THREE.Vector3(90.0, 0.25, -12), // Đi ngang qua Ga xe lửa DK Station
+    new THREE.Vector3(91.5, 0.25, 8),  // Qua ga và giao cắt đường bộ
+    new THREE.Vector3(100.0, 0.35, 35), // Uốn cong về phía đông nam
+    new THREE.Vector3(116.0, 0.4, 68),
+  ];
+  railwayCurve = new THREE.CatmullRomCurve3(railCurvePoints);
+
+  // Nền đá cát ballast uốn cong theo tim ray (như ảnh 1 & 3)
+  const ballastTube = new THREE.Mesh(
+    new THREE.TubeGeometry(railwayCurve, 120, 2.2, 5, false),
+    new THREE.MeshStandardMaterial({ color: CONFIG.RAILWAY.ballastColor, roughness: 0.95, flatShading: true })
+  );
+  ballastTube.scale.set(1.0, 0.25, 1.0);
+  ballastTube.position.y = -0.15;
+  ballastTube.receiveShadow = true;
+  scene.add(ballastTube);
+
+  // Hai thanh ray thép uốn lượn song song sáng bóng
+  const railGauge = CONFIG.RAILWAY.railGauge;
+  const railMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.RAILWAY.railColor,
+    roughness: 0.25,
+    metalness: 0.85,
+  });
+
+  const rail1Points = [];
+  const rail2Points = [];
+  const totalSamples = 160;
+
+  for (let i = 0; i <= totalSamples; i++) {
+    const t = i / totalSamples;
+    const pt = railwayCurve.getPointAt(t);
+    const tangent = railwayCurve.getTangentAt(t);
+    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+    rail1Points.push(pt.clone().add(normal.clone().multiplyScalar(-railGauge / 2)).add(new THREE.Vector3(0, 0.18, 0)));
+    rail2Points.push(pt.clone().add(normal.clone().multiplyScalar(railGauge / 2)).add(new THREE.Vector3(0, 0.18, 0)));
+  }
+
+  const rail1Curve = new THREE.CatmullRomCurve3(rail1Points);
+  const rail2Curve = new THREE.CatmullRomCurve3(rail2Points);
+
+  const railMesh1 = new THREE.Mesh(new THREE.TubeGeometry(rail1Curve, 140, 0.08, 6, false), railMat);
+  railMesh1.castShadow = true;
+  scene.add(railMesh1);
+
+  const railMesh2 = new THREE.Mesh(new THREE.TubeGeometry(rail2Curve, 140, 0.08, 6, false), railMat);
+  railMesh2.castShadow = true;
+  scene.add(railMesh2);
+
+  // Tà vẹt gỗ vuông góc tiếp tuyến đường ray
+  const sleeperCount = 135;
+  const sleeperGeo = new THREE.BoxGeometry(2.3, 0.14, 0.38);
+  const sleeperMat = new THREE.MeshStandardMaterial({ color: CONFIG.RAILWAY.sleeperColor, roughness: 0.9 });
+  const sleeperInstanced = new THREE.InstancedMesh(sleeperGeo, sleeperMat, sleeperCount);
   sleeperInstanced.castShadow = true;
   sleeperInstanced.receiveShadow = true;
 
   const dummy = new THREE.Object3D();
-  const startZ = -42 - railConfig.length / 2;
-  const stepZ = railConfig.length / sleeperCount;
-  for (let i = 0; i < sleeperCount; i++) {
-    dummy.position.set(railConfig.positionX, -0.4, startZ + i * stepZ);
+  for (let s = 0; s < sleeperCount; s++) {
+    const t = s / (sleeperCount - 1);
+    const pos = railwayCurve.getPointAt(t);
+    const tangent = railwayCurve.getTangentAt(t);
+    const angleY = Math.atan2(tangent.x, tangent.z);
+
+    dummy.position.set(pos.x, pos.y + 0.06, pos.z);
+    dummy.rotation.set(0, angleY + Math.PI / 2, 0);
     dummy.updateMatrix();
-    sleeperInstanced.setMatrixAt(i, dummy.matrix);
+    sleeperInstanced.setMatrixAt(s, dummy.matrix);
   }
   sleeperInstanced.instanceMatrix.needsUpdate = true;
   scene.add(sleeperInstanced);
+
+  // --------------------------------------------------------------------------
+  // C. Cây Cầu vòm đường sắt màu đỏ tươi rực rỡ (Red Arch Railway Bridge - như ảnh 1)
+  // --------------------------------------------------------------------------
+  const bridgeGroup = new THREE.Group();
+  bridgeGroup.position.set(95.0, 0, -49);
+  bridgeGroup.rotation.y = 0.38; // Khớp góc xiên đường sắt
+
+  const redSteelMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.RAILWAY.bridgeArchColor,
+    roughness: 0.35,
+    metalness: 0.5,
+  });
+
+  // Bản mặt cầu dầm thép đỏ
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.6, 26), redSteelMat);
+  deck.position.y = 1.8;
+  deck.castShadow = true;
+  bridgeGroup.add(deck);
+
+  // Hai vòm thép đỏ hình bán nguyệt hai bên
+  [-2.2, 2.2].forEach((archX) => {
+    // Vòm cong bằng CylinderGeometry cắt nửa
+    const archSegment = new THREE.Mesh(
+      new THREE.CylinderGeometry(11.5, 11.5, 0.45, 16, 1, true, 0, Math.PI),
+      redSteelMat
+    );
+    archSegment.rotation.z = Math.PI / 2;
+    archSegment.rotation.y = Math.PI / 2;
+    archSegment.position.set(archX, 0.2, 0);
+    archSegment.scale.set(0.45, 1.0, 1.0);
+    archSegment.castShadow = true;
+    bridgeGroup.add(archSegment);
+
+    // Lan can đỏ trên mặt cầu
+    const railTop = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 25), redSteelMat);
+    railTop.position.set(archX, 2.9, 0);
+    bridgeGroup.add(railTop);
+
+    for (let rz = -12; rz <= 12; rz += 2.0) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), redSteelMat);
+      post.position.set(archX, 2.45, rz);
+      bridgeGroup.add(post);
+    }
+  });
+
+  // Mố cầu đá kiên cố cắm xuống đáy sông
+  const pierMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 });
+  [-11, 11].forEach((pz) => {
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(5.2, 4.0, 3.2), pierMat);
+    pier.position.set(0, -0.4, pz);
+    pier.castShadow = true;
+    pier.receiveShadow = true;
+    bridgeGroup.add(pier);
+  });
+
+  bridgeGroup.userData = {
+    id: 'redArchBridge',
+    title: 'Cầu vòm đường sắt màu đỏ (Red Arch Railway Bridge)',
+    type: 'bridge',
+    desc: 'Cầu vòm đường sắt kết cấu thép sơn đỏ rực rỡ bắc qua thung lũng sông máng nước, tạo điểm nhấn cảnh quan sinh thái hùng vĩ.',
+    zone: 'Đường sắt Bắc - Nam',
+  };
+  deck.userData = bridgeGroup.userData;
+  scene.add(bridgeGroup);
+  interactiveObjects.push(deck);
+
+  // --------------------------------------------------------------------------
+  // D. Ga xe lửa DK Station (như ảnh 3: Mái ngói đỏ, ke ga trắng, barie, biển ga)
+  // --------------------------------------------------------------------------
+  const stationGroup = new THREE.Group();
+  stationGroup.position.set(87.5, 0, -2.0);
+
+  // Sân ke ga bê tông trắng
+  const platform = new THREE.Mesh(
+    new THREE.BoxGeometry(5.2, 0.55, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.7 })
+  );
+  platform.position.y = 0.28;
+  platform.receiveShadow = true;
+  stationGroup.add(platform);
+
+  // Vạch an toàn màu vàng trên ke ga
+  const safetyLine = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.18, 23.5),
+    new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+  );
+  safetyLine.rotation.x = -Math.PI / 2;
+  safetyLine.position.set(2.2, 0.56, 0);
+  stationGroup.add(safetyLine);
+
+  // Tòa nhà ga nhỏ phong cách châu Âu
+  const stationBuilding = new THREE.Group();
+  stationBuilding.position.set(-0.8, 0.55, -2.0);
+
+  // Thân nhà tường trắng kem
+  const stWalls = new THREE.Mesh(
+    new THREE.BoxGeometry(3.6, 3.2, 10.5),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6 })
+  );
+  stWalls.position.y = 1.6;
+  stWalls.castShadow = true;
+  stationBuilding.add(stWalls);
+
+  // Mái ngói đỏ dốc tươi tắn (như ảnh 3)
+  const stRoof = new THREE.Mesh(
+    new THREE.ConeGeometry(3.5, 2.2, 4),
+    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5, flatShading: true })
+  );
+  stRoof.rotation.y = Math.PI / 4;
+  stRoof.scale.set(1.2, 1.0, 2.8);
+  stRoof.position.y = 3.9;
+  stRoof.castShadow = true;
+  stationBuilding.add(stRoof);
+
+  // Hiên che sân ga cột xanh
+  const porchRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.15, 11),
+    new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6 })
+  );
+  porchRoof.position.set(2.4, 2.7, 0);
+  stationBuilding.add(porchRoof);
+
+  const columnMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.5 });
+  for (let cz = -4.5; cz <= 4.5; cz += 3.0) {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.7), columnMat);
+    col.position.set(3.4, 1.35, cz);
+    stationBuilding.add(col);
+  }
+
+  // Biển hiệu tên ga "GA XE LỬA DK BIKE" (như biển Willowbend trong ảnh 3)
+  const signBoard = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.8, 3.2),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 })
+  );
+  signBoard.position.set(3.45, 3.2, 0);
+  stationBuilding.add(signBoard);
+
+  // Đồng hồ tròn treo tường chỉ giờ
+  const clockMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.35, 0.1, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
+  );
+  clockMesh.rotation.z = Math.PI / 2;
+  clockMesh.position.set(1.85, 2.2, 0);
+  stationBuilding.add(clockMesh);
+
+  // Ghế băng gỗ chờ tàu trên ke ga
+  const benchMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 });
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 1.8), benchMat);
+  bench.position.set(1.2, 0.25, 4.2);
+  stationBuilding.add(bench);
+
+  // Valy hành lý của khách
+  const luggage = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.3, 0.6),
+    new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.5 })
+  );
+  luggage.position.set(1.2, 0.15, 5.5);
+  stationBuilding.add(luggage);
+
+  // Trưởng ga & Khách đợi tàu
+  const stationMaster = createCharacter({ shirtColor: 0x1e3a8a, pantsColor: 0x1e293b, hatColor: 0xef4444 });
+  stationMaster.position.set(1.6, 0, 1.5);
+  stationBuilding.add(stationMaster);
+
+  const passenger = createCharacter({ shirtColor: 0x059669, pantsColor: 0x334155, hatColor: 0xfef08a });
+  passenger.position.set(1.5, 0, -3.2);
+  stationBuilding.add(passenger);
+
+  stationGroup.add(stationBuilding);
+
+  // Cột barie chắn tàu đường sắt (như ảnh 3: sọc đỏ trắng)
+  const gatePost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.22, 1.4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
+  );
+  gatePost.position.set(3.2, 0.7, 7.5);
+  stationGroup.add(gatePost);
+
+  const gateArmPivot = new THREE.Group();
+  gateArmPivot.position.set(3.2, 1.3, 7.5);
+
+  const gateArm = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.14, 5.0),
+    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 })
+  );
+  gateArm.position.set(0, 0, 2.5);
+  gateArmPivot.add(gateArm);
+  stationGroup.add(gateArmPivot);
+  railwayGateArms.push({ pivot: gateArmPivot, currentAngle: 0, targetAngle: 0 });
+
+  stationGroup.userData = {
+    id: 'dkStation',
+    title: 'Ga xe lửa DK Station (Willowbend Style)',
+    type: 'station',
+    desc: 'Nhà ga đường sắt hành khách và hàng hóa kết nối khuôn viên DK Bike với mạng lưới đường sắt quốc gia.',
+    zone: 'Ga DK Station',
+  };
+  stWalls.userData = stationGroup.userData;
+  scene.add(stationGroup);
+  interactiveObjects.push(stWalls);
+
+  // --------------------------------------------------------------------------
+  // E. Cụm làng quê / nhà dân chân đồi mái ngói màu sắc (như ảnh 3)
+  // --------------------------------------------------------------------------
+  const villageHouses = [
+    { x: 108, z: -25, color: 0xef4444, rot: 0.1 },
+    { x: 116, z: -30, color: 0x2563eb, rot: -0.2 },
+    { x: 124, z: -22, color: 0xf97316, rot: 0.3 },
+    { x: 112, z: -12, color: 0x059669, rot: 0.05 },
+    { x: 120, z: -8, color: 0xeab308, rot: -0.15 },
+    { x: 128, z: -14, color: 0xdc2626, rot: 0.2 },
+    { x: 114, z: 5, color: 0x3b82f6, rot: -0.1 },
+    { x: 122, z: 12, color: 0xf97316, rot: 0.25 },
+  ];
+
+  const wallMatWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
+  chimneySmokePuffs = [];
+
+  villageHouses.forEach((vh, vIdx) => {
+    const houseGroup = new THREE.Group();
+    houseGroup.position.set(vh.x, 0.2, vh.z);
+    houseGroup.rotation.y = vh.rot;
+
+    // Tường nhà trắng
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 3.8), wallMatWhite);
+    body.position.y = 1.6;
+    body.castShadow = true;
+    houseGroup.add(body);
+
+    // Mái dốc màu sắc
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(3.4, 2.2, 4),
+      new THREE.MeshStandardMaterial({ color: vh.color, roughness: 0.5, flatShading: true })
+    );
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 4.1;
+    roof.castShadow = true;
+    houseGroup.add(roof);
+
+    // Ống khói
+    const chimney = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 1.6, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+    );
+    chimney.position.set(1.0, 4.4, 0.8);
+    houseGroup.add(chimney);
+
+    // Khói trắng zíc zắc bốc lên từ ống khói (như ảnh 3)
+    const puffMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.7 });
+    for (let cp = 0; cp < 4; cp++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.24 + cp * 0.1, 6, 6), puffMat);
+      puff.position.set(1.0 + (cp % 2 === 0 ? 0.15 : -0.15), 5.4 + cp * 0.7, 0.8);
+      houseGroup.add(puff);
+      chimneySmokePuffs.push(puff);
+    }
+
+    scene.add(houseGroup);
+  });
+
+  // Đường mòn đất cát vàng dẫn từ làng ra ga xe lửa (như ảnh 3)
+  const pathMat = new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.95 });
+  const villagePath = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 35), pathMat);
+  villagePath.rotation.x = -Math.PI / 2;
+  villagePath.rotation.z = -0.3;
+  villagePath.position.set(104, 0.08, -6);
+  villagePath.receiveShadow = true;
+  scene.add(villagePath);
+
+  // --------------------------------------------------------------------------
+  // F. Đàn cừu trắng muốt đầu đen trên sườn đồi xanh & Bóng thoại (như ảnh 2)
+  // --------------------------------------------------------------------------
+  const sheepGroup = new THREE.Group();
+  sheepGroup.position.set(120, 3.5, -62);
+
+  const woolMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
+  const sheepBlackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+
+  const sheepCoords = [
+    { x: 0, z: 0, rot: 0.3 },
+    { x: 2.2, z: -1.2, rot: -0.5 },
+    { x: -1.8, z: 1.5, rot: 0.8 },
+    { x: 3.5, z: 1.8, rot: 2.1 },
+    { x: 1.2, z: 3.2, rot: 1.2 },
+    { x: -3.2, z: -1.5, rot: -1.8 },
+    { x: 4.8, z: -0.5, rot: -0.2 },
+  ];
+
+  sheepCoords.forEach((sc, sIdx) => {
+    const oneSheep = new THREE.Group();
+    oneSheep.position.set(sc.x, 0, sc.z);
+    oneSheep.rotation.y = sc.rot;
+
+    // Thân lông xù trắng
+    const bodyWool = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 1), woolMat);
+    bodyWool.scale.set(1.0, 0.85, 1.35);
+    bodyWool.position.y = 0.65;
+    bodyWool.castShadow = true;
+    oneSheep.add(bodyWool);
+
+    // Đầu đen
+    const sheepHead = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.35, 0.42), sheepBlackMat);
+    sheepHead.position.set(0, 0.82, 0.72);
+    oneSheep.add(sheepHead);
+
+    // Tai vểnh hai bên
+    [-0.22, 0.22].forEach((ex) => {
+      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.1), sheepBlackMat);
+      ear.position.set(ex, 0.92, 0.65);
+      oneSheep.add(ear);
+    });
+
+    // 4 chân đen ngắn
+    [-0.24, 0.24].forEach((lx) => {
+      [-0.35, 0.35].forEach((lz) => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), sheepBlackMat);
+        leg.position.set(lx, 0.2, lz);
+        oneSheep.add(leg);
+      });
+    });
+
+    sheepGroup.add(oneSheep);
+    fluffySheeps.push(oneSheep);
+  });
+
+  // Bóng thoại hoạt hình đáng yêu (như ảnh 2: "I could dance all afternoon!")
+  const speechBubble = new THREE.Mesh(
+    new THREE.BoxGeometry(3.6, 1.2, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
+  );
+  speechBubble.position.set(2.5, 3.2, 0.5);
+  speechBubble.rotation.y = -Math.PI / 4;
+  sheepGroup.add(speechBubble);
+
+  const bubbleTail = new THREE.Mesh(
+    new THREE.ConeGeometry(0.35, 0.6, 3),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
+  );
+  bubbleTail.rotation.z = Math.PI;
+  bubbleTail.position.set(1.6, 2.3, 0.5);
+  sheepGroup.add(bubbleTail);
+
+  sheepGroup.userData = {
+    id: 'sheepFlock',
+    title: 'Đàn cừu sinh thái trên đồi cỏ (Eco Sheep Flock)',
+    type: 'animals',
+    desc: 'Đàn cừu trắng muốt gặm cỏ thong dong trên sườn đồi xanh ngắt, biểu tượng của môi trường sinh thái trong lành tại DK Bike Campus.',
+    zone: 'Đồi Sinh Thái Đông',
+  };
+  speechBubble.userData = sheepGroup.userData;
+  scene.add(sheepGroup);
+  interactiveObjects.push(speechBubble);
 }
 
 // ============================================================================
@@ -1424,77 +2079,245 @@ function buildDK2Vehicles() {
 }
 
 // ============================================================================
-// 10. Landscaping & Trees (InstancedMesh)
+// 10. Landscaping, Greenery, River Rocks & Wildflowers (Vibrant Faceted Low-Poly)
 // ============================================================================
 function buildLandscaping() {
-  const treeCount = 95;
-  const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 2.0, 5);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9 });
-  const foliageGeo = new THREE.ConeGeometry(1.5, 3.5, 5);
-  const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.8, flatShading: true });
-
-  const trunkInstanced = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
-  const foliageInstanced = new THREE.InstancedMesh(foliageGeo, foliageMat, treeCount);
-  trunkInstanced.castShadow = true;
-  foliageInstanced.castShadow = true;
-
   const dummy = new THREE.Object3D();
-  let idx = 0;
 
-  // Trees along railway boundary
-  for (let z = -90; z <= 0; z += 5) {
-    if (idx >= treeCount) break;
-    const x = 81.5 + (Math.random() - 0.5) * 0.8;
-    dummy.position.set(x, 1.0, z);
-    dummy.scale.setScalar(0.9 + Math.random() * 0.3);
-    dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(idx, dummy.matrix);
+  // 1. Thân cây gỗ (Trunks) cho cây tán tròn
+  const roundTreeCount = 260;
+  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.36, 2.2, 5);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9, flatShading: true });
+  const trunkInstanced = new THREE.InstancedMesh(trunkGeo, trunkMat, roundTreeCount);
+  trunkInstanced.castShadow = true;
 
-    dummy.position.set(x, 3.2, z);
+  // 2. Tán cây tròn đa giác (Icosahedron Faceted Foliage - 4 bảng màu xanh rực rỡ & 1 vàng thu như ảnh mẫu)
+  const foliageGeo = new THREE.IcosahedronGeometry(1.85, 1);
+  const foliageColors = [
+    0x4ade80, // Xanh lá mạ rực rỡ
+    0x22c55e, // Xanh tươi sáng
+    0x84cc16, // Xanh nõn chuối
+    0x15803d, // Xanh lá đậm ngọc
+    0xeab308, // Lá vàng thu nổi bật
+  ];
+
+  const foliageMeshes = foliageColors.map((colorHex) => {
+    const mat = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      roughness: 0.75,
+      flatShading: true,
+    });
+    const im = new THREE.InstancedMesh(foliageGeo, mat, Math.ceil(roundTreeCount / foliageColors.length) + 15);
+    im.castShadow = true;
+    return { mesh: im, idx: 0 };
+  });
+
+  // Tọa độ đặt 260 cây tán tròn khắp dự án:
+  let tIdx = 0;
+
+  // A. Vành đai cây xanh mướt quanh bờ sông & Tuyến đường sắt (như ảnh 1 & 2)
+  for (let z = -110; z <= 65; z += 4.5) {
+    if (tIdx >= roundTreeCount) break;
+    // Bờ Tây sông & Ven kè DK1
+    const x1 = 80.5 + (Math.sin(z * 0.1) * 2.2);
+    const y1 = 0.5;
+    const s1 = 0.85 + Math.random() * 0.45;
+
+    dummy.position.set(x1, y1 + 1.1 * s1, z);
+    dummy.scale.set(s1, s1, s1);
+    dummy.rotation.set(0, Math.random() * Math.PI, 0);
     dummy.updateMatrix();
-    foliageInstanced.setMatrixAt(idx, dummy.matrix);
-    idx++;
+    trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+
+    dummy.position.set(x1, y1 + 3.0 * s1, z);
+    dummy.updateMatrix();
+    const cIdx = tIdx % foliageColors.length;
+    foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
+    tIdx++;
+
+    // Bờ Đông sông & Chân đồi làng quê
+    if (tIdx < roundTreeCount) {
+      const x2 = 101.5 + (Math.cos(z * 0.12) * 3.5);
+      const y2 = 0.8 + (x2 > 105 ? 1.5 : 0);
+      const s2 = 0.9 + Math.random() * 0.5;
+
+      dummy.position.set(x2, y2 + 1.1 * s2, z);
+      dummy.scale.set(s2, s2, s2);
+      dummy.rotation.set(0, Math.random() * Math.PI, 0);
+      dummy.updateMatrix();
+      trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+
+      dummy.position.set(x2, y2 + 3.0 * s2, z);
+      dummy.updateMatrix();
+      const cIdx2 = tIdx % foliageColors.length;
+      foliageMeshes[cIdx2].mesh.setMatrixAt(foliageMeshes[cIdx2].idx++, dummy.matrix);
+      tIdx++;
+    }
   }
 
-  // Trees along road DT234
-  for (let z = -95; z <= 10; z += 8) {
-    if (idx >= treeCount) break;
-    const x = -15 + (Math.random() - 0.5) * 1.0;
-    dummy.position.set(x, 1.0, z);
-    dummy.scale.setScalar(0.85 + Math.random() * 0.3);
-    dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(idx, dummy.matrix);
-
-    dummy.position.set(x, 3.0, z);
-    dummy.updateMatrix();
-    foliageInstanced.setMatrixAt(idx, dummy.matrix);
-    idx++;
-  }
-
-  // Trees on DK2 Hill slope
-  for (let i = 0; i < 40; i++) {
-    if (idx >= treeCount) break;
+  // B. Rừng cây trên sườn đồi phía Đông (quanh đàn cừu và làng quê)
+  for (let i = 0; i < 75; i++) {
+    if (tIdx >= roundTreeCount) break;
     const ang = Math.random() * Math.PI * 2;
-    const rad = 10 + Math.random() * 32;
+    const rad = 6 + Math.random() * 38;
+    const x = 126 + Math.cos(ang) * rad;
+    const z = -45 + Math.sin(ang) * (rad * 1.5);
+    const y = 1.0 + Math.random() * 10.0;
+    const s = 0.85 + Math.random() * 0.55;
+
+    dummy.position.set(x, y + 1.1 * s, z);
+    dummy.scale.set(s, s, s);
+    dummy.rotation.set(0, Math.random() * Math.PI, 0);
+    dummy.updateMatrix();
+    trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+
+    dummy.position.set(x, y + 3.0 * s, z);
+    dummy.updateMatrix();
+    const cIdx = tIdx % foliageColors.length;
+    foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
+    tIdx++;
+  }
+
+  // C. Cây xanh dọc trục đường ĐT234 & Cổng nhà máy
+  for (let z = -98; z <= 25; z += 6.5) {
+    if (tIdx >= roundTreeCount) break;
+    [-14.5, -5.5].forEach((rx) => {
+      if (tIdx >= roundTreeCount) return;
+      const x = rx + (Math.random() - 0.5) * 1.0;
+      const y = 0.2;
+      const s = 0.8 + Math.random() * 0.35;
+
+      dummy.position.set(x, y + 1.1 * s, z);
+      dummy.scale.set(s, s, s);
+      dummy.rotation.set(0, Math.random() * Math.PI, 0);
+      dummy.updateMatrix();
+      trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+
+      dummy.position.set(x, y + 3.0 * s, z);
+      dummy.updateMatrix();
+      const cIdx = tIdx % foliageColors.length;
+      foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
+      tIdx++;
+    });
+  }
+
+  // D. Rừng cây trên đồi DK2 Vườn Lan
+  for (let i = 0; i < 50; i++) {
+    if (tIdx >= roundTreeCount) break;
+    const ang = Math.random() * Math.PI * 2;
+    const rad = 8 + Math.random() * 34;
     const x = CONFIG.HILLS.dk2.position.x + Math.cos(ang) * rad;
     const z = CONFIG.HILLS.dk2.position.z + Math.sin(ang) * rad;
     const y = 2.0 + Math.random() * 12.0;
+    const s = 0.9 + Math.random() * 0.5;
 
-    dummy.position.set(x, y, z);
-    dummy.scale.setScalar(1.0 + Math.random() * 0.6);
+    dummy.position.set(x, y + 1.1 * s, z);
+    dummy.scale.set(s, s, s);
+    dummy.rotation.set(0, Math.random() * Math.PI, 0);
     dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(idx, dummy.matrix);
+    trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
 
-    dummy.position.set(x, y + 2.5, z);
+    dummy.position.set(x, y + 3.0 * s, z);
     dummy.updateMatrix();
-    foliageInstanced.setMatrixAt(idx, dummy.matrix);
-    idx++;
+    const cIdx = tIdx % foliageColors.length;
+    foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
+    tIdx++;
   }
 
   trunkInstanced.instanceMatrix.needsUpdate = true;
-  foliageInstanced.instanceMatrix.needsUpdate = true;
   scene.add(trunkInstanced);
-  scene.add(foliageInstanced);
+
+  foliageMeshes.forEach((fm) => {
+    fm.mesh.instanceMatrix.needsUpdate = true;
+    scene.add(fm.mesh);
+  });
+
+  // 3. Cây thông đa tầng (Tiered Pine Cones - 3 nón xếp tầng như ảnh 1 & 3)
+  const pineCount = 90;
+  const pineGeo = new THREE.ConeGeometry(1.6, 2.4, 5);
+  const pineMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.8, flatShading: true });
+  const pineInstanced = new THREE.InstancedMesh(pineGeo, pineMat, pineCount * 3);
+  pineInstanced.castShadow = true;
+
+  let pIdx = 0;
+  for (let p = 0; p < pineCount; p++) {
+    const px = (p % 2 === 0 ? 55 : 135) + (Math.random() - 0.5) * 45;
+    const pz = -110 + (p / pineCount) * 160 + (Math.random() - 0.5) * 15;
+    const py = 0.5 + Math.random() * 6;
+    const ps = 0.75 + Math.random() * 0.45;
+
+    // 3 tầng nón xếp chồng
+    for (let tier = 0; tier < 3; tier++) {
+      const tierScale = ps * (1 - tier * 0.22);
+      dummy.position.set(px, py + tier * 1.5 * ps, pz);
+      dummy.scale.set(tierScale, tierScale, tierScale);
+      dummy.rotation.set(0, Math.random() * Math.PI, 0);
+      dummy.updateMatrix();
+      pineInstanced.setMatrixAt(pIdx++, dummy.matrix);
+    }
+  }
+  pineInstanced.instanceMatrix.needsUpdate = true;
+  scene.add(pineInstanced);
+
+  // 4. Bụi cây tròn (Round Bushes) ven bờ sông và bờ rào
+  const bushCount = 70;
+  const bushGeo = new THREE.DodecahedronGeometry(0.85, 1);
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.8, flatShading: true });
+  const bushInstanced = new THREE.InstancedMesh(bushGeo, bushMat, bushCount);
+  bushInstanced.castShadow = true;
+
+  for (let b = 0; b < bushCount; b++) {
+    const bx = 83.0 + (Math.random() - 0.5) * 8.0;
+    const bz = -90 + (b / bushCount) * 140;
+    const by = -0.5 + Math.random() * 0.4;
+    dummy.position.set(bx, by, bz);
+    dummy.scale.setScalar(0.7 + Math.random() * 0.5);
+    dummy.rotation.set(Math.random(), Math.random(), Math.random());
+    dummy.updateMatrix();
+    bushInstanced.setMatrixAt(b, dummy.matrix);
+  }
+  bushInstanced.instanceMatrix.needsUpdate = true;
+  scene.add(bushInstanced);
+
+  // 5. Tảng đá cuội xám ven bờ sông và bãi cát (River Pebbles - như ảnh 2)
+  const rockCount = 45;
+  const rockGeo = new THREE.DodecahedronGeometry(0.65, 0);
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9, flatShading: true });
+  const rockInstanced = new THREE.InstancedMesh(rockGeo, rockMat, rockCount);
+  rockInstanced.castShadow = true;
+
+  for (let r = 0; r < rockCount; r++) {
+    const rx = (r % 2 === 0 ? 84.0 : 94.5) + (Math.random() - 0.5) * 2.0;
+    const rz = -95 + (r / rockCount) * 150;
+    const ry = -1.1 + Math.random() * 0.3;
+    dummy.position.set(rx, ry, rz);
+    dummy.scale.set(1.0 + Math.random() * 0.6, 0.6 + Math.random() * 0.3, 1.0 + Math.random() * 0.6);
+    dummy.rotation.set(Math.random(), Math.random(), Math.random());
+    dummy.updateMatrix();
+    rockInstanced.setMatrixAt(r, dummy.matrix);
+  }
+  rockInstanced.instanceMatrix.needsUpdate = true;
+  scene.add(rockInstanced);
+
+  // 6. Khóm hoa dại rực rỡ (Wildflowers - Trắng, Vàng, Hồng phấn như ảnh 3)
+  const flowerCount = 90;
+  const flowerGeo = new THREE.SphereGeometry(0.18, 5, 5);
+  const flowerColors = [0xffffff, 0xfacc15, 0xf472b6];
+  flowerColors.forEach((flColor) => {
+    const flMat = new THREE.MeshBasicMaterial({ color: flColor });
+    const flInstanced = new THREE.InstancedMesh(flowerGeo, flMat, flowerCount / 3);
+
+    for (let f = 0; f < flowerCount / 3; f++) {
+      const fx = (f % 2 === 0 ? 112 : 28) + (Math.random() - 0.5) * 25;
+      const fz = -70 + (f / (flowerCount / 3)) * 90 + (Math.random() - 0.5) * 15;
+      dummy.position.set(fx, 0.15, fz);
+      dummy.scale.setScalar(0.8 + Math.random() * 0.5);
+      dummy.updateMatrix();
+      flInstanced.setMatrixAt(f, dummy.matrix);
+    }
+    flInstanced.instanceMatrix.needsUpdate = true;
+    scene.add(flInstanced);
+  });
 }
 
 // ============================================================================
@@ -2441,94 +3264,278 @@ function setupAnimatedVehicles() {
   scene.add(animatedTruck);
 }
 
-// Đoàn tàu hỏa chạy trên đường sắt Bắc - Nam
+// Đoàn tàu hơi nước cổ điển đỏ rực rỡ, các toa xe màu sắc & Dải khói mây trắng khổng lồ (như ảnh 1)
 function setupTrain() {
   animatedTrain = new THREE.Group();
-  const trainX = CONFIG.RAILWAY.positionX;
-  animatedTrain.position.set(trainX, 0, -110);
+  trainCars = [];
+  trainSmokeTrail = [];
 
-  // 1. Đầu máy xe lửa (Locomotive D19E)
+  // 1. Đầu máy hơi nước cổ điển màu đỏ (Red Steam Locomotive)
   const locoGroup = new THREE.Group();
-  locoGroup.position.set(0, 0, 0);
 
-  const locoBody = new THREE.Mesh(
-    new THREE.BoxGeometry(2.2, 2.4, 8.0),
-    new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.35, metalness: 0.4 }) // Deep Red
+  // Nồi hơi nằm ngang hình trụ tròn đỏ tươi
+  const boilerGeo = new THREE.CylinderGeometry(1.05, 1.05, 5.4, 12);
+  const redBoilerMat = new THREE.MeshStandardMaterial({
+    color: 0xdc2626, // Đỏ tươi rực rỡ như ảnh 1
+    roughness: 0.35,
+    metalness: 0.3,
+  });
+  const boiler = new THREE.Mesh(boilerGeo, redBoilerMat);
+  boiler.rotation.x = Math.PI / 2;
+  boiler.position.set(0, 1.7, 0.6);
+  boiler.castShadow = true;
+  locoGroup.add(boiler);
+
+  // Mũi chóp cầu nồi hơi phía trước màu than đen
+  const frontCap = new THREE.Mesh(
+    new THREE.SphereGeometry(1.05, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
   );
-  locoBody.position.y = 1.4;
-  locoBody.castShadow = true;
-  locoGroup.add(locoBody);
+  frontCap.rotation.x = -Math.PI / 2;
+  frontCap.position.set(0, 1.7, 3.3);
+  locoGroup.add(frontCap);
 
-  // Buồng lái kính
-  const cabinWin = new THREE.Mesh(
-    new THREE.BoxGeometry(2.25, 0.8, 1.8),
-    new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.8 })
+  // Các vòng đai kim loại mạ vàng bo quanh nồi hơi
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.2, metalness: 0.8 });
+  [-1.2, 0.4, 1.8].forEach((rz) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.05, 8, 16), ringMat);
+    ring.position.set(0, 1.7, rz);
+    locoGroup.add(ring);
+  });
+
+  // Cabin người lái phía sau (Cabin Box)
+  const cabGeo = new THREE.BoxGeometry(2.35, 2.5, 2.6);
+  const cab = new THREE.Mesh(cabGeo, redBoilerMat);
+  cab.position.set(0, 1.85, -2.5);
+  cab.castShadow = true;
+  locoGroup.add(cab);
+
+  // Mui cabin vòm cong màu đen than
+  const cabRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(2.55, 0.25, 2.9),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 })
   );
-  cabinWin.position.set(0, 2.0, 2.2);
-  locoGroup.add(cabinWin);
+  cabRoof.position.set(0, 3.15, -2.5);
+  locoGroup.add(cabRoof);
 
-  // Đèn pha tàu hỏa
-  const trainHeadlight = new THREE.Mesh(
-    new THREE.SphereGeometry(0.25, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  // Cửa sổ kính cabin xanh biếc hai bên
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.8 });
+  [-1.2, 1.2].forEach((wx) => {
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.8), winMat);
+    win.rotation.y = wx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    win.position.set(wx, 2.1, -2.5);
+    locoGroup.add(win);
+  });
+
+  // Ống khói đen loe miệng ở đầu nồi hơi (như ảnh 1)
+  const stackGeo = new THREE.CylinderGeometry(0.38, 0.3, 1.4, 8);
+  const stackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 });
+  const stack = new THREE.Mesh(stackGeo, stackMat);
+  stack.position.set(0, 3.0, 2.5);
+  stack.castShadow = true;
+  locoGroup.add(stack);
+
+  // Vành loe mạ vàng ở miệng ống khói
+  const stackRim = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.06, 8, 16), ringMat);
+  stackRim.rotation.x = Math.PI / 2;
+  stackRim.position.set(0, 3.7, 2.5);
+  locoGroup.add(stackRim);
+
+  // Đèn pha tàu hỏa tròn phía trước phát sáng
+  const headlight = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfef08a })
   );
-  trainHeadlight.position.set(0, 1.4, 4.05);
-  locoGroup.add(trainHeadlight);
+  headlight.position.set(0, 1.8, 3.8);
+  locoGroup.add(headlight);
 
-  // Ống xả khói trên nóc
-  const exhaust = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 })
-  );
-  exhaust.position.set(0, 2.7, -1.8);
-  locoGroup.add(exhaust);
+  // 6 Bánh xe lớn màu đỏ chói viền vàng (như ảnh 1)
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
+  const wheelGeo = new THREE.CylinderGeometry(0.68, 0.68, 0.24, 12);
+  [-1.25, 1.25].forEach((wx) => {
+    [-1.6, 0.2, 2.0].forEach((wz) => {
+      const w = new THREE.Mesh(wheelGeo, wheelMat);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(wx, 0.68, wz);
+      w.castShadow = true;
+      locoGroup.add(w);
 
-  // Khói hơi nước tàu hỏa
-  const puffMat = new THREE.MeshBasicMaterial({ color: 0xf1f5f9, transparent: true, opacity: 0.55 });
-  trainSteamPuffs = [];
-  for (let p = 0; p < 4; p++) {
-    const puff = new THREE.Mesh(new THREE.SphereGeometry(0.28, 6, 6), puffMat);
-    puff.position.set(0, 2.8 + p * 0.4, -1.8 - p * 0.6);
-    locoGroup.add(puff);
-    trainSteamPuffs.push(puff);
-  }
+      // Trục tâm vàng
+      const hubPin = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.28, 8), ringMat);
+      hubPin.rotation.z = Math.PI / 2;
+      hubPin.position.set(wx, 0.68, wz);
+      locoGroup.add(hubPin);
+    });
 
-  locoBody.userData = {
-    id: 'freightTrain',
-    title: 'Đoàn tàu hàng Bắc - Nam (Đầu máy Đổi Mới D19E)',
+    // Thanh truyền cơ khí nối các bánh xe (Connecting Rod)
+    const rod = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.16, 3.7),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.8 })
+    );
+    rod.position.set(wx > 0 ? 1.4 : -1.4, 0.68, 0.2);
+    locoGroup.add(rod);
+  });
+
+  // Tài xế lái tàu thò đầu ra ngoài cửa sổ
+  const trainDriver = createCharacter({ shirtColor: 0x0284c7, pantsColor: 0x1e293b, hatColor: 0xef4444, isDriver: true });
+  trainDriver.position.set(1.1, 1.35, -2.5);
+  trainDriver.rotation.y = Math.PI / 2;
+  locoGroup.add(trainDriver);
+
+  locoGroup.userData = {
+    id: 'steamLoco',
+    title: 'Đoàn tàu hơi nước cổ điển DK Heritage',
     type: 'train',
-    desc: 'Tuyến đường sắt huyết mạch Bắc - Nam chạy dọc ranh giới phía Đông nhà máy, vận chuyển container linh kiện xe điện DK Bike.',
+    desc: 'Đầu máy xe lửa hơi nước màu đỏ rực rỡ kéo đoàn toa chở hàng và hành khách trên tuyến đường sắt sinh thái bao quanh khuôn viên.',
     zone: 'Đường sắt Bắc - Nam',
   };
-  interactiveObjects.push(locoBody);
+  boiler.userData = locoGroup.userData;
+  scene.add(locoGroup);
+  interactiveObjects.push(boiler);
+  trainCars.push({ group: locoGroup, offsetT: 0 });
 
-  animatedTrain.add(locoGroup);
+  // 2. Toa hàng số 1: Toa trần thùng gỗ xanh lá chở kiện hàng (như ảnh 1)
+  const wagon1 = new THREE.Group();
+  const flatbedMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+  const w1Base = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.35, 5.6), flatbedMat);
+  w1Base.position.y = 0.55;
+  wagon1.add(w1Base);
 
-  // 2. Các toa hàng (Freight / Container Wagons)
-  const wagonColors = [0x0284c7, 0xf59e0b, 0x16a34a]; // Blue, Orange, Green
-  for (let i = 1; i <= 3; i++) {
-    const wagon = new THREE.Group();
-    wagon.position.set(0, 0, -i * 8.6);
+  // Thùng gỗ màu xanh lá tươi
+  const woodGreenMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.65 });
+  const w1Box = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 5.4), woodGreenMat);
+  w1Box.position.y = 1.3;
+  w1Box.castShadow = true;
+  wagon1.add(w1Box);
 
-    const flatbed = new THREE.Mesh(
-      new THREE.BoxGeometry(2.3, 0.4, 8.0),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
-    );
-    flatbed.position.y = 0.4;
-    wagon.add(flatbed);
-
-    const container = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 2.2, 7.6),
-      new THREE.MeshStandardMaterial({ color: wagonColors[i - 1], roughness: 0.5 })
-    );
-    container.position.y = 1.7;
-    container.castShadow = true;
-    wagon.add(container);
-
-    animatedTrain.add(wagon);
+  // Các thùng kiện hàng gỗ & carton bên trong
+  const crateMat1 = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 });
+  const crateMat2 = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8 });
+  for (let c = 0; c < 5; c++) {
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.9), c % 2 === 0 ? crateMat1 : crateMat2);
+    crate.position.set((c % 2 === 0 ? -0.4 : 0.4), 1.9, -1.8 + c * 0.9);
+    crate.castShadow = true;
+    wagon1.add(crate);
   }
 
-  scene.add(animatedTrain);
+  // Bánh xe toa hàng
+  [-1.2, 1.2].forEach((wx) => {
+    [-1.8, 1.8].forEach((wz) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.22, 10), wheelMat);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(wx, 0.48, wz);
+      wagon1.add(w);
+    });
+  });
+
+  scene.add(wagon1);
+  trainCars.push({ group: wagon1, offsetT: 0.056 });
+
+  // 3. Toa khách số 2: Toa hành khách màu tím-xanh viền vàng (như ảnh 1)
+  const wagon2 = new THREE.Group();
+  const coachPurpleMat = new THREE.MeshStandardMaterial({ color: 0x312e81, roughness: 0.4 }); // Xanh tím sang trọng
+  const coach2Body = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.2, 7.2), coachPurpleMat);
+  coach2Body.position.y = 1.65;
+  coach2Body.castShadow = true;
+  wagon2.add(coach2Body);
+
+  const coachRoofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+  const coach2Roof = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.35, 7.5), coachRoofMat);
+  coach2Roof.position.y = 2.85;
+  wagon2.add(coach2Roof);
+
+  // Dãy cửa sổ kính dài hai bên
+  [-1.17, 1.17].forEach((cx) => {
+    for (let winZ = -2.6; winZ <= 2.6; winZ += 1.3) {
+      const wGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.75), winMat);
+      wGlass.rotation.y = cx > 0 ? Math.PI / 2 : -Math.PI / 2;
+      wGlass.position.set(cx, 1.95, winZ);
+      wagon2.add(wGlass);
+    }
+  });
+
+  [-1.2, 1.2].forEach((wx) => {
+    [-2.4, 2.4].forEach((wz) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.22, 10), wheelMat);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(wx, 0.48, wz);
+      wagon2.add(w);
+    });
+  });
+
+  scene.add(wagon2);
+  trainCars.push({ group: wagon2, offsetT: 0.122 });
+
+  // 4. Toa khách số 3: Toa hành khách màu vàng đất / mù tạt (như ảnh 1)
+  const wagon3 = new THREE.Group();
+  const coachYellowMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.45 }); // Vàng mù tạt
+  const coach3Body = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.2, 7.2), coachYellowMat);
+  coach3Body.position.y = 1.65;
+  coach3Body.castShadow = true;
+  wagon3.add(coach3Body);
+
+  const coach3Roof = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.35, 7.5), coachRoofMat);
+  coach3Roof.position.y = 2.85;
+  wagon3.add(coach3Roof);
+
+  [-1.17, 1.17].forEach((cx) => {
+    for (let winZ = -2.6; winZ <= 2.6; winZ += 1.3) {
+      const wGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.75), winMat);
+      wGlass.rotation.y = cx > 0 ? Math.PI / 2 : -Math.PI / 2;
+      wGlass.position.set(cx, 1.95, winZ);
+      wagon3.add(wGlass);
+    }
+  });
+
+  [-1.2, 1.2].forEach((wx) => {
+    [-2.4, 2.4].forEach((wz) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.22, 10), wheelMat);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(wx, 0.48, wz);
+      wagon3.add(w);
+    });
+  });
+
+  scene.add(wagon3);
+  trainCars.push({ group: wagon3, offsetT: 0.188 });
+
+  // --------------------------------------------------------------------------
+  // 5. DẢI KHÓI MÂY TRẮNG BỒNG BỀNH KHỔNG LỒ (Giant Puffy Cloud Smoke Trail - như ảnh 1)
+  // --------------------------------------------------------------------------
+  const puffCount = 18;
+  const smokeCloudMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.4,
+    flatShading: true,
+  });
+
+  for (let i = 0; i < puffCount; i++) {
+    const puffGroup = new THREE.Group();
+    // Kích thước khối mây trắng nở to dần từ 0.9m lên tới 4.0m
+    const baseR = 0.9 + (i / puffCount) * 3.1;
+
+    // Cụm 3 quả cầu tròn bông gòn ghép lại
+    const p1 = new THREE.Mesh(new THREE.DodecahedronGeometry(baseR, 1), smokeCloudMat);
+    puffGroup.add(p1);
+
+    const p2 = new THREE.Mesh(new THREE.DodecahedronGeometry(baseR * 0.8, 1), smokeCloudMat);
+    p2.position.set(baseR * 0.4, baseR * 0.25, 0);
+    puffGroup.add(p2);
+
+    const p3 = new THREE.Mesh(new THREE.DodecahedronGeometry(baseR * 0.75, 1), smokeCloudMat);
+    p3.position.set(-baseR * 0.35, -baseR * 0.2, baseR * 0.25);
+    puffGroup.add(p3);
+
+    puffGroup.position.set(90, 10, -50);
+    puffGroup.castShadow = true;
+    scene.add(puffGroup);
+
+    trainSmokeTrail.push({
+      group: puffGroup,
+      baseScale: 1.0,
+      index: i,
+    });
+  }
 }
 
 // Đàn chim bay lượn trên đồi
@@ -2577,8 +3584,6 @@ function updateAnimatedObjects(delta, time) {
     const nextX = centerX + Math.sin(t + 0.05) * radiusX;
     const nextZ = centerZ + Math.cos(t + 0.05) * radiusZ;
     animatedBike.rotation.y = Math.atan2(nextX - x, nextZ - z);
-
-    // Nghiêng xe khi vào cua
     animatedBike.rotation.z = -Math.sin(t) * 0.14;
   }
 
@@ -2589,25 +3594,87 @@ function updateAnimatedObjects(delta, time) {
     animatedTruck.position.z = -120 + truckProgress;
   }
 
-  // 3. Tàu hàng trên đường sắt & khói hơi nước
-  if (animatedTrain) {
-    trainProgress += delta * 18;
-    if (trainProgress > 160) trainProgress = 0;
-    animatedTrain.position.z = -120 + trainProgress;
+  // 3. Đoàn tàu hơi nước uốn lượn cong trên đường ray & Dải khói mây trắng khổng lồ (như ảnh 1)
+  if (railwayCurve && trainCars.length > 0) {
+    trainProgress = (trainProgress + delta * 0.034) % 1.0;
 
-    // Cụm khói bốc lên từ ống xả
-    trainSteamPuffs.forEach((puff, idx) => {
-      puff.position.y += delta * 1.5;
-      puff.position.z -= delta * 2.6;
-      puff.scale.addScalar(delta * 0.4);
-      if (puff.position.y > 4.6) {
-        puff.position.set(0, 2.7, -1.8);
-        puff.scale.setScalar(0.4 + idx * 0.15);
-      }
+    // Cập nhật vị trí và góc quay chuẩn tiếp tuyến cho từng toa xe
+    trainCars.forEach((car) => {
+      const tCar = (trainProgress - car.offsetT + 1.0) % 1.0;
+      const pos = railwayCurve.getPointAt(tCar);
+      const tangent = railwayCurve.getTangentAt(tCar);
+
+      car.group.position.copy(pos);
+      car.group.rotation.y = Math.atan2(tangent.x, tangent.z);
+    });
+
+    // Cập nhật Dải khói mây trắng khổng lồ (Giant Puffy Cloud Trail) uốn khúc theo đoàn tàu (như ảnh 1)
+    const tLoco = trainProgress;
+    trainSmokeTrail.forEach((smokeItem, sIdx) => {
+      const tSmoke = (tLoco - 0.012 - sIdx * 0.014 + 1.0) % 1.0;
+      const smokePos = railwayCurve.getPointAt(tSmoke);
+
+      // Khói bốc cao dần lên và bồng bềnh nhịp nhàng
+      smokePos.y += 3.2 + sIdx * 0.22 + Math.sin(time * 0.003 + sIdx * 0.5) * 0.25;
+      // Gió nhẹ thổi dạt sang Đông
+      smokePos.x += sIdx * 0.35;
+
+      smokeItem.group.position.copy(smokePos);
+
+      // Hiệu ứng phập phồng (Breathing pulse)
+      const pulse = 1.0 + Math.sin(time * 0.004 + sIdx * 0.7) * 0.08;
+      smokeItem.group.scale.setScalar(smokeItem.baseScale * pulse);
+    });
+
+    // Barie chắn tàu tại Ga DK Station: tự động hạ cần xuống khi tàu đến gần ga
+    const isNearStation = tLoco > 0.38 && tLoco < 0.62;
+    railwayGateArms.forEach((b) => {
+      b.targetAngle = isNearStation ? 0 : Math.PI / 2.2;
+      b.currentAngle += (b.targetAngle - b.currentAngle) * delta * 3.5;
+      b.pivot.rotation.x = b.currentAngle;
     });
   }
 
-  // 4. Công nhân đi bộ tuần tra & cử động chân tay
+  // 4. Cánh quạt cối xay gió trên đỉnh đồi quay đều (như ảnh 1)
+  if (windmillBlades) {
+    windmillBlades.rotation.z += delta * 1.2;
+  }
+
+  // 5. Mây trời low-poly trôi nhẹ nhàng trên không
+  skyClouds.forEach((cloud) => {
+    cloud.position.x += delta * cloud.userData.speed;
+    if (cloud.position.x > 220) {
+      cloud.position.x = -220;
+    }
+  });
+
+  // 6. Thuyền gỗ nhấp nhô nhẹ trên dòng sông máng nước xanh ngọc (như ảnh 2)
+  if (rowingBoat) {
+    rowingBoat.position.y = -1.3 + Math.sin(time * 0.0025) * 0.04;
+    rowingBoat.rotation.z = Math.sin(time * 0.002) * 0.03;
+  }
+
+  // 7. Đàn cá bơi lội dưới sông
+  if (riverFishGroup) {
+    riverFishGroup.rotation.y += delta * 0.7;
+  }
+
+  // 8. Đàn cừu trên đồi cỏ lắc đầu thong thả (như ảnh 2)
+  fluffySheeps.forEach((sheep, shIdx) => {
+    sheep.rotation.y += Math.sin(time * 0.002 + shIdx) * 0.004;
+  });
+
+  // 9. Khói trắng zíc zắc từ ống khói các ngôi nhà (như ảnh 3)
+  chimneySmokePuffs.forEach((puff, idx) => {
+    puff.position.y += delta * 0.85;
+    puff.scale.addScalar(delta * 0.1);
+    if (puff.position.y > 7.8) {
+      puff.position.y = 5.2;
+      puff.scale.setScalar(0.7);
+    }
+  });
+
+  // 10. Công nhân đi bộ tuần tra & cử động chân tay
   walkingWorkers.forEach((w) => {
     w.mesh.position[w.axis] += w.dir * w.speed * delta;
     if (w.mesh.position[w.axis] >= w.maxX) {
@@ -2626,17 +3693,17 @@ function updateAnimatedObjects(delta, time) {
     if (w.mesh.userData.rightArm) w.mesh.userData.rightArm.rotation.x = swing;
   });
 
-  // 5. Cờ bay trong gió
+  // 11. Cờ bay trong gió
   flagMeshes.forEach((flag, idx) => {
     flag.rotation.y = Math.sin(time * 0.003 + idx) * 0.15;
   });
 
-  // 6. Quạt thông gió trên nóc xưởng B
+  // 12. Quạt thông gió trên nóc xưởng B
   roofVentilators.forEach((vent) => {
     vent.rotation.y += delta * 2.5;
   });
 
-  // 7. Đàn chim chao lượn quanh đỉnh đồi Vườn Lan
+  // 13. Đàn chim chao lượn quanh đỉnh đồi Vườn Lan
   if (birdFlockGroup) {
     birdFlockGroup.rotation.y += delta * 0.25;
     birdMeshes.forEach((b) => {
@@ -2646,7 +3713,7 @@ function updateAnimatedObjects(delta, time) {
     });
   }
 
-  // 8. Hoạt cảnh cuộn Cửa cuốn xưởng B & Kho D2.1 (Animated Roller Shutter Doors)
+  // 14. Hoạt cảnh cuộn Cửa cuốn xưởng B & Kho D2.1 (Animated Roller Shutter Doors)
   shutterDoors.forEach((d) => {
     if (Math.abs(d.targetProgress - d.currentProgress) > 0.005) {
       d.currentProgress += Math.sign(d.targetProgress - d.currentProgress) * delta * 1.5;
@@ -2663,7 +3730,7 @@ function updateAnimatedObjects(delta, time) {
     }
   });
 
-  // 9. Xe nâng hàng: Hoạt cảnh càng nâng nâng hạ pallet hàng (Animated Forklifts)
+  // 15. Xe nâng hàng: Hoạt cảnh càng nâng nâng hạ pallet hàng (Animated Forklifts)
   animatedForklifts.forEach((fl, idx) => {
     if (fl.liftGroup) {
       const lift = Math.sin(time * 0.0022 + idx * 1.5) * 0.55 + 0.6;
@@ -2671,7 +3738,7 @@ function updateAnimatedObjects(delta, time) {
     }
   });
 
-  // 10. Barie cổng tự động: Cần chắn mở lên khi xe tải chạy qua (Animated Barriers)
+  // 16. Barie cổng tự động: Cần chắn mở lên khi xe tải chạy qua (Animated Barriers)
   const truckZ = animatedTruck ? animatedTruck.position.z : -100;
   const isNearGate1 = Math.abs(truckZ - (-20)) < 16;
   const isNearGate2 = Math.abs(truckZ - (-28)) < 16;
@@ -2683,7 +3750,7 @@ function updateAnimatedObjects(delta, time) {
     b.armPivot.rotation.z = b.currentAngle;
   });
 
-  // 11. Trạm sạc xe điện: Đèn LED breathing pulse xung nhịp nạp pin
+  // 17. Trạm sạc xe điện: Đèn LED breathing pulse xung nhịp nạp pin
   chargingStationsList.forEach((cs) => {
     const pulse = 0.5 + Math.sin(time * 0.005) * 0.4;
     if (cs.ledGlow && cs.ledGlow.material) {
@@ -2694,7 +3761,7 @@ function updateAnimatedObjects(delta, time) {
     }
   });
 
-  // 12. Đàn cá Koi bơi lội và quẫy đuôi trong hồ nước Nhà điều hành
+  // 18. Đàn cá Koi bơi lội và quẫy đuôi trong hồ nước Nhà điều hành
   koiFishes.forEach((fish) => {
     fish.angle += delta * fish.speed;
     fish.mesh.position.x = fish.baseX + Math.cos(fish.angle) * fish.radiusX;
@@ -2811,6 +3878,14 @@ function createBuildingLabels() {
     { text: 'Mái che xe 3 bánh', pos: new THREE.Vector3(79.5, 5.0, -46), id: 'maiCheXe' },
     { text: '⚡ Trạm sạc nhanh EV', pos: new THREE.Vector3(26, 3.2, -24), id: 'chargerDK1' },
     { text: '🚪 Cửa xưởng & Bốc dỡ', pos: new THREE.Vector3(58, 5.2, -32), id: 'doorB1' },
+
+    // Tuyến đường sắt, Cầu vòm đỏ & Cảnh quan sinh thái mới (Theo ảnh mẫu)
+    { text: '🚂 Tàu hơi nước & Đường sắt', pos: new THREE.Vector3(92, 5.5, -20), id: 'steamLoco' },
+    { text: '🌉 Cầu vòm đỏ (Red Arch)', pos: new THREE.Vector3(95, 5.5, -49), id: 'redArchBridge' },
+    { text: '🚉 Ga xe lửa DK Station', pos: new THREE.Vector3(88, 5.0, -2), id: 'dkStation' },
+    { text: '⛵ Thuyền chèo đò trên sông', pos: new THREE.Vector3(89.5, 1.8, -8), id: 'rowingBoat' },
+    { text: '🐑 Đàn cừu trên đồi cỏ', pos: new THREE.Vector3(120, 6.0, -62), id: 'sheepFlock' },
+    { text: '🌾 Cối xay gió sinh thái', pos: new THREE.Vector3(55, 34.0, -108), id: 'windmill' },
 
     // DK2
     { text: 'Nhà điều hành DK2 (HQ)', pos: new THREE.Vector3(-28, 13.0, -28), id: 'nhaDieuHanhDK2' },
@@ -3027,10 +4102,35 @@ function showInteractiveModal(data) {
     area.innerText = 'Bãi đỗ sân trước Nhà A';
     roof.innerText = 'Đỗ đúng ô kẻ vạch tiêu chuẩn';
   } else if (data.type === 'train') {
-    dim.innerText = 'Đầu máy D19E + 3 toa';
-    height.innerText = 'Tải trọng: 1.200 tấn';
+    dim.innerText = 'Đầu máy hơi nước đỏ + 3 toa';
+    height.innerText = 'Tải trọng: 850 tấn';
     area.innerText = 'Tuyến ĐS Bắc - Nam';
-    roof.innerText = 'Vận chuyển container xuất xưởng';
+    roof.innerText = 'Kéo dải khói mây trắng bồng bềnh khổng lồ';
+  } else if (data.type === 'bridge') {
+    dim.innerText = 'Chiều dài: 26.0m';
+    height.innerText = 'Vòm thép cao 5.5m';
+    area.innerText = 'Kết cấu thép chịu lực sơn đỏ';
+    roof.innerText = 'Bắc qua thung lũng sông máng nước';
+  } else if (data.type === 'station') {
+    dim.innerText = 'Ke ga 24m × 5.2m';
+    height.innerText = 'Mái ngói dốc 2 tầng 4.2m';
+    area.innerText = 'Nhà ga phong cách đồng quê Willowbend';
+    roof.innerText = 'Có barie đường sắt tự động đóng mở';
+  } else if (data.type === 'boat') {
+    dim.innerText = '4.2m × 1.6m';
+    height.innerText = 'Mộc mạc truyền thống';
+    area.innerText = 'Thuyền nan gỗ tự nhiên';
+    roof.innerText = 'Chèo thuyền ngắm cảnh lá sen & đàn cá';
+  } else if (data.type === 'animals') {
+    dim.innerText = 'Đàn 7 chú cừu xù';
+    height.innerText = 'Thân lông trắng, đầu đen nhánh';
+    area.innerText = 'Đồi cỏ sinh thái xanh ngắt';
+    roof.innerText = 'Thong dong gặm cỏ trong ánh nắng vàng';
+  } else if (data.type === 'landmark') {
+    dim.innerText = 'Tháp nón 9.5m, 4 cánh quạt 11m';
+    height.innerText = 'Đỉnh đồi cao +25m';
+    area.innerText = 'Cối xay gió phong cách Hà Lan';
+    roof.innerText = 'Cánh quạt quay êm đềm trong gió';
   } else {
     dim.innerText = '--';
     height.innerText = '--';
@@ -3120,7 +4220,13 @@ function setupEventListeners() {
   // Focus card button
   document.getElementById('btn-focus-card').addEventListener('click', () => {
     const tag = document.getElementById('card-tag').innerText.toLowerCase();
-    if (tag.includes('dk1') || tag === 'nhab') setCameraPreset('nhaB');
+    const title = document.getElementById('card-title').innerText.toLowerCase();
+    if (tag.includes('train') || title.includes('tàu') || title.includes('cầu')) setCameraPreset('railway');
+    else if (tag.includes('station') || title.includes('ga')) setCameraPreset('dkStation');
+    else if (tag.includes('animal') || title.includes('cừu')) setCameraPreset('sheepFlock');
+    else if (tag.includes('boat') || title.includes('thuyền') || title.includes('sông')) setCameraPreset('river');
+    else if (tag.includes('landmark') || title.includes('cối xay')) setCameraPreset('windmill');
+    else if (tag.includes('dk1') || tag === 'nhab') setCameraPreset('nhaB');
     else if (tag.includes('dk2') || tag.includes('nha')) setCameraPreset('nhaDieuHanh');
     else if (tag.includes('lan')) setCameraPreset('vuonLan');
     else if (tag.includes('bốc') || tag.includes('xưởng')) setCameraPreset('logistics');

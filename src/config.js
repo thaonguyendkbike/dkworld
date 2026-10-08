@@ -7,41 +7,42 @@
 
 export const CONFIG = {
   // Cài đặt chung & Camera
+  // Cài đặt chung & Camera
   WORLD: {
     unit: 1.0, // 1 đơn vị = 1 mét
-    fogColorDay: 0xd9e8f5,
+    fogColorDay: 0xc8f0f8, // Sương mù xanh ngọc nhạt thanh khiết
     fogColorSunset: 0xffd1a9,
     fogColorNight: 0x090d16,
-    fogNear: 70,
-    fogFar: 360,
+    fogNear: 80,
+    fogFar: 420,
   },
 
   CAMERA: {
     fov: 42,
     near: 0.1,
-    far: 1000,
+    far: 1200,
     // Vị trí góc nhìn bao quát toàn bộ liên hoàn DK1 + DK2
     initialPosition: { x: 30, y: 135, z: 120 },
     initialTarget: { x: -15, y: 5, z: -45 },
     minDistance: 15,
-    maxDistance: 350,
+    maxDistance: 380,
     maxPolarAngle: Math.PI / 2.05,
   },
 
-  // Ánh sáng theo các thời điểm trong ngày
+  // Ánh sáng tươi sáng rực rỡ (Toon Vibrant Low-Poly Aesthetic)
   LIGHTING: {
     day: {
       ambientColor: 0xffffff,
-      ambientIntensity: 0.65,
-      sunColor: 0xfffaed,
-      sunIntensity: 1.8,
-      sunPosition: { x: 80, y: 130, z: 60 },
-      skyColor: 0xb5d8f7,
-      groundColor: 0xe0ece4,
+      ambientIntensity: 0.88, // Nâng sáng toàn bộ các góc khuất
+      sunColor: 0xfffbeb,
+      sunIntensity: 2.2,
+      sunPosition: { x: 90, y: 140, z: 70 },
+      skyColor: 0x58a5f8, // Trời xanh biếc rực rỡ như ảnh mẫu
+      groundColor: 0x86efac, // Cỏ xanh tươi phản chiếu
     },
     sunset: {
       ambientColor: 0xffcaa0,
-      ambientIntensity: 0.5,
+      ambientIntensity: 0.55,
       sunColor: 0xff7e40,
       sunIntensity: 2.0,
       sunPosition: { x: 140, y: 40, z: 40 },
@@ -50,38 +51,43 @@ export const CONFIG = {
     },
     night: {
       ambientColor: 0x1f2a44,
-      ambientIntensity: 0.25,
+      ambientIntensity: 0.28,
       sunColor: 0x5b7cb5,
-      sunIntensity: 0.4,
+      sunIntensity: 0.45,
       sunPosition: { x: 50, y: 90, z: -30 },
       skyColor: 0x070b14,
       groundColor: 0x04060a,
     },
   },
 
-  // Mặt bằng 2 phân khu
+  // Mặt bằng 2 phân khu & Thảo nguyên xanh mướt
   GROUND: {
+    grassColor: 0x4ade80, // Màu cỏ xanh tươi sáng chủ đạo
+    grassAccentColor: 0x22c55e, // Cỏ xanh mướt
+    sandColor: 0xfde68a, // Màu cát vàng ven sông và đường mòn
     dk1: {
       width: 100,
       depth: 95,
-      color: 0x828a86,
+      color: 0x52b788,
+      yardColor: 0x94a3b8,
       center: { x: 45, y: -1.0, z: -40 },
     },
     dk2: {
       width: 110,
       depth: 90,
-      color: 0x7c8480,
+      color: 0x40916c,
+      yardColor: 0x94a3b8,
       center: { x: -75, y: -1.0, z: -45 },
     },
-    borderStoneColor: 0x6e7571,
+    borderStoneColor: 0x64748b,
   },
 
   // Đường Tỉnh ĐT234 kết nối DK1 và DK2
   ROAD_DT234: {
     positionX: -10,
     width: 7.0,
-    length: 160,
-    asphaltColor: 0x2b3035,
+    length: 170,
+    asphaltColor: 0x334155, // Nhựa đường xám sáng sạch sẽ
     lineColor: 0xffcc00,
   },
 
@@ -95,10 +101,10 @@ export const CONFIG = {
       height: 13.5,
       depth: 33.5,
       position: { x: 65.0, y: 13.5 / 2, z: -50.0 },
-      wallColor: 0x47515a,
-      baseWallColor: 0xced4da,
-      roofColor: 0x2b333c,
-      monitorRoof: { width: 7.0, height: 2.2, depth: 28.0, color: 0x242a32 },
+      wallColor: 0x475569,
+      baseWallColor: 0xe2e8f0,
+      roofColor: 0x1e293b,
+      monitorRoof: { width: 7.0, height: 2.2, depth: 28.0, color: 0x0f172a },
       logo: { text: 'DK Bike', color: 0xffb703, size: 2.8 },
       stories: 3,
     },
@@ -110,10 +116,10 @@ export const CONFIG = {
       height: 11.0,
       depth: 12.2,
       position: { x: 35.0, y: 11.0 / 2, z: -35.0 },
-      wallColor: 0x606a74,
-      baseWallColor: 0xd8dde2,
-      roofColor: 0x9ca9b5,
-      stairColor: 0x1d63b8,
+      wallColor: 0x64748b,
+      baseWallColor: 0xf1f5f9,
+      roofColor: 0xcfd8dc,
+      stairColor: 0x0284c7,
       stories: 3,
     },
 
@@ -124,8 +130,8 @@ export const CONFIG = {
       height: 6.5,
       depth: 11.8,
       position: { x: 45.0, y: 6.5 / 2, z: -58.5 },
-      wallColor: 0x5a636c,
-      roofColor: 0x0056b3,
+      wallColor: 0x64748b,
+      roofColor: 0x0284c7, // Mái xanh dương tươi tắn
       solarPanels: true,
       stories: 1,
     },
@@ -137,9 +143,9 @@ export const CONFIG = {
       height: 10.5,
       depth: 11.6,
       position: { x: 23.0, y: 10.5 / 2, z: -12.0 },
-      wallColor: 0x7c858d,
-      baseWallColor: 0xe9ecef,
-      roofColor: 0x8a3324,
+      wallColor: 0x94a3b8,
+      baseWallColor: 0xf8fafc,
+      roofColor: 0xef4444, // Mái ngói đỏ tươi
       stories: 3,
     },
 
@@ -150,9 +156,9 @@ export const CONFIG = {
       height: 4.2,
       depth: 28.0,
       position: { x: 79.5, y: 2.1, z: -46.0 },
-      canopyColor: 0x00b4d8,
-      opacity: 0.65,
-      frameColor: 0x222930,
+      canopyColor: 0x06b6d4,
+      opacity: 0.7,
+      frameColor: 0x1e293b,
     },
 
     nhaBaoVeDK1: {
@@ -162,8 +168,8 @@ export const CONFIG = {
       height: 3.2,
       depth: 3.2,
       position: { x: 77.0, y: 1.6, z: -23.0 },
-      wallColor: 0xdde2e6,
-      roofColor: 0x1d3557,
+      wallColor: 0xf8fafc,
+      roofColor: 0x0284c7,
     },
 
     // === PHÂN KHU DK2 ===
@@ -174,10 +180,10 @@ export const CONFIG = {
       height: 11.5,
       depth: 12.0,
       position: { x: -28.0, y: 11.5 / 2, z: -28.0 },
-      wallColor: 0x52606d,
-      baseWallColor: 0xe2e8f0,
+      wallColor: 0x475569,
+      baseWallColor: 0xf8fafc,
       roofColor: 0x1e293b,
-      solarArray: true, // Dàn pin năng lượng mặt trời phủ kín toàn bộ mái
+      solarArray: true,
       stories: 3,
       area: '253 m² sàn',
     },
@@ -214,8 +220,8 @@ export const CONFIG = {
       width: 75.0,
       depth: 40.0,
       position: { x: -78.0, y: 0.03, z: -45.0 },
-      yardColor: 0x6d757d,
-      courtColor: 0x2e7d32, // Các ô sơn xanh lá
+      yardColor: 0x64748b,
+      courtColor: 0x22c55e, // Ô sân xanh lá tươi
     },
 
     hoTronDK2: {
@@ -224,7 +230,7 @@ export const CONFIG = {
       radius: 6.0,
       height: 1.6,
       position: { x: -108.0, y: -0.6, z: -65.0 },
-      waterColor: 0x0284c7,
+      waterColor: 0x38bdf8,
     },
 
     vuonLanDK2: {
@@ -235,35 +241,39 @@ export const CONFIG = {
       depth: 22.0,
       position: { x: -130.0, y: 16.0, z: -82.0 },
       canopyColor: 0x38bdf8,
-      opacity: 0.55,
+      opacity: 0.65,
       frameColor: 0x1e293b,
     },
   },
 
   // Tuyến đường nội bộ & test track (rộng 3.0m)
   ROADS: {
-    roadColor: 0x3d444b,
+    roadColor: 0x475569,
     lineColor: 0xffffff,
-    kerbColor: 0xa0aab2,
+    kerbColor: 0xcfd8dc,
     trackArrowColor: 0xffcc00,
     width: 3.0,
   },
 
-  // Tuyến đường sắt Bắc - Nam & Kênh nước
+  // Tuyến đường sắt uốn lượn, Cầu vòm đỏ & Nhà ga DK Station
   RAILWAY: {
-    positionX: 87.5,
-    length: 130,
+    positionX: 92.0,
+    length: 180,
     railGauge: 1.4,
-    railColor: 0x8d99ae,
-    ballastColor: 0x495057,
+    railColor: 0x94a3b8,
+    ballastColor: 0xd4a373, // Đá cát vàng nâu như ảnh 1 & 3
+    sleeperColor: 0x5c3d2e,
+    bridgeArchColor: 0xdc2626, // Cầu vòm đỏ rực rỡ như ảnh 1
   },
 
+  // Sông / Máng nước xanh ngọc trong vắt (như ảnh 2)
   CANAL: {
-    positionX: 92.5,
-    width: 4.5,
-    depth: 1.6,
-    length: 130,
-    waterColor: 0x2a6f97,
+    positionX: 86.0,
+    length: 180,
+    width: 9.0,
+    waterColor: 0x38bdf8, // Nước xanh ngọc trong veo
+    sandColor: 0xfde68a,
+    depth: 1.8,
   },
 
   // Bờ kè đá chống sạt lở (Retaining Wall)
@@ -271,22 +281,22 @@ export const CONFIG = {
     height: 4.5,
     width: 1.8,
     positionX: 83.2,
-    color: 0x5c6773,
+    color: 0x64748b,
   },
 
-  // Sườn đồi cảnh quan DK1 & DK2
+  // Sườn đồi cảnh quan phủ xanh
   HILLS: {
     dk1: {
       position: { x: 45, y: 0, z: -85 },
-      radius: 40,
-      height: 18,
-      color: 0x3a5a40,
+      radius: 42,
+      height: 19,
+      color: 0x22c55e,
     },
     dk2: {
       position: { x: -120, y: 0, z: -78 },
-      radius: 52,
-      height: 24,
-      color: 0x32533c,
+      radius: 54,
+      height: 25,
+      color: 0x16a34a,
     },
   },
 
@@ -328,9 +338,29 @@ export const CONFIG = {
       name: 'Đường chạy thử xe (DK1)',
     },
     railway: {
-      pos: { x: 110, y: 25, z: -40 },
-      target: { x: 88, y: 2, z: -40 },
-      name: 'Kênh & Đường ray',
+      pos: { x: 125, y: 22, z: -35 },
+      target: { x: 95, y: 4, z: -49 },
+      name: 'Tàu hơi nước & Cầu vòm đỏ',
+    },
+    dkStation: {
+      pos: { x: 110, y: 16, z: 12 },
+      target: { x: 88, y: 3, z: -2 },
+      name: 'Ga xe lửa DK Station',
+    },
+    sheepFlock: {
+      pos: { x: 135, y: 18, z: -48 },
+      target: { x: 120, y: 5, z: -62 },
+      name: 'Đàn cừu trên đồi cỏ',
+    },
+    river: {
+      pos: { x: 105, y: 12, z: 8 },
+      target: { x: 89.5, y: 0, z: -8 },
+      name: 'Sông máng nước & Thuyền nan',
+    },
+    windmill: {
+      pos: { x: 75, y: 36, z: -85 },
+      target: { x: 55, y: 26, z: -108 },
+      name: 'Cối xay gió sinh thái',
     },
     logistics: {
       pos: { x: 45, y: 18, z: -20 },
