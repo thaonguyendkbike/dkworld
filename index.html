@@ -24,76 +24,84 @@
       <div class="brand-badge">DK1 & DK2 (10.398 m²)</div>
     </div>
 
-    <!-- Quick Camera View Presets -->
-    <nav class="view-presets" id="view-presets" aria-label="Góc nhìn camera">
-      <button class="preset-btn active" id="btn-view-overview" data-view="overview" title="Toàn cảnh liên hoàn DK1 + DK2">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span>Toàn cảnh</span>
+    <!-- Quick Camera View Presets with Collapsible Drawer -->
+    <div class="view-presets-wrapper" id="view-presets-wrapper">
+      <button class="preset-toggle-btn" id="btn-toggle-presets" title="Thu gọn / Mở rộng danh sách góc nhìn">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Góc nhìn</span>
+        <span class="collapse-arrow" id="presets-arrow">▾</span>
       </button>
-      <button class="preset-btn" id="btn-view-dk1" data-view="dk1" title="Khuôn viên nhà máy DK1">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-        <span>Khu DK1</span>
-      </button>
-      <button class="preset-btn" id="btn-view-dk2" data-view="dk2" title="Khu mở rộng DK2">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>
-        <span>Khu DK2</span>
-      </button>
-      <button class="preset-btn" id="btn-view-nhab" data-view="nhaB" title="Xưởng chính Nhà B (DK1)">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        <span>Nhà B (DK1)</span>
-      </button>
-      <button class="preset-btn" id="btn-view-hq" data-view="nhaDieuHanh" title="Nhà điều hành & Pin mặt trời (DK2)">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        <span>Nhà điều hành (DK2)</span>
-      </button>
-      <button class="preset-btn" id="btn-view-vuonlan" data-view="vuonLan" title="Vườn lan trên đồi (DK2)">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        <span>Vườn Lan trên đồi</span>
-      </button>
-      <button class="preset-btn" id="btn-view-logistics" data-view="logistics" title="Khu bốc dỡ & Cửa xưởng Nhà B">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-        <span>Bốc dỡ & Xưởng</span>
-      </button>
-      <button class="preset-btn" id="btn-view-charging" data-view="chargingHub" title="Trạm sạc xe máy điện thông minh">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        <span>Trạm sạc EV</span>
-      </button>
-      <button class="preset-btn" id="btn-view-railway" data-view="railway" title="Đoàn tàu hơi nước & Cầu vòm đỏ">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="3" x2="4" y2="21"/><line x1="20" y1="3" x2="20" y2="21"/><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-        <span>🚂 Tàu & Cầu vòm</span>
-      </button>
-      <button class="preset-btn" id="btn-view-station" data-view="dkStation" title="Ga xe lửa DK Station">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3v4H5V6z"/></svg>
-        <span>🚉 Ga xe lửa</span>
-      </button>
-      <button class="preset-btn" id="btn-view-sheep" data-view="sheepFlock" title="Đàn cừu sinh thái trên đồi cỏ">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c1 1 3 1 4 0"/></svg>
-        <span>🐑 Đàn cừu</span>
-      </button>
-      <button class="preset-btn" id="btn-view-river" data-view="river" title="Sông máng nước & Thuyền nan">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17l20 0M4 17l3 4h10l3-4M12 3v14M12 4l6 6H6l6-6z"/></svg>
-        <span>⛵ Sông máng</span>
-      </button>
-      <button class="preset-btn" id="btn-view-volleyball" data-view="volleyball" title="Sân bóng chuyền ngoài trời DK1">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20M2 12h20"/></svg>
-        <span>🏐 Bóng chuyền</span>
-      </button>
-      <button class="preset-btn" id="btn-view-aoca" data-view="aoCaDK2" title="Ao cá đồi sinh thái DK2">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c5 0 9 4 9 9s-4 9-9 9-9-4-9-9 4-9 9-9z"/><path d="M12 6c3 2 3 6 0 8"/></svg>
-        <span>🐟 Ao cá đồi</span>
-      </button>
-      <button class="preset-btn" id="btn-view-doiga" data-view="doiGaDK2" title="Đồi sinh thái: Vườn hoa, Đàn gà & Chim bồ câu DK2">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="2"/></svg>
-        <span>🕊️ Đồi hoa & chim gà</span>
-      </button>
-    </nav>
+
+      <nav class="view-presets" id="view-presets" aria-label="Góc nhìn camera">
+        <button class="preset-btn active" id="btn-view-overview" data-view="overview" title="Toàn cảnh liên hoàn DK1 + DK2">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Toàn cảnh</span>
+        </button>
+        <button class="preset-btn" id="btn-view-dk1" data-view="dk1" title="Khuôn viên nhà máy DK1">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <span>Khu DK1</span>
+        </button>
+        <button class="preset-btn" id="btn-view-dk2" data-view="dk2" title="Khu mở rộng DK2">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>
+          <span>Khu DK2</span>
+        </button>
+        <button class="preset-btn" id="btn-view-nhab" data-view="nhaB" title="Xưởng chính Nhà B (DK1)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Nhà B (DK1)</span>
+        </button>
+        <button class="preset-btn" id="btn-view-hq" data-view="nhaDieuHanh" title="Nhà điều hành & Pin mặt trời (DK2)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Nhà điều hành (DK2)</span>
+        </button>
+        <button class="preset-btn" id="btn-view-vuonlan" data-view="vuonLan" title="Vườn lan trên đồi (DK2)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <span>Vườn Lan trên đồi</span>
+        </button>
+        <button class="preset-btn" id="btn-view-logistics" data-view="logistics" title="Khu bốc dỡ & Cửa xưởng Nhà B">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <span>Bốc dỡ & Xưởng</span>
+        </button>
+        <button class="preset-btn" id="btn-view-charging" data-view="chargingHub" title="Trạm sạc xe máy điện thông minh">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>Trạm sạc EV</span>
+        </button>
+        <button class="preset-btn" id="btn-view-railway" data-view="railway" title="Đoàn tàu hơi nước & Cầu vòm đỏ">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="3" x2="4" y2="21"/><line x1="20" y1="3" x2="20" y2="21"/><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+          <span>🚂 Tàu & Cầu vòm</span>
+        </button>
+        <button class="preset-btn" id="btn-view-station" data-view="dkStation" title="Ga xe lửa DK Station">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3v4H5V6z"/></svg>
+          <span>🚉 Ga xe lửa</span>
+        </button>
+        <button class="preset-btn" id="btn-view-sheep" data-view="sheepFlock" title="Đàn cừu sinh thái trên đồi cỏ">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c1 1 3 1 4 0"/></svg>
+          <span>🐑 Đàn cừu</span>
+        </button>
+        <button class="preset-btn" id="btn-view-river" data-view="river" title="Sông máng nước & Thuyền nan">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17l20 0M4 17l3 4h10l3-4M12 3v14M12 4l6 6H6l6-6z"/></svg>
+          <span>⛵ Sông máng</span>
+        </button>
+        <button class="preset-btn" id="btn-view-volleyball" data-view="volleyball" title="Sân bóng chuyền ngoài trời DK1">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20M2 12h20"/></svg>
+          <span>🏐 Bóng chuyền</span>
+        </button>
+        <button class="preset-btn" id="btn-view-aoca" data-view="aoCaDK2" title="Ao cá đồi sinh thái DK2">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c5 0 9 4 9 9s-4 9-9 9-9-4-9-9 4-9 9-9z"/><path d="M12 6c3 2 3 6 0 8"/></svg>
+          <span>🐟 Ao cá đồi</span>
+        </button>
+        <button class="preset-btn" id="btn-view-doiga" data-view="doiGaDK2" title="Đồi sinh thái: Vườn hoa, Đàn gà & Chim bồ câu DK2">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="2"/></svg>
+          <span>🕊️ Đồi hoa & chim gà</span>
+        </button>
+      </nav>
+    </div>
 
     <!-- Environment Controls: Time & Weather & Door Action -->
     <div class="env-controls">
       <div class="control-group action-toggles">
         <button class="icon-toggle-btn" id="btn-toggle-doors" title="Mở / Đóng cửa cuốn công nghiệp Xưởng B">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 3h12a1 1 0 0 1 1 1v3H5V4a1 1 0 0 1 1-1zM5 11h14M5 15h14"/></svg>
-          <span class="btn-text" id="btn-door-text">Cửa xưởng: Đóng</span>
+          <span class="btn-text" id="btn-door-text">Cửa: Đóng</span>
         </button>
       </div>
       <div class="control-group time-toggles" role="group" aria-label="Thời gian trong ngày">
@@ -110,9 +118,19 @@
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="16" y1="13" x2="16" y2="21"/><line x1="8" y1="13" x2="8" y2="21"/><line x1="12" y1="15" x2="12" y2="23"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
           <span class="btn-text">Mưa</span>
         </button>
+        <button class="icon-toggle-btn" id="btn-toggle-ui" title="Ẩn/Hiện thanh công cụ (Chế độ ngắm cảnh Zen Mode)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="btn-text">Zen</span>
+        </button>
       </div>
     </div>
   </header>
+
+  <!-- Floating Button to exit Zen Mode -->
+  <button class="floating-zen-exit hidden" id="btn-zen-exit" title="Hiện lại toàn bộ thanh công cụ">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    <span>Hiện giao diện</span>
+  </button>
 
   <!-- Interactive Building Detail Modal / Card -->
   <aside class="building-card hidden" id="building-card" aria-live="polite">

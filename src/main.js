@@ -6970,10 +6970,87 @@ function createBuildingLabels() {
   labelsData.forEach((item) => {
     const el = document.createElement('div');
     el.className = 'building-label-3d';
-    el.innerText = item.text;
+    el.dataset.id = item.id;
+    el.title = item.text;
+
+    // Small glowing indicator dot with pulsing aura
+    const dot = document.createElement('div');
+    dot.className = 'label-dot';
+
+    // Expandable badge pill containing label name
+    const pill = document.createElement('div');
+    pill.className = 'label-pill';
+    pill.innerText = item.text;
+
+    el.appendChild(dot);
+    el.appendChild(pill);
     container.appendChild(el);
-    labelElements.push({ el, worldPos: item.pos });
+
+    // Click on label dot or pill -> Open card modal & focus camera smoothly
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleLabelClick(item);
+    });
+
+    labelElements.push({ el, worldPos: item.pos, item });
   });
+}
+
+function handleLabelClick(item) {
+  if (CONFIG.BUILDINGS[item.id]) {
+    showBuildingModal(item.id);
+  } else {
+    const bMatch = {
+      steamLoco: { type: 'train', title: 'Tàu hơi nước & Tuyến đường sắt' },
+      redArchBridge: { type: 'bridge', title: 'Cầu vòm thép sơn đỏ vượt sông' },
+      dkStation: { type: 'station', title: 'Ga xe lửa DK Station' },
+      rowingBoat: { type: 'boat', title: 'Thuyền nan chèo đò trên sông máng' },
+      sheepFlock: { type: 'animals', title: 'Đàn cừu sinh thái trên đồi cỏ' },
+      windmill: { type: 'landmark', title: 'Cối xay gió sinh thái trên đỉnh đồi' },
+      volleyballCourt: { type: 'sports', title: 'Sân bóng chuyền ngoài trời DK1' },
+      chargerDK1: { type: 'chargingStation', title: 'Trạm sạc xe máy điện thông minh' },
+      doorB1: { type: 'shutterDoor', title: 'Cửa cuốn công nghiệp Xưởng B' },
+      aoCaDK2: { type: 'landscape', title: 'Ao cá đồi sinh thái DK2' },
+      doiGaDK2: { type: 'livestock', title: 'Đồi sinh thái: Đàn gà & Tháp chim bồ câu DK2' },
+      ecoTrailDK2: { type: 'landscape', title: 'Đường mòn sinh thái DK2' },
+    }[item.id];
+    if (bMatch) {
+      showInteractiveModal(bMatch);
+    }
+  }
+
+  // Smooth camera zoom
+  if (CONFIG.PRESETS[item.id]) {
+    setCameraPreset(item.id);
+  } else {
+    smoothFocusOnPoint(item.pos);
+  }
+}
+
+function smoothFocusOnPoint(targetPoint, offset = new THREE.Vector3(26, 22, 26)) {
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const endTarget = targetPoint.clone();
+  const endPos = targetPoint.clone().add(offset);
+
+  const duration = 1100;
+  const startTime = performance.now();
+
+  cameraTween = (time) => {
+    const elapsed = time - startTime;
+    const progress = Math.min(elapsed / duration, 1.0);
+    const ease = progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+    camera.position.lerpVectors(startPos, endPos, ease);
+    controls.target.lerpVectors(startTarget, endTarget, ease);
+    controls.update();
+
+    if (progress >= 1.0) {
+      cameraTween = null;
+    }
+  };
 }
 
 function updateLabels() {
@@ -6983,6 +7060,8 @@ function updateLabels() {
   }
 
   const tempV = new THREE.Vector3();
+  const camPos = camera.position;
+
   labelElements.forEach((l) => {
     tempV.copy(l.worldPos);
     tempV.project(camera);
@@ -6995,7 +7074,15 @@ function updateLabels() {
     const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-(tempV.y * 0.5) + 0.5) * window.innerHeight;
 
-    l.el.style.display = 'block';
+    // Khoảng cách camera tới nhãn: Nếu gần (< 68m) thì tự động bung mở tên nhãn
+    const dist = camPos.distanceTo(l.worldPos);
+    if (dist < 68) {
+      l.el.classList.add('is-near');
+    } else {
+      l.el.classList.remove('is-near');
+    }
+
+    l.el.style.display = 'flex';
     l.el.style.left = `${x}px`;
     l.el.style.top = `${y}px`;
   });
@@ -7330,9 +7417,48 @@ function setupEventListeners() {
     else if (tag.includes('sạc')) setCameraPreset('chargingHub');
   });
 
+  // Toggle collapsible Presets drawer (Khối 6)
+  const togglePresetsBtn = document.getElementById('btn-toggle-presets');
+  const presetsWrapper = document.getElementById('view-presets-wrapper');
+  if (togglePresetsBtn && presetsWrapper) {
+    togglePresetsBtn.addEventListener('click', () => {
+      presetsWrapper.classList.toggle('is-collapsed');
+    });
+  }
+
+  // Zen Mode (Toàn màn hình / Ẩn hiện thanh công cụ) (Khối 6)
+  const zenToggleBtn = document.getElementById('btn-toggle-ui');
+  const zenExitBtn = document.getElementById('btn-zen-exit');
+  if (zenToggleBtn) {
+    zenToggleBtn.addEventListener('click', () => {
+      document.body.classList.add('zen-mode');
+      if (zenExitBtn) zenExitBtn.classList.remove('hidden');
+    });
+  }
+  if (zenExitBtn) {
+    zenExitBtn.addEventListener('click', () => {
+      document.body.classList.remove('zen-mode');
+      zenExitBtn.classList.add('hidden');
+    });
+  }
+
+  // Keyboard shortcut: Escape to close card and exit Zen mode
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const card = document.getElementById('building-card');
+      if (card && !card.classList.contains('hidden')) {
+        card.classList.add('hidden');
+      }
+      if (document.body.classList.contains('zen-mode')) {
+        document.body.classList.remove('zen-mode');
+        if (zenExitBtn) zenExitBtn.classList.add('hidden');
+      }
+    }
+  });
+
   // Raycaster click on 3D canvas (Tương tác toàn diện với Công trình, Cửa xưởng, Xe cộ, Nhân sự)
   window.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.top-nav') || e.target.closest('.building-card') || e.target.closest('.bottom-hud')) {
+    if (e.target.closest('.top-nav') || e.target.closest('.building-card') || e.target.closest('.bottom-hud') || e.target.closest('.building-label-3d') || e.target.closest('.floating-zen-exit')) {
       return;
     }
 

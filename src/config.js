@@ -21,9 +21,9 @@ export const CONFIG = {
     fov: 42,
     near: 0.1,
     far: 1200,
-    // Vị trí góc nhìn bao quát toàn bộ liên hoàn DK1 + DK2
-    initialPosition: { x: 30, y: 135, z: 120 },
-    initialTarget: { x: -15, y: 5, z: -45 },
+    // Vị trí góc nhìn bao quát toàn bộ liên hoàn DK1 + DK2 (Khối 6: Thấp & gần, isometric diorama)
+    initialPosition: { x: 18, y: 55, z: 80 },
+    initialTarget: { x: -12, y: 6, z: -42 },
     minDistance: 15,
     maxDistance: 380,
     maxPolarAngle: Math.PI / 2.05,
@@ -349,8 +349,8 @@ export const CONFIG = {
   // Preset vị trí camera chuyển cảnh (Quick Focus)
   PRESETS: {
     overview: {
-      pos: { x: 30, y: 135, z: 120 },
-      target: { x: -15, y: 5, z: -45 },
+      pos: { x: 18, y: 55, z: 80 },
+      target: { x: -12, y: 6, z: -42 },
       name: 'Toàn cảnh liên hoàn DK1 + DK2',
     },
     dk1: {

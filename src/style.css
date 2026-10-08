@@ -109,6 +109,51 @@ html, body {
   border: 1px solid rgba(255, 183, 3, 0.3);
 }
 
+/* View Presets Collapsible Wrapper */
+.view-presets-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.preset-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-dark);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  box-shadow: var(--shadow-elevated);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.preset-toggle-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--color-primary);
+}
+
+.collapse-arrow {
+  font-size: 0.85rem;
+  transition: transform 0.28s ease;
+  display: inline-block;
+  color: var(--color-primary);
+}
+
+.view-presets-wrapper.is-collapsed .collapse-arrow {
+  transform: rotate(-90deg);
+}
+
 /* View Presets Bar */
 .view-presets {
   display: flex;
@@ -121,6 +166,23 @@ html, body {
   padding: 5px 8px;
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-elevated);
+  max-width: 900px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, padding 0.25s ease;
+}
+
+.view-presets::-webkit-scrollbar {
+  display: none;
+}
+
+.view-presets-wrapper.is-collapsed .view-presets {
+  max-width: 0;
+  opacity: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  pointer-events: none;
 }
 
 .preset-btn {
@@ -131,23 +193,25 @@ html, body {
   border: none;
   color: var(--color-text-muted);
   font-family: var(--font-sans);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 6px 12px;
+  padding: 6px 11px;
   border-radius: var(--radius-pill);
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .preset-btn:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .preset-btn.active {
   color: #0f172a;
   background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  font-weight: 700;
 }
 
 /* Environment Controls */
@@ -184,6 +248,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
 }
 
 .toggle-btn:hover, .icon-toggle-btn:hover {
@@ -204,32 +269,32 @@ html, body {
 }
 
 /* ==========================================================================
-   Building Detail Card (Sidebar / Modal)
+   Building Detail Card (Sidebar / Modal - Refined Glassmorphism)
    ========================================================================== */
 
 .building-card {
   position: absolute;
   top: 76px;
   right: 16px;
-  width: 320px;
-  background: var(--color-card-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--color-border);
+  width: 330px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: var(--shadow-elevated);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .building-card.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-8px) scale(0.96);
+  transform: translateY(-10px) scale(0.95);
 }
 
 .card-header {
@@ -240,25 +305,36 @@ html, body {
 
 .card-tag {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--color-primary);
-  background: rgba(255, 183, 3, 0.12);
-  padding: 3px 8px;
-  border-radius: 4px;
+  color: #0f172a;
+  background: var(--color-primary);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 6px rgba(255, 183, 3, 0.35);
 }
 
 .card-close {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--color-text-muted);
-  font-size: 1.25rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 1.15rem;
   cursor: pointer;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .card-close:hover {
   color: #ffffff;
+  background: rgba(239, 68, 68, 0.8);
+  border-color: #ef4444;
+  transform: rotate(90deg);
 }
 
 .card-title {
@@ -466,34 +542,136 @@ html, body {
   transition: opacity 0.5s ease;
 }
 
-/* 3D Label Overlays */
+/* ==========================================================================
+   3D Label Overlays (Khối 6: Dot-to-Pill Interaction & Proximity Zoom)
+   ========================================================================== */
+
 .building-label-3d {
   position: absolute;
-  pointer-events: none;
-  transform: translate(-50%, -100%);
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  transition: opacity 0.2s;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
   z-index: 5;
+  user-select: none;
+  transition: transform 0.2s ease;
 }
 
-.building-label-3d::after {
+.building-label-3d .label-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffb703;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 12px rgba(255, 183, 3, 0.75);
+  position: relative;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s, border-color 0.2s;
+}
+
+/* Pulsing aura ring */
+.building-label-3d .label-dot::after {
   content: '';
   position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 4px 4px 0 4px;
-  border-style: solid;
-  border-color: rgba(15, 23, 42, 0.85) transparent transparent transparent;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 183, 3, 0.7);
+  animation: label-dot-pulse 2.2s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes label-dot-pulse {
+  0% { transform: scale(0.65); opacity: 1; }
+  60% { transform: scale(1.85); opacity: 0; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+.building-label-3d .label-pill {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0;
+  margin-left: 0;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  transition: max-width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, padding 0.22s ease, margin 0.22s ease;
+  pointer-events: none;
+}
+
+/* On Hover, Touch, or Camera Proximity Near (< 68m) -> Expand to Pill */
+.building-label-3d:hover .label-pill,
+.building-label-3d.is-near .label-pill {
+  max-width: 280px;
+  opacity: 1;
+  padding: 4px 12px;
+  margin-left: 7px;
+  pointer-events: auto;
+}
+
+.building-label-3d:hover .label-dot,
+.building-label-3d.is-near .label-dot {
+  transform: scale(1.22);
+  background: #ffffff;
+  border-color: #ffb703;
+}
+
+/* ==========================================================================
+   Zen Mode / Cinematic UI Toggle (Khối 6)
+   ========================================================================== */
+
+body.zen-mode .top-nav,
+body.zen-mode .bottom-hud,
+body.zen-mode .interaction-hint,
+body.zen-mode .building-card {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-16px) !important;
+  transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+.floating-zen-exit {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  color: #ffffff;
+  padding: 8px 16px;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-elevated);
+  transition: all 0.2s ease;
+}
+
+.floating-zen-exit:hover {
+  background: var(--color-primary);
+  color: #0f172a;
+  transform: scale(1.04);
+}
+
+.floating-zen-exit.hidden {
+  display: none;
 }
 
 /* Responsive adjustments for mobile */
@@ -502,8 +680,11 @@ html, body {
     flex-wrap: wrap;
     gap: 8px;
   }
-  .view-presets {
+  .view-presets-wrapper {
     order: 3;
+    width: 100%;
+  }
+  .view-presets {
     width: 100%;
     overflow-x: auto;
     justify-content: flex-start;
