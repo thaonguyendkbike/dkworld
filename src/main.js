@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CONFIG } from './config.js';
+
+// Wind shader uniform for swaying foliage (Khối 2)
+const windUniforms = {
+  uWindTime: { value: 0 },
+};
 
 // ============================================================================
 // State & Variables
@@ -2255,256 +2261,536 @@ function buildDK2Vehicles() {
 }
 
 // ============================================================================
-// 10. Landscaping, Greenery, River Rocks & Wildflowers (Vibrant Faceted Low-Poly)
+// 10. Landscaping & Greenery: High-Density Forest, 4 Tree Types & Flora (Khối 2)
 // ============================================================================
-function buildLandscaping() {
-  const dummy = new THREE.Object3D();
 
-  // 1. Thân cây gỗ (Trunks) cho cây tán tròn
-  const roundTreeCount = 260;
-  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.36, 2.2, 5);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9, flatShading: true });
-  const trunkInstanced = new THREE.InstancedMesh(trunkGeo, trunkMat, roundTreeCount);
-  trunkInstanced.castShadow = true;
-
-  // 2. Tán cây tròn đa giác (Icosahedron Faceted Foliage - 4 bảng màu xanh rực rỡ & 1 vàng thu như ảnh mẫu)
-  const foliageGeo = new THREE.IcosahedronGeometry(1.85, 1);
-  const foliageColors = [
-    0x4ade80, // Xanh lá mạ rực rỡ
-    0x22c55e, // Xanh tươi sáng
-    0x84cc16, // Xanh nõn chuối
-    0x15803d, // Xanh lá đậm ngọc
-    0xeab308, // Lá vàng thu nổi bật
-  ];
-
-  const foliageMeshes = foliageColors.map((colorHex) => {
-    const mat = new THREE.MeshStandardMaterial({
-      color: colorHex,
-      roughness: 0.75,
-      flatShading: true,
-    });
-    const im = new THREE.InstancedMesh(foliageGeo, mat, Math.ceil(roundTreeCount / foliageColors.length) + 15);
-    im.castShadow = true;
-    return { mesh: im, idx: 0 };
+// Tạo vật liệu tán cây hỗ trợ hiệu ứng gió đung đưa qua Vertex Shader
+function createWindFoliageMaterial(baseColorHex, roughness = 0.82) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: baseColorHex,
+    roughness: roughness,
+    flatShading: true,
   });
 
-  // Tọa độ đặt 260 cây tán tròn khắp dự án:
-  let tIdx = 0;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWindTime = windUniforms.uWindTime;
+    shader.uniforms.uWindSpeed = { value: CONFIG.FOREST.wind.speed };
+    shader.uniforms.uWindStrength = { value: CONFIG.FOREST.wind.strength };
 
-  // A. Vành đai cây xanh mướt quanh bờ sông & Tuyến đường sắt (như ảnh 1 & 2)
-  for (let z = -110; z <= 65; z += 4.5) {
-    if (tIdx >= roundTreeCount) break;
-    // Bờ Tây sông & Ven kè DK1
-    const x1 = 80.5 + (Math.sin(z * 0.1) * 2.2);
-    const y1 = 0.5;
-    const s1 = 0.85 + Math.random() * 0.45;
+    shader.vertexShader = `
+      uniform float uWindTime;
+      uniform float uWindSpeed;
+      uniform float uWindStrength;
+      ${shader.vertexShader}
+    `;
 
-    dummy.position.set(x1, y1 + 1.1 * s1, z);
-    dummy.scale.set(s1, s1, s1);
-    dummy.rotation.set(0, Math.random() * Math.PI, 0);
-    dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `
+      #include <begin_vertex>
+      // Chỉ ngọn và tán trên cao đung đưa theo gió, gốc cây bám chắc mặt đất
+      float swayFactor = clamp(position.y / 2.6, 0.0, 1.0);
+      float sway = sin(uWindTime * uWindSpeed + position.x * 0.16 + position.z * 0.16) * uWindStrength * swayFactor;
+      transformed.x += sway;
+      transformed.z += sway * 0.55;
+      `
+    );
+  };
 
-    dummy.position.set(x1, y1 + 3.0 * s1, z);
-    dummy.updateMatrix();
-    const cIdx = tIdx % foliageColors.length;
-    foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
-    tIdx++;
+  return mat;
+}
 
-    // Bờ Đông sông & Chân đồi làng quê
-    if (tIdx < roundTreeCount) {
-      const x2 = 101.5 + (Math.cos(z * 0.12) * 3.5);
-      const y2 = 0.8 + (x2 > 105 ? 1.5 : 0);
-      const s2 = 0.9 + Math.random() * 0.5;
+// Tạo hình cầu đa diện Icosahedron với đỉnh dịch chuyển ngẫu nhiên (Faceted Organic Low-Poly)
+function createJitteredIcosahedron(radius, detail = 1, jitterAmount = 0.28) {
+  const geo = new THREE.IcosahedronGeometry(radius, detail);
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  const normal = new THREE.Vector3();
 
-      dummy.position.set(x2, y2 + 1.1 * s2, z);
-      dummy.scale.set(s2, s2, s2);
-      dummy.rotation.set(0, Math.random() * Math.PI, 0);
-      dummy.updateMatrix();
-      trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    normal.copy(v).normalize();
+    // Hash xác định theo tọa độ đỉnh
+    const seed = Math.sin(v.x * 12.9898 + v.y * 78.233 + v.z * 37.719) * 43758.5453;
+    const hash = seed - Math.floor(seed);
+    v.addScaledVector(normal, (hash - 0.5) * jitterAmount * radius);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
 
-      dummy.position.set(x2, y2 + 3.0 * s2, z);
-      dummy.updateMatrix();
-      const cIdx2 = tIdx % foliageColors.length;
-      foliageMeshes[cIdx2].mesh.setMatrixAt(foliageMeshes[cIdx2].idx++, dummy.matrix);
-      tIdx++;
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// Tạo hình cây thông 3 tầng nón xếp chồng + thân gỗ gộp chung (Compound Tiered Pine)
+function createTieredPineGeometry() {
+  const geos = [];
+
+  // 3 tầng nón thuôn nhọn
+  const tiers = [
+    { radius: 1.65, height: 2.2, y: 1.8 },
+    { radius: 1.25, height: 1.9, y: 3.0 },
+    { radius: 0.85, height: 1.5, y: 4.0 },
+  ];
+
+  tiers.forEach((t) => {
+    const cone = new THREE.ConeGeometry(t.radius, t.height, 5);
+    cone.translate(0, t.y, 0);
+    geos.push(cone);
+  });
+
+  // Thân cây thông
+  const trunk = new THREE.CylinderGeometry(0.22, 0.35, 1.8, 5);
+  trunk.translate(0, 0.9, 0);
+  geos.push(trunk);
+
+  const merged = BufferGeometryUtils.mergeGeometries(geos, false);
+  merged.computeVertexNormals();
+  return merged;
+}
+
+// Tính toán độ cao bề mặt địa hình tổng thể (Toàn bộ các đỉnh đồi, sườn dốc và thung lũng)
+function getTerrainElevation(x, z) {
+  let maxY = 0.1;
+
+  // 1. Đồi DK2
+  const dk2Y = getDK2HillSurfaceY(x, z);
+  if (dk2Y > maxY) maxY = dk2Y;
+
+  // 2. Các ngọn đồi phía Đông, Bắc và sau xưởng DK1
+  const hillsData = [
+    { x: 125, z: -80, radius: 52, apex: 24, base: -2 },
+    { x: 142, z: -25, radius: 48, apex: 20, base: -2 },
+    { x: 132, z: 38, radius: 45, apex: 18, base: -2 },
+    { x: 55, z: -108, radius: 54, apex: 26, base: -2 }, // Đồi Cối xay gió
+    { x: 45, z: -85, radius: 42, apex: 17, base: -2 },  // Đồi sau DK1
+  ];
+
+  for (let i = 0; i < hillsData.length; i++) {
+    const h = hillsData[i];
+    const dist = Math.hypot(x - h.x, z - h.z);
+    if (dist < h.radius) {
+      const hillY = h.base + (h.apex - h.base) * (1 - dist / h.radius);
+      if (hillY > maxY) maxY = hillY;
     }
   }
 
-  // B. Rừng cây trên sườn đồi phía Đông (quanh đàn cừu và làng quê)
-  for (let i = 0; i < 75; i++) {
-    if (tIdx >= roundTreeCount) break;
-    const ang = Math.random() * Math.PI * 2;
-    const rad = 6 + Math.random() * 38;
-    const x = 126 + Math.cos(ang) * rad;
-    const z = -45 + Math.sin(ang) * (rad * 1.5);
-    // Tránh mọc đè vào bãi chăn thả đàn cừu (108, -45)
-    if (Math.hypot(x - 108, z - (-45)) < 14) continue;
-    const y = Math.max(0.5, getEastHillSurfaceY(x, z));
-    const s = 0.85 + Math.random() * 0.55;
-
-    dummy.position.set(x, y + 1.1 * s, z);
-    dummy.scale.set(s, s, s);
-    dummy.rotation.set(0, Math.random() * Math.PI, 0);
-    dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
-
-    dummy.position.set(x, y + 3.0 * s, z);
-    dummy.updateMatrix();
-    const cIdx = tIdx % foliageColors.length;
-    foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
-    tIdx++;
+  // 3. Khe suối / Lòng sông máng nước
+  if (x > 84 && x < 97 && z > -110 && z < 70) {
+    const distFromCenter = Math.abs(x - 90);
+    if (distFromCenter < 5.5) return -1.35;
+    return -0.4;
   }
 
-  // C. Cây xanh dọc trục đường ĐT234 & Cổng nhà máy
-  for (let z = -98; z <= 25; z += 6.5) {
-    if (tIdx >= roundTreeCount) break;
-    [-14.5, -5.5].forEach((rx) => {
-      if (tIdx >= roundTreeCount) return;
-      const x = rx + (Math.random() - 0.5) * 1.0;
-      const y = 0.2;
-      const s = 0.8 + Math.random() * 0.35;
+  return Math.max(0.1, maxY);
+}
 
-      dummy.position.set(x, y + 1.1 * s, z);
+// Kiểm tra khoảng cách an toàn với đường sắt
+function isNearRailwayTrack(x, z, minDist = 3.2) {
+  if (!railwayCurve) return false;
+  if (x < 78 || x > 108 || z < -115 || z > 68) return false;
+  for (let s = 0; s <= 36; s++) {
+    const pt = railwayCurve.getPointAt(s / 36);
+    if (Math.hypot(x - pt.x, z - pt.z) < minDist) return true;
+  }
+  return false;
+}
+
+// Vùng cấm mọc cây rừng tự nhiên (bảo vệ nhà xưởng, đường sá, đồng cỏ đàn cừu, ao cá, đàn gà)
+function isForestExcludedZone(x, z) {
+  // Khuôn viên nhà máy DK1 (Xưởng B, Văn phòng A, Nhà C, Nhà ăn, Sân bóng chuyền, Bãi đỗ)
+  if (x > 15 && x < 83 && z > -68 && z < -10) return true;
+  // Khuôn viên nhà máy DK2 (Tòa nhà HQ, Kho linh kiện, Sân xe thành phẩm, Sân thử)
+  if (x > -112 && x < -24 && z > -78 && z < -16) return true;
+  // Lòng đường ĐT234 (chỉ trồng cây cảnh 2 bên vỉa hè)
+  if (x > -14.5 && x < -5.5 && z > -96 && z < 25) return true;
+  // Lòng sông sâu
+  if (x > 86 && x < 94 && z > -105 && z < 65) return true;
+  // Đồng cỏ chăn thả đàn cừu sinh thái
+  if (Math.hypot(x - 108, z - (-45)) < 15.5) return true;
+  // Ao cá đồi sinh thái và sàn gỗ câu cá DK2
+  if (Math.hypot(x - (-98), z - (-56)) < 14.0) return true;
+  // Bãi nuôi đàn gà thả đồi và máng ăn DK2
+  if (Math.hypot(x - (-112), z - (-36)) < 12.5) return true;
+  // Hành lang an toàn đường ray tàu hỏa
+  if (isNearRailwayTrack(x, z, 3.2)) return true;
+
+  return false;
+}
+
+// Hàm nhiễu 2D đa tần số tạo cụm rừng tự nhiên không thẳng hàng
+function forestNoise2D(x, z) {
+  const s1 = Math.sin(x * 0.032 + Math.cos(z * 0.032) * 1.9);
+  const s2 = Math.sin(x * 0.075 - z * 0.082);
+  const s3 = Math.cos(x * 0.15 + z * 0.13);
+  return (s1 * 0.5 + s2 * 0.3 + s3 * 0.2 + 1.0) * 0.5; // [0..1]
+}
+
+function buildLandscaping() {
+  const dummy = new THREE.Object3D();
+  const fCfg = CONFIG.FOREST;
+
+  // --------------------------------------------------------------------------
+  // 1. (a) Cây tán tròn Low-Poly (Icosahedron Faceted Foliage - Dịch đỉnh ngẫu nhiên)
+  // --------------------------------------------------------------------------
+  const roundCount = fCfg.roundTreeCount || 1500;
+  const roundTrunkGeo = new THREE.CylinderGeometry(0.2, 0.36, 2.0, 5);
+  const roundTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9, flatShading: true });
+  const roundTrunkInst = new THREE.InstancedMesh(roundTrunkGeo, roundTrunkMat, roundCount);
+  roundTrunkInst.castShadow = true;
+
+  const roundFoliageGeo = createJitteredIcosahedron(1.7, 1, 0.28);
+  const roundFoliageMat = createWindFoliageMaterial(0x22c55e, 0.8);
+  const roundFoliageInst = new THREE.InstancedMesh(roundFoliageGeo, roundFoliageMat, roundCount);
+  roundFoliageInst.castShadow = true;
+
+  // --------------------------------------------------------------------------
+  // 2. (b) Cây thông nhiều tầng hình nón (Tiered Pine Cones)
+  // --------------------------------------------------------------------------
+  const pineCount = fCfg.pineTreeCount || 850;
+  const pineGeo = createTieredPineGeometry();
+  const pineMat = createWindFoliageMaterial(0x14532d, 0.85);
+  const pineInst = new THREE.InstancedMesh(pineGeo, pineMat, pineCount);
+  pineInst.castShadow = true;
+
+  // --------------------------------------------------------------------------
+  // 3. (c) Cây tán vàng/cam điểm xuyến (Autumn / Golden Foliage)
+  // --------------------------------------------------------------------------
+  const autumnCount = fCfg.autumnTreeCount || 260;
+  const autumnTrunkInst = new THREE.InstancedMesh(roundTrunkGeo, roundTrunkMat, autumnCount);
+  autumnTrunkInst.castShadow = true;
+
+  const autumnFoliageGeo = createJitteredIcosahedron(1.55, 1, 0.3);
+  const autumnFoliageMat = createWindFoliageMaterial(0xf59e0b, 0.78);
+  const autumnFoliageInst = new THREE.InstancedMesh(autumnFoliageGeo, autumnFoliageMat, autumnCount);
+  autumnFoliageInst.castShadow = true;
+
+  // --------------------------------------------------------------------------
+  // 4. (d) Bụi cây thấp (Low Bushes)
+  // --------------------------------------------------------------------------
+  const bushCount = fCfg.bushCount || 700;
+  const bushGeo = new THREE.DodecahedronGeometry(0.85, 0);
+  const bushMat = createWindFoliageMaterial(0x4ade80, 0.82);
+  const bushInst = new THREE.InstancedMesh(bushGeo, bushMat, bushCount);
+  bushInst.castShadow = true;
+
+  // --------------------------------------------------------------------------
+  // 5. Tảng đá cuội & Bãi sỏi ven bờ (River Rocks & Hillside Boulders)
+  // --------------------------------------------------------------------------
+  const rockCount = fCfg.rockCount || 220;
+  const rockGeo = new THREE.DodecahedronGeometry(0.75, 0);
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9, flatShading: true });
+  const rockInst = new THREE.InstancedMesh(rockGeo, rockMat, rockCount);
+  rockInst.castShadow = true;
+
+  // --------------------------------------------------------------------------
+  // 6. Thảm hoa dại rực rỡ (Wildflowers - Trắng, Vàng, Hồng phấn, Tím pastel)
+  // --------------------------------------------------------------------------
+  const flowerCount = fCfg.flowerCount || 800;
+  const flowerGeo = new THREE.SphereGeometry(0.2, 5, 4);
+  const flowerMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const flowerInst = new THREE.InstancedMesh(flowerGeo, flowerMat, flowerCount);
+
+  // --------------------------------------------------------------------------
+  // 7. Khóm cỏ tuft (Grass Tufts)
+  // --------------------------------------------------------------------------
+  const tuftCount = fCfg.grassTuftCount || 600;
+  const tuftGeo = new THREE.ConeGeometry(0.25, 0.65, 3);
+  const tuftMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.85, flatShading: true });
+  const tuftInst = new THREE.InstancedMesh(tuftGeo, tuftMat, tuftCount);
+
+  // Color helper objects
+  const colObj = new THREE.Color();
+  const roundColors = fCfg.colors.roundFoliage;
+  const pineColors = fCfg.colors.pineFoliage;
+  const autumnColors = fCfg.colors.autumnFoliage;
+  const bushColors = fCfg.colors.bushFoliage;
+  const flowerColors = fCfg.colors.wildflowers;
+  const rockColors = fCfg.colors.rocks;
+
+  // Bộ đếm instance đã đặt
+  let rIdx = 0;
+  let pIdx = 0;
+  let aIdx = 0;
+  let bIdx = 0;
+  let roIdx = 0;
+  let flIdx = 0;
+  let tuIdx = 0;
+
+  // ==========================================================================
+  // PHẦN A: CÂY CẢNH ĐỀU ĐẶN DỌC ĐƯỜNG NỘI BỘ & ĐT234 (Theo đúng prompt)
+  // ==========================================================================
+  // Dọc 2 bên lề đường ĐT234
+  for (let z = -94; z <= 24; z += 5.8) {
+    [-13.8, -6.2].forEach((rx) => {
+      if (rIdx >= roundCount) return;
+      const x = rx + (Math.random() - 0.5) * 0.4;
+      const y = 0.2;
+      const s = 0.82 + Math.random() * 0.25;
+
+      dummy.position.set(x, y + 1.0 * s, z);
       dummy.scale.set(s, s, s);
       dummy.rotation.set(0, Math.random() * Math.PI, 0);
       dummy.updateMatrix();
-      trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+      roundTrunkInst.setMatrixAt(rIdx, dummy.matrix);
 
-      dummy.position.set(x, y + 3.0 * s, z);
+      dummy.position.set(x, y + 2.8 * s, z);
       dummy.updateMatrix();
-      const cIdx = tIdx % foliageColors.length;
-      foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
-      tIdx++;
+      roundFoliageInst.setMatrixAt(rIdx, dummy.matrix);
+
+      colObj.setHex(roundColors[rIdx % roundColors.length]);
+      colObj.offsetHSL((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08);
+      roundFoliageInst.setColorAt(rIdx, colObj);
+      rIdx++;
     });
   }
 
-  // D. Rừng cây trên đồi DK2 Vườn Lan (Tránh đè lên Ao cá và Đàn gà)
-  for (let i = 0; i < 60; i++) {
-    if (tIdx >= roundTreeCount) break;
-    const ang = Math.random() * Math.PI * 2;
-    const rad = 8 + Math.random() * 34;
-    const x = CONFIG.HILLS.dk2.position.x + Math.cos(ang) * rad;
-    const z = CONFIG.HILLS.dk2.position.z + Math.sin(ang) * rad;
-    // Tránh đè lên Ao cá đồi sinh thái (-98, -56) và Đàn gà thả đồi (-112, -36)
-    if (Math.hypot(x - (-98), z - (-56)) < 13 || Math.hypot(x - (-112), z - (-36)) < 12) continue;
-    const y = Math.max(0.5, getDK2HillSurfaceY(x, z));
-    const s = 0.9 + Math.random() * 0.5;
+  // Dọc lối dạo bộ bờ kênh DK1
+  for (let z = -65; z <= -12; z += 5.2) {
+    if (rIdx >= roundCount) break;
+    const x = 79.2 + (Math.random() - 0.5) * 0.6;
+    const y = 0.5;
+    const s = 0.85 + Math.random() * 0.3;
 
-    dummy.position.set(x, y + 1.1 * s, z);
+    dummy.position.set(x, y + 1.0 * s, z);
     dummy.scale.set(s, s, s);
     dummy.rotation.set(0, Math.random() * Math.PI, 0);
     dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(tIdx, dummy.matrix);
+    roundTrunkInst.setMatrixAt(rIdx, dummy.matrix);
 
-    dummy.position.set(x, y + 3.0 * s, z);
+    dummy.position.set(x, y + 2.8 * s, z);
     dummy.updateMatrix();
-    const cIdx = tIdx % foliageColors.length;
-    foliageMeshes[cIdx].mesh.setMatrixAt(foliageMeshes[cIdx].idx++, dummy.matrix);
-    tIdx++;
+    roundFoliageInst.setMatrixAt(rIdx, dummy.matrix);
+
+    colObj.setHex(roundColors[rIdx % roundColors.length]);
+    colObj.offsetHSL((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08);
+    roundFoliageInst.setColorAt(rIdx, colObj);
+    rIdx++;
   }
 
-  trunkInstanced.instanceMatrix.needsUpdate = true;
-  scene.add(trunkInstanced);
+  // ==========================================================================
+  // PHẦN B: PHỦ KÍN ĐỒI NÚI & RÌA KHU ĐẤT BẰNG THUẬT TOÁN NHIỄU THEO CỤM
+  // ==========================================================================
+  // Quét lưới jitter toàn cảnh từ rìa Tây sang rìa Đông, từ sườn Bắc đến thung lũng Nam
+  const minX = -182, maxX = 192, stepX = 3.8;
+  const minZ = -158, maxZ = 85, stepZ = 3.8;
 
-  foliageMeshes.forEach((fm) => {
-    fm.mesh.instanceMatrix.needsUpdate = true;
-    scene.add(fm.mesh);
-  });
+  for (let gz = minZ; gz <= maxZ; gz += stepZ) {
+    for (let gx = minX; gx <= maxX; gx += stepX) {
+      // Dịch tọa độ ngẫu nhiên tự nhiên
+      const x = gx + (Math.random() - 0.5) * 3.3;
+      const z = gz + (Math.random() - 0.5) * 3.3;
 
-  // 3. Cây thông đa tầng (Tiered Pine Cones - 3 nón xếp tầng như ảnh 1 & 3)
-  const pineCount = 90;
-  const pineGeo = new THREE.ConeGeometry(1.6, 2.4, 5);
-  const pineMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.8, flatShading: true });
-  const pineInstanced = new THREE.InstancedMesh(pineGeo, pineMat, pineCount * 3);
-  pineInstanced.castShadow = true;
+      if (isForestExcludedZone(x, z)) continue;
 
-  let pIdx = 0;
-  for (let p = 0; p < pineCount; p++) {
-    let px = (p % 2 === 0 ? 55 : 135) + (Math.random() - 0.5) * 45;
-    let pz = -110 + (p / pineCount) * 160 + (Math.random() - 0.5) * 15;
-    if (px > 31 && px < 57 && pz > -20 && pz < -4) {
-      px += 18;
-    }
-    // Tránh che đàn cừu
-    if (px > 98 && px < 118 && pz > -55 && pz < -35) {
-      px = 125;
-    }
-    const py = 0.5 + Math.random() * 6;
-    const ps = 0.75 + Math.random() * 0.45;
+      const elevation = getTerrainElevation(x, z);
+      const nVal = forestNoise2D(x, z);
 
-    // 3 tầng nón xếp chồng
-    for (let tier = 0; tier < 3; tier++) {
-      const tierScale = ps * (1 - tier * 0.22);
-      dummy.position.set(px, py + tier * 1.5 * ps, pz);
-      dummy.scale.set(tierScale, tierScale, tierScale);
-      dummy.rotation.set(0, Math.random() * Math.PI, 0);
-      dummy.updateMatrix();
-      pineInstanced.setMatrixAt(pIdx++, dummy.matrix);
+      // Lọc mật độ theo nhiễu:
+      // Ở sườn đồi cao (elevation > 8), rừng phủ dày đặc như ảnh mẫu Grand Valley
+      // Ở đồng bằng thấp, tạo khoảng hở bãi cỏ đón nắng
+      if (elevation < 3.5 && nVal < 0.28) {
+        // Có thể mọc bụi thấp hoặc hoa dại
+        if (nVal > 0.18 && flIdx < flowerCount && Math.random() < 0.4) {
+          dummy.position.set(x, elevation + 0.12, z);
+          dummy.scale.setScalar(0.7 + Math.random() * 0.6);
+          dummy.updateMatrix();
+          flowerInst.setMatrixAt(flIdx, dummy.matrix);
+          colObj.setHex(flowerColors[flIdx % flowerColors.length]);
+          flowerInst.setColorAt(flIdx, colObj);
+          flIdx++;
+        }
+        continue;
+      }
+
+      const isHighRidge = elevation > 9.5;
+      const isNearRiver = Math.abs(x - 90) < 17;
+      const scaleRand = 0.78 + Math.random() * 0.55;
+      const rotY = Math.random() * Math.PI * 2;
+
+      // Phân bổ 4 loại cây theo cao độ và cụm sinh thái
+      if (isHighRidge || (nVal > 0.68 && !isNearRiver)) {
+        // (b) Thông nhiều tầng hình nón trên đỉnh đồi & triền núi cao
+        if (pIdx < pineCount && Math.random() < 0.75) {
+          dummy.position.set(x, elevation, z);
+          dummy.scale.set(scaleRand, scaleRand * (0.9 + Math.random() * 0.3), scaleRand);
+          dummy.rotation.set(0, rotY, 0);
+          dummy.updateMatrix();
+          pineInst.setMatrixAt(pIdx, dummy.matrix);
+
+          colObj.setHex(pineColors[pIdx % pineColors.length]);
+          colObj.offsetHSL((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08);
+          pineInst.setColorAt(pIdx, colObj);
+          pIdx++;
+
+          // Bụi thấp dưới chân cây thông
+          if (bIdx < bushCount && Math.random() < 0.35) {
+            const bx = x + (Math.random() - 0.5) * 2.2;
+            const bz = z + (Math.random() - 0.5) * 2.2;
+            const by = getTerrainElevation(bx, bz);
+            dummy.position.set(bx, by + 0.25, bz);
+            dummy.scale.setScalar(0.55 + Math.random() * 0.45);
+            dummy.rotation.set(Math.random(), Math.random(), Math.random());
+            dummy.updateMatrix();
+            bushInst.setMatrixAt(bIdx, dummy.matrix);
+
+            colObj.setHex(bushColors[bIdx % bushColors.length]);
+            bushInst.setColorAt(bIdx, colObj);
+            bIdx++;
+          }
+        } else if (aIdx < autumnCount && Math.random() < 0.5) {
+          // (c) Cây tán vàng/cam thu rực rỡ điểm xuyến trên đồi
+          dummy.position.set(x, elevation + 1.0 * scaleRand, z);
+          dummy.scale.set(scaleRand, scaleRand, scaleRand);
+          dummy.rotation.set(0, rotY, 0);
+          dummy.updateMatrix();
+          autumnTrunkInst.setMatrixAt(aIdx, dummy.matrix);
+
+          dummy.position.set(x, elevation + 2.7 * scaleRand, z);
+          dummy.updateMatrix();
+          autumnFoliageInst.setMatrixAt(aIdx, dummy.matrix);
+
+          colObj.setHex(autumnColors[aIdx % autumnColors.length]);
+          colObj.offsetHSL((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08);
+          autumnFoliageInst.setColorAt(aIdx, colObj);
+          aIdx++;
+        }
+      } else {
+        // (a) Cây tán tròn Low-Poly ở sườn dốc trung bình và thung lũng
+        if (rIdx < roundCount) {
+          dummy.position.set(x, elevation + 1.0 * scaleRand, z);
+          dummy.scale.set(scaleRand, scaleRand, scaleRand);
+          dummy.rotation.set(0, rotY, 0);
+          dummy.updateMatrix();
+          roundTrunkInst.setMatrixAt(rIdx, dummy.matrix);
+
+          dummy.position.set(x, elevation + 2.8 * scaleRand, z);
+          dummy.updateMatrix();
+          roundFoliageInst.setMatrixAt(rIdx, dummy.matrix);
+
+          colObj.setHex(roundColors[rIdx % roundColors.length]);
+          colObj.offsetHSL((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08);
+          roundFoliageInst.setColorAt(rIdx, colObj);
+          rIdx++;
+
+          // Điểm xuyến cây tán vàng xen kẽ trong rừng xanh
+          if (aIdx < autumnCount && Math.random() < 0.14) {
+            const ax = x + (Math.random() - 0.5) * 3.5;
+            const az = z + (Math.random() - 0.5) * 3.5;
+            if (!isForestExcludedZone(ax, az)) {
+              const ay = getTerrainElevation(ax, az);
+              const as = 0.8 + Math.random() * 0.45;
+              dummy.position.set(ax, ay + 1.0 * as, az);
+              dummy.scale.set(as, as, as);
+              dummy.rotation.set(0, Math.random() * Math.PI, 0);
+              dummy.updateMatrix();
+              autumnTrunkInst.setMatrixAt(aIdx, dummy.matrix);
+
+              dummy.position.set(ax, ay + 2.7 * as, az);
+              dummy.updateMatrix();
+              autumnFoliageInst.setMatrixAt(aIdx, dummy.matrix);
+
+              colObj.setHex(autumnColors[aIdx % autumnColors.length]);
+              colObj.offsetHSL((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08);
+              autumnFoliageInst.setColorAt(aIdx, colObj);
+              aIdx++;
+            }
+          }
+        }
+      }
+
+      // (d) Bụi rậm ngẫu nhiên dưới các tán cây
+      if (bIdx < bushCount && Math.random() < 0.28) {
+        const bx = x + (Math.random() - 0.5) * 2.8;
+        const bz = z + (Math.random() - 0.5) * 2.8;
+        if (!isForestExcludedZone(bx, bz)) {
+          const by = getTerrainElevation(bx, bz);
+          dummy.position.set(bx, by + 0.35, bz);
+          dummy.scale.setScalar(0.65 + Math.random() * 0.5);
+          dummy.rotation.set(Math.random(), Math.random(), Math.random());
+          dummy.updateMatrix();
+          bushInst.setMatrixAt(bIdx, dummy.matrix);
+
+          colObj.setHex(bushColors[bIdx % bushColors.length]);
+          bushInst.setColorAt(bIdx, colObj);
+          bIdx++;
+        }
+      }
+
+      // Rải đá cuội ven bờ sông và triền đồi
+      if (roIdx < rockCount && (isNearRiver || Math.random() < 0.12)) {
+        const rx = x + (Math.random() - 0.5) * 3.0;
+        const rz = z + (Math.random() - 0.5) * 3.0;
+        if (!isForestExcludedZone(rx, rz)) {
+          const ry = getTerrainElevation(rx, rz);
+          dummy.position.set(rx, ry + 0.2, rz);
+          dummy.scale.set(
+            0.7 + Math.random() * 0.7,
+            0.4 + Math.random() * 0.4,
+            0.7 + Math.random() * 0.7
+          );
+          dummy.rotation.set(Math.random(), Math.random(), Math.random());
+          dummy.updateMatrix();
+          rockInst.setMatrixAt(roIdx, dummy.matrix);
+
+          colObj.setHex(rockColors[roIdx % rockColors.length]);
+          rockInst.setColorAt(roIdx, colObj);
+          roIdx++;
+        }
+      }
+
+      // Khóm cỏ tuft
+      if (tuIdx < tuftCount && Math.random() < 0.22) {
+        dummy.position.set(x, elevation + 0.2, z);
+        dummy.scale.setScalar(0.8 + Math.random() * 0.5);
+        dummy.rotation.set(0, Math.random() * Math.PI, 0);
+        dummy.updateMatrix();
+        tuftInst.setMatrixAt(tuIdx++, dummy.matrix);
+      }
     }
   }
-  pineInstanced.instanceMatrix.needsUpdate = true;
-  scene.add(pineInstanced);
 
-  // 4. Bụi cây tròn (Round Bushes) ven bờ sông và bờ rào
-  const bushCount = 70;
-  const bushGeo = new THREE.DodecahedronGeometry(0.85, 1);
-  const bushMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.8, flatShading: true });
-  const bushInstanced = new THREE.InstancedMesh(bushGeo, bushMat, bushCount);
-  bushInstanced.castShadow = true;
+  // Cập nhật ma trận và bảng màu InstancedMesh
+  roundTrunkInst.count = rIdx;
+  roundTrunkInst.instanceMatrix.needsUpdate = true;
+  scene.add(roundTrunkInst);
 
-  for (let b = 0; b < bushCount; b++) {
-    const bx = 83.0 + (Math.random() - 0.5) * 8.0;
-    const bz = -90 + (b / bushCount) * 140;
-    const by = -0.5 + Math.random() * 0.4;
-    dummy.position.set(bx, by, bz);
-    dummy.scale.setScalar(0.7 + Math.random() * 0.5);
-    dummy.rotation.set(Math.random(), Math.random(), Math.random());
-    dummy.updateMatrix();
-    bushInstanced.setMatrixAt(b, dummy.matrix);
-  }
-  bushInstanced.instanceMatrix.needsUpdate = true;
-  scene.add(bushInstanced);
+  roundFoliageInst.count = rIdx;
+  roundFoliageInst.instanceMatrix.needsUpdate = true;
+  if (roundFoliageInst.instanceColor) roundFoliageInst.instanceColor.needsUpdate = true;
+  scene.add(roundFoliageInst);
 
-  // 5. Tảng đá cuội xám ven bờ sông và bãi cát (River Pebbles - như ảnh 2)
-  const rockCount = 45;
-  const rockGeo = new THREE.DodecahedronGeometry(0.65, 0);
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9, flatShading: true });
-  const rockInstanced = new THREE.InstancedMesh(rockGeo, rockMat, rockCount);
-  rockInstanced.castShadow = true;
+  pineInst.count = pIdx;
+  pineInst.instanceMatrix.needsUpdate = true;
+  if (pineInst.instanceColor) pineInst.instanceColor.needsUpdate = true;
+  scene.add(pineInst);
 
-  for (let r = 0; r < rockCount; r++) {
-    const rx = (r % 2 === 0 ? 84.0 : 94.5) + (Math.random() - 0.5) * 2.0;
-    const rz = -95 + (r / rockCount) * 150;
-    const ry = -1.1 + Math.random() * 0.3;
-    dummy.position.set(rx, ry, rz);
-    dummy.scale.set(1.0 + Math.random() * 0.6, 0.6 + Math.random() * 0.3, 1.0 + Math.random() * 0.6);
-    dummy.rotation.set(Math.random(), Math.random(), Math.random());
-    dummy.updateMatrix();
-    rockInstanced.setMatrixAt(r, dummy.matrix);
-  }
-  rockInstanced.instanceMatrix.needsUpdate = true;
-  scene.add(rockInstanced);
+  autumnTrunkInst.count = aIdx;
+  autumnTrunkInst.instanceMatrix.needsUpdate = true;
+  scene.add(autumnTrunkInst);
 
-  // 6. Khóm hoa dại rực rỡ (Wildflowers - Trắng, Vàng, Hồng phấn như ảnh 3)
-  const flowerCount = 90;
-  const flowerGeo = new THREE.SphereGeometry(0.18, 5, 5);
-  const flowerColors = [0xffffff, 0xfacc15, 0xf472b6];
-  flowerColors.forEach((flColor) => {
-    const flMat = new THREE.MeshBasicMaterial({ color: flColor });
-    const flInstanced = new THREE.InstancedMesh(flowerGeo, flMat, flowerCount / 3);
+  autumnFoliageInst.count = aIdx;
+  autumnFoliageInst.instanceMatrix.needsUpdate = true;
+  if (autumnFoliageInst.instanceColor) autumnFoliageInst.instanceColor.needsUpdate = true;
+  scene.add(autumnFoliageInst);
 
-    for (let f = 0; f < flowerCount / 3; f++) {
-      const fx = (f % 2 === 0 ? 112 : 28) + (Math.random() - 0.5) * 25;
-      const fz = -70 + (f / (flowerCount / 3)) * 90 + (Math.random() - 0.5) * 15;
-      dummy.position.set(fx, 0.15, fz);
-      dummy.scale.setScalar(0.8 + Math.random() * 0.5);
-      dummy.updateMatrix();
-      flInstanced.setMatrixAt(f, dummy.matrix);
-    }
-    flInstanced.instanceMatrix.needsUpdate = true;
-    scene.add(flInstanced);
-  });
+  bushInst.count = bIdx;
+  bushInst.instanceMatrix.needsUpdate = true;
+  if (bushInst.instanceColor) bushInst.instanceColor.needsUpdate = true;
+  scene.add(bushInst);
+
+  rockInst.count = roIdx;
+  rockInst.instanceMatrix.needsUpdate = true;
+  if (rockInst.instanceColor) rockInst.instanceColor.needsUpdate = true;
+  scene.add(rockInst);
+
+  flowerInst.count = flIdx;
+  flowerInst.instanceMatrix.needsUpdate = true;
+  if (flowerInst.instanceColor) flowerInst.instanceColor.needsUpdate = true;
+  scene.add(flowerInst);
+
+  tuftInst.count = tuIdx;
+  tuftInst.instanceMatrix.needsUpdate = true;
+  scene.add(tuftInst);
 }
 
 // ============================================================================
@@ -5558,6 +5844,9 @@ function animate(time) {
   const rawDelta = (currentTime - lastTime) / 1000;
   const delta = (!isNaN(rawDelta) && rawDelta > 0) ? Math.min(rawDelta, 0.1) : 0.016;
   lastTime = currentTime;
+
+  // Cập nhật thời gian gió đung đưa cây rừng (Khối 2)
+  windUniforms.uWindTime.value = currentTime * 0.001;
 
   if (cameraTween) {
     cameraTween(currentTime);

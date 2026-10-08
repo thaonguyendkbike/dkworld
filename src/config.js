@@ -298,6 +298,35 @@ export const CONFIG = {
     },
   },
 
+  // Khối 2: Rừng & Cây cối sinh thái (Lush Forest & Flora - Theo phong cách Grand Valley)
+  FOREST: {
+    // Số lượng cây và thực vật InstancedMesh (đảm bảo 60 FPS)
+    roundTreeCount: 1500,     // (a) Cây tán tròn low-poly ngẫu nhiên đỉnh
+    pineTreeCount: 850,       // (b) Thông nhiều tầng hình nón
+    autumnTreeCount: 260,     // (c) Cây tán vàng/cam điểm xuyến
+    bushCount: 700,           // (d) Bụi thấp
+    rockCount: 220,           // Đá cuội ven sông và sườn đồi
+    flowerCount: 800,         // Hoa dại nhiều màu
+    grassTuftCount: 600,      // Khóm cỏ tuft
+
+    // Bảng màu rực rỡ phong phú
+    colors: {
+      roundFoliage: [0x4ade80, 0x22c55e, 0x16a34a, 0x15803d, 0x84cc16],
+      pineFoliage: [0x0f5132, 0x14532d, 0x166534, 0x1e3a2b, 0x064e3b],
+      autumnFoliage: [0xf59e0b, 0xeab308, 0xf97316, 0xd97706, 0xfbbf24],
+      bushFoliage: [0x4ade80, 0x22c55e, 0x84cc16, 0xa3e635],
+      wildflowers: [0xffffff, 0xfef08a, 0xf472b6, 0xc084fc, 0x38bdf8],
+      rocks: [0x64748b, 0x94a3b8, 0x475569, 0x78716c],
+      trunks: [0x5c3d2e, 0x78350f, 0x451a03],
+    },
+
+    // Hiệu ứng gió đung đưa (Vertex Shader)
+    wind: {
+      speed: 1.8,
+      strength: 0.16,
+    },
+  },
+
   // Preset vị trí camera chuyển cảnh (Quick Focus)
   PRESETS: {
     overview: {
