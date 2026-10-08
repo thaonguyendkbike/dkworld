@@ -525,3 +525,15 @@ html, body {
     width: auto;
   }
 }
+
+/* Subtle Cinematic Vignette (Khối 3) */
+.vignette-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 62%, rgba(15, 23, 42, 0.26) 100%);
+  z-index: 1;
+}

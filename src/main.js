@@ -13,6 +13,7 @@ const windUniforms = {
 // ============================================================================
 let scene, camera, renderer, controls;
 let dirLight, hemiLight, ambientLight;
+let skyDomeMaterial;
 let currentEnv = 'day';
 let isRaining = false;
 let rainParticles;
@@ -112,14 +113,15 @@ function init() {
     CONFIG.CAMERA.initialPosition.z
   );
 
-  // Renderer
+  // Renderer (Khối 3: sRGB, ACESFilmic, PCFSoftShadowMap)
   renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.15;
   container.appendChild(renderer.domElement);
 
   // OrbitControls
@@ -157,6 +159,8 @@ function init() {
 
   // Landscaping & Greenery (InstancedMesh)
   buildLandscaping();
+  buildCourtyardGreenery();
+  buildBuildingContactShadows();
 
   // Logistics, Equipment & Infrastructure Details
   buildLogisticsAndEquipment();
@@ -187,9 +191,47 @@ function init() {
 }
 
 // ============================================================================
-// 2. Lighting System
 // ============================================================================
+// 2. Atmosphere & Lighting System (Khối 3: Bầu trời Gradient & Nắng góc thấp)
+// ============================================================================
+function createGradientSky() {
+  const skyGeo = new THREE.SphereGeometry(620, 32, 16);
+  skyDomeMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      topColor: { value: new THREE.Color(CONFIG.LIGHTING.day.skyGradient.top) },
+      bottomColor: { value: new THREE.Color(CONFIG.LIGHTING.day.skyGradient.bottom) },
+      offset: { value: 30.0 },
+      exponent: { value: 0.65 },
+    },
+    vertexShader: `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor;
+      uniform vec3 bottomColor;
+      uniform float offset;
+      uniform float exponent;
+      varying vec3 vWorldPosition;
+      void main() {
+        float h = normalize(vWorldPosition + offset).y;
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+      }
+    `,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+  const skyMesh = new THREE.Mesh(skyGeo, skyDomeMaterial);
+  scene.add(skyMesh);
+}
+
 function setupLights() {
+  createGradientSky();
+
   ambientLight = new THREE.AmbientLight(
     CONFIG.LIGHTING.day.ambientColor,
     CONFIG.LIGHTING.day.ambientIntensity
@@ -199,7 +241,7 @@ function setupLights() {
   hemiLight = new THREE.HemisphereLight(
     CONFIG.LIGHTING.day.skyColor,
     CONFIG.LIGHTING.day.groundColor,
-    0.45
+    0.55
   );
   scene.add(hemiLight);
 
@@ -213,17 +255,18 @@ function setupLights() {
     CONFIG.LIGHTING.day.sunPosition.z
   );
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.mapSize.width = 4096;
+  dirLight.shadow.mapSize.height = 4096;
   dirLight.shadow.camera.near = 10;
-  dirLight.shadow.camera.far = 400;
+  dirLight.shadow.camera.far = 420;
 
-  const d = 140;
+  const d = 160;
   dirLight.shadow.camera.left = -d;
   dirLight.shadow.camera.right = d;
   dirLight.shadow.camera.top = d;
   dirLight.shadow.camera.bottom = -d;
-  dirLight.shadow.bias = -0.0005;
+  dirLight.shadow.bias = -0.0003;
+  dirLight.shadow.normalBias = 0.04;
   scene.add(dirLight);
 
   logoLight = new THREE.PointLight(0xffb703, 0, 35);
@@ -2395,12 +2438,14 @@ function isNearRailwayTrack(x, z, minDist = 3.2) {
   return false;
 }
 
-// Vùng cấm mọc cây rừng tự nhiên (bảo vệ nhà xưởng, đường sá, đồng cỏ đàn cừu, ao cá, đàn gà)
+// Vùng cấm mọc cây rừng tự nhiên (bảo vệ nhà xưởng, đường sá, đồng cỏ đàn cừu, ao cá, đàn gà, vườn lan)
 function isForestExcludedZone(x, z) {
   // Khuôn viên nhà máy DK1 (Xưởng B, Văn phòng A, Nhà C, Nhà ăn, Sân bóng chuyền, Bãi đỗ)
   if (x > 15 && x < 83 && z > -68 && z < -10) return true;
   // Khuôn viên nhà máy DK2 (Tòa nhà HQ, Kho linh kiện, Sân xe thành phẩm, Sân thử)
   if (x > -112 && x < -24 && z > -78 && z < -16) return true;
+  // Vườn Lan & Sinh thái trên đồi DK2 (-130, -82, size 22x22 + hiên đón)
+  if (Math.abs(x - (-130)) < 16.5 && Math.abs(z - (-82)) < 16.5) return true;
   // Lòng đường ĐT234 (chỉ trồng cây cảnh 2 bên vỉa hè)
   if (x > -14.5 && x < -5.5 && z > -96 && z < 25) return true;
   // Lòng sông sâu
@@ -2497,6 +2542,20 @@ function buildLandscaping() {
   const tuftGeo = new THREE.ConeGeometry(0.25, 0.65, 3);
   const tuftMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.85, flatShading: true });
   const tuftInst = new THREE.InstancedMesh(tuftGeo, tuftMat, tuftCount);
+
+  // --------------------------------------------------------------------------
+  // 8. Các mảng đất nâu ấm & vỉa đá lộ thiên trên sườn đồi núi (Earthen Soil Patches)
+  // --------------------------------------------------------------------------
+  const earthPatchCount = 150;
+  const earthGeo = new THREE.CylinderGeometry(1.6, 2.2, 0.28, 6);
+  const earthMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.GROUND.earthColor, // 0x78350f đất nâu ấm
+    roughness: 0.95,
+    flatShading: true,
+  });
+  const earthInst = new THREE.InstancedMesh(earthGeo, earthMat, earthPatchCount);
+  earthInst.receiveShadow = true;
+  let eaIdx = 0;
 
   // Color helper objects
   const colObj = new THREE.Color();
@@ -2746,6 +2805,15 @@ function buildLandscaping() {
         dummy.updateMatrix();
         tuftInst.setMatrixAt(tuIdx++, dummy.matrix);
       }
+
+      // Điểm xuyết mảng đất nâu ấm trên sườn đồi cao hoặc rìa núi xa (rìa đồi núi thi thoảng điểm xuyết thêm màu nâu đất)
+      if (eaIdx < earthPatchCount && elevation > 5.0 && (Math.abs(x) > 85 || z < -65) && Math.random() < 0.14) {
+        dummy.position.set(x, elevation + 0.08, z);
+        dummy.scale.set(0.9 + Math.random() * 0.7, 0.5 + Math.random() * 0.4, 0.9 + Math.random() * 0.7);
+        dummy.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
+        dummy.updateMatrix();
+        earthInst.setMatrixAt(eaIdx++, dummy.matrix);
+      }
     }
   }
 
@@ -2791,6 +2859,131 @@ function buildLandscaping() {
   tuftInst.count = tuIdx;
   tuftInst.instanceMatrix.needsUpdate = true;
   scene.add(tuftInst);
+
+  earthInst.count = eaIdx;
+  earthInst.instanceMatrix.needsUpdate = true;
+  scene.add(earthInst);
+}
+
+// ============================================================================
+// Cây cảnh, bồn hoa & tiểu cảnh trong sân gần các tòa nhà (Courtyard Greenery)
+// ============================================================================
+function buildCourtyardGreenery() {
+  const group = new THREE.Group();
+  const potMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 }); // Bồn đá xám
+  const soilMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.95 });
+  const shrubMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.7, flatShading: true });
+  const cypressMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75, flatShading: true });
+
+  const planterLocations = [
+    // 1. Mặt tiền Nhà A (Văn phòng & Kỹ thuật) - Bồn cây cảnh đá lối vào
+    { x: 26, y: 0, z: -27.5, type: 'topiary' },
+    { x: 30, y: 0, z: -27.5, type: 'cypress' },
+    { x: 36, y: 0, z: -27.5, type: 'cypress' },
+    { x: 40, y: 0, z: -27.5, type: 'topiary' },
+    { x: 46, y: 0, z: -27.5, type: 'shrub' },
+
+    // 2. Trước sảnh Nhà B (Xưởng sản xuất)
+    { x: 53, y: 0, z: -31.8, type: 'cypress' },
+    { x: 63, y: 0, z: -31.8, type: 'topiary' },
+    { x: 74, y: 0, z: -31.8, type: 'cypress' },
+
+    // 3. Sân Nhà ăn CBNV & góc thư giãn
+    { x: 18, y: 0, z: -7.5, type: 'shrub' },
+    { x: 22, y: 0, z: -5.5, type: 'topiary' },
+    { x: 28, y: 0, z: -5.5, type: 'cypress' },
+
+    // 4. Trước sảnh Tòa nhà Điều hành DK2 (HQ)
+    { x: -38, y: 0, z: -19.5, type: 'cypress' },
+    { x: -33, y: 0, z: -19.5, type: 'topiary' },
+    { x: -27, y: 0, z: -19.5, type: 'topiary' },
+    { x: -22, y: 0, z: -19.5, type: 'cypress' },
+
+    // 5. Góc sân kiểm định xe DK2
+    { x: -62, y: 0, z: -19.5, type: 'shrub' },
+    { x: -70, y: 0, z: -19.5, type: 'cypress' },
+  ];
+
+  planterLocations.forEach((loc) => {
+    const pGroup = new THREE.Group();
+    pGroup.position.set(loc.x, loc.y, loc.z);
+
+    // Bồn cây bê tông đá
+    const pot = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 0.95), potMat);
+    pot.position.y = 0.25;
+    pot.castShadow = true;
+    pot.receiveShadow = true;
+    pGroup.add(pot);
+
+    // Đất màu mỡ
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.05, 0.82), soilMat);
+    soil.position.y = 0.5;
+    pGroup.add(soil);
+
+    if (loc.type === 'cypress') {
+      // Cây tùng tháp hình nón sang trọng
+      const cy = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.1, 7), cypressMat);
+      cy.position.y = 1.55;
+      cy.castShadow = true;
+      pGroup.add(cy);
+    } else if (loc.type === 'topiary') {
+      // Cây tỉa hình cầu tròn
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.6, 5), potMat);
+      stem.position.y = 0.8;
+      pGroup.add(stem);
+
+      const ball = new THREE.Mesh(new THREE.DodecahedronGeometry(0.58, 1), shrubMat);
+      ball.position.y = 1.38;
+      ball.castShadow = true;
+      pGroup.add(ball);
+    } else {
+      // Bụi hoa/cây tán thấp
+      const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 0), shrubMat);
+      bush.position.y = 0.8;
+      bush.scale.set(1.1, 0.85, 1.1);
+      bush.castShadow = true;
+      pGroup.add(bush);
+    }
+
+    group.add(pGroup);
+  });
+
+  scene.add(group);
+}
+
+// ============================================================================
+// Giả lập Ambient Occlusion (Bóng tiếp đất mềm chân các tòa nhà - Contact Shadows)
+// ============================================================================
+function buildBuildingContactShadows() {
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x020617,
+    transparent: true,
+    opacity: 0.26,
+    depthWrite: false,
+  });
+
+  const buildings = [
+    // Nhà B (Xưởng 3 tầng)
+    { x: 65.0, z: -50.0, w: 24.8, d: 35.8 },
+    // Nhà A (Văn phòng)
+    { x: 35.0, z: -35.0, w: 34.8, d: 14.5 },
+    // Nhà C (Kho xưởng)
+    { x: 45.0, z: -58.5, w: 16.2, d: 13.8 },
+    // Nhà ăn CBNV
+    { x: 23.0, z: -12.0, w: 14.2, d: 11.2 },
+    // Nhà điều hành DK2 (HQ)
+    { x: -35.0, z: -32.0, w: 26.8, d: 20.8 },
+    // Kho D2.1
+    { x: -78.0, z: -68.0, w: 36.8, d: 16.8 },
+  ];
+
+  buildings.forEach((b) => {
+    const geo = new THREE.PlaneGeometry(b.w, b.d);
+    const m = new THREE.Mesh(geo, shadowMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(b.x, 0.02, b.z);
+    scene.add(m);
+  });
 }
 
 // ============================================================================
@@ -5353,6 +5546,12 @@ function setEnvironment(time) {
   if (time === 'sunset') scene.fog.color.set(CONFIG.WORLD.fogColorSunset);
   if (time === 'night') scene.fog.color.set(CONFIG.WORLD.fogColorNight);
 
+  // Cập nhật vòm trời Gradient (Khối 3)
+  if (skyDomeMaterial && cfg.skyGradient) {
+    skyDomeMaterial.uniforms.topColor.value.setHex(cfg.skyGradient.top);
+    skyDomeMaterial.uniforms.bottomColor.value.setHex(cfg.skyGradient.bottom);
+  }
+
   ambientLight.color.set(cfg.ambientColor);
   ambientLight.intensity = cfg.ambientIntensity;
   hemiLight.color.set(cfg.skyColor);
@@ -5363,33 +5562,37 @@ function setEnvironment(time) {
   dirLight.position.set(cfg.sunPosition.x, cfg.sunPosition.y, cfg.sunPosition.z);
 
   const isNight = time === 'night';
+  const isSunset = time === 'sunset';
 
-  // Toggle window interior lights
+  // Bật đèn cửa sổ nội thất ấm cúng ban đêm / hoàng hôn
   windowLights.forEach((mat) => {
     if (isNight) {
       mat.emissive.set(0xfbbf24);
-      mat.emissiveIntensity = 0.8;
+      mat.emissiveIntensity = 0.85;
+    } else if (isSunset) {
+      mat.emissive.set(0xf59e0b);
+      mat.emissiveIntensity = 0.45;
     } else {
       mat.emissive.set(0x000000);
       mat.emissiveIntensity = 0;
     }
   });
 
-  // Toggle streetlights
+  // Bật đèn đường cao áp
   streetLightLamps.forEach((mat) => {
-    if (isNight) {
+    if (isNight || isSunset) {
       mat.emissive.set(0xfef08a);
-      mat.emissiveIntensity = 1.0;
+      mat.emissiveIntensity = isNight ? 1.2 : 0.6;
     } else {
       mat.emissive.set(0x000000);
       mat.emissiveIntensity = 0;
     }
   });
   streetLightSpotLights.forEach((light) => {
-    light.intensity = isNight ? 1.4 : 0;
+    light.intensity = isNight ? 1.5 : (isSunset ? 0.6 : 0);
   });
 
-  logoLight.intensity = isNight ? 1.5 : 0;
+  logoLight.intensity = isNight ? 1.8 : (isSunset ? 0.8 : 0);
 
   document.querySelectorAll('.toggle-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.time === time);

@@ -10,11 +10,11 @@ export const CONFIG = {
   // Cài đặt chung & Camera
   WORLD: {
     unit: 1.0, // 1 đơn vị = 1 mét
-    fogColorDay: 0xc8f0f8, // Sương mù xanh ngọc nhạt thanh khiết
-    fogColorSunset: 0xffd1a9,
-    fogColorNight: 0x090d16,
-    fogNear: 80,
-    fogFar: 420,
+    fogColorDay: 0xcfeafe, // Sương mù xanh nhạt hòa sắc chân trời
+    fogColorSunset: 0xfdba74,
+    fogColorNight: 0x0b1120,
+    fogNear: 110,
+    fogFar: 460,
   },
 
   CAMERA: {
@@ -29,57 +29,61 @@ export const CONFIG = {
     maxPolarAngle: Math.PI / 2.05,
   },
 
-  // Ánh sáng tươi sáng rực rỡ (Toon Vibrant Low-Poly Aesthetic)
+  // Khối 3: Ánh sáng đậm ấm, tương phản cao, nắng góc thấp (Grand Valley Aesthetic)
   LIGHTING: {
     day: {
-      ambientColor: 0xffffff,
-      ambientIntensity: 0.88, // Nâng sáng toàn bộ các góc khuất
-      sunColor: 0xfffbeb,
-      sunIntensity: 2.2,
-      sunPosition: { x: 90, y: 140, z: 70 },
-      skyColor: 0x58a5f8, // Trời xanh biếc rực rỡ như ảnh mẫu
-      groundColor: 0x86efac, // Cỏ xanh tươi phản chiếu
+      ambientColor: 0xbae6fd,
+      ambientIntensity: 0.58, // Hạ ambient để tăng độ tương phản sáng-tối sắc nét
+      sunColor: 0xfff7ed, // Nắng vàng ấm rực rỡ
+      sunIntensity: 2.85,
+      sunPosition: { x: 125, y: 78, z: 90 }, // Nắng góc thấp đổ bóng dài có chiều sâu
+      skyColor: 0x38bdf8,
+      groundColor: 0x166534, // Phản xạ xanh lá đậm ấm từ thảm cỏ
+      skyGradient: { top: 0x1d4ed8, bottom: 0xcfeafe },
     },
     sunset: {
-      ambientColor: 0xffcaa0,
-      ambientIntensity: 0.55,
-      sunColor: 0xff7e40,
-      sunIntensity: 2.0,
-      sunPosition: { x: 140, y: 40, z: 40 },
-      skyColor: 0xff9966,
-      groundColor: 0x4a3b32,
+      ambientColor: 0xfed7aa,
+      ambientIntensity: 0.45,
+      sunColor: 0xf97316,
+      sunIntensity: 2.4,
+      sunPosition: { x: 140, y: 32, z: 35 },
+      skyColor: 0xea580c,
+      groundColor: 0x431407,
+      skyGradient: { top: 0x7c2d12, bottom: 0xfdba74 },
     },
     night: {
-      ambientColor: 0x1f2a44,
-      ambientIntensity: 0.28,
-      sunColor: 0x5b7cb5,
+      ambientColor: 0x1e293b,
+      ambientIntensity: 0.22,
+      sunColor: 0x60a5fa,
       sunIntensity: 0.45,
-      sunPosition: { x: 50, y: 90, z: -30 },
-      skyColor: 0x070b14,
-      groundColor: 0x04060a,
+      sunPosition: { x: 45, y: 80, z: -35 },
+      skyColor: 0x030712,
+      groundColor: 0x020617,
+      skyGradient: { top: 0x030712, bottom: 0x0f172a },
     },
   },
 
-  // Mặt bằng 2 phân khu & Thảo nguyên xanh mướt
+  // Mặt bằng 2 phân khu & Thảo nguyên xanh đậm bão hòa
   GROUND: {
-    grassColor: 0x4ade80, // Màu cỏ xanh tươi sáng chủ đạo
-    grassAccentColor: 0x22c55e, // Cỏ xanh mướt
-    sandColor: 0xfde68a, // Màu cát vàng ven sông và đường mòn
+    grassColor: 0x16a34a, // Xanh lá bão hòa đậm ấm (bỏ tông bạc hà nhạt)
+    grassAccentColor: 0x15803d, // Xanh ngọc sẫm
+    earthColor: 0x78350f, // Màu đất nâu ấm điểm xuyến rìa đồi
+    sandColor: 0xfde68a, // Màu cát vàng ven sông
     dk1: {
       width: 100,
       depth: 95,
-      color: 0x52b788,
+      color: 0x15803d,
       yardColor: 0x94a3b8,
       center: { x: 45, y: -1.0, z: -40 },
     },
     dk2: {
       width: 110,
       depth: 90,
-      color: 0x40916c,
+      color: 0x166534,
       yardColor: 0x94a3b8,
       center: { x: -75, y: -1.0, z: -45 },
     },
-    borderStoneColor: 0x64748b,
+    borderStoneColor: 0x475569,
   },
 
   // Đường Tỉnh ĐT234 kết nối DK1 và DK2
@@ -316,7 +320,7 @@ export const CONFIG = {
       autumnFoliage: [0xf59e0b, 0xeab308, 0xf97316, 0xd97706, 0xfbbf24],
       bushFoliage: [0x4ade80, 0x22c55e, 0x84cc16, 0xa3e635],
       wildflowers: [0xffffff, 0xfef08a, 0xf472b6, 0xc084fc, 0x38bdf8],
-      rocks: [0x64748b, 0x94a3b8, 0x475569, 0x78716c],
+      rocks: [0x64748b, 0x94a3b8, 0x78350f, 0x854d0e, 0x5c3d2e, 0x92400e, 0x713f12, 0xa16207],
       trunks: [0x5c3d2e, 0x78350f, 0x451a03],
     },
 
