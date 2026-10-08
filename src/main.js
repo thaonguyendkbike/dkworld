@@ -380,6 +380,26 @@ function buildPylonSign(x, y, z, brand, sub, colorHex, id) {
 // ============================================================================
 // 3b. Đại cảnh Thảo nguyên xanh, Đồi nhấp nhô, Cối xay gió & Mây trời (Vibrant Low-Poly)
 // ============================================================================
+// Tính toán độ cao mặt đồi phía Đông (quanh đàn cừu và làng quê)
+function getEastHillSurfaceY(x, z) {
+  const hx = 125, hz = -80, radius = 52;
+  const dist = Math.hypot(x - hx, z - hz);
+  if (dist >= radius) return 0.2;
+  return Math.max(0.2, -2.0 + 26.0 * (1 - dist / radius));
+}
+
+// Tính toán độ cao sườn đồi phân khu DK2 (quanh ao cá và đàn gà thả đồi)
+function getDK2HillSurfaceY(x, z) {
+  const hx = CONFIG.HILLS.dk2.position.x; // -120
+  const hz = CONFIG.HILLS.dk2.position.z; // -78
+  const radius = CONFIG.HILLS.dk2.radius; // 54
+  const dist = Math.hypot(x - hx, z - hz);
+  if (dist >= radius) return 0.05;
+  const coneApexY = 23.0;
+  const coneBaseY = -2.0;
+  return Math.max(0.05, coneBaseY + (coneApexY - coneBaseY) * (1 - dist / radius));
+}
+
 function buildVastTerrainAndClouds() {
   // 1. Thảm cỏ xanh mướt mát đại cảnh bao la
   const meadowGeo = new THREE.BoxGeometry(540, 2.0, 480);
@@ -870,29 +890,60 @@ function buildCanalAndRailway() {
   stWalls.castShadow = true;
   stationBuilding.add(stWalls);
 
-  // Mái ngói đỏ dốc tươi tắn (như ảnh 3)
-  const stRoof = new THREE.Mesh(
-    new THREE.ConeGeometry(3.5, 2.2, 4),
-    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5, flatShading: true })
-  );
-  stRoof.rotation.y = Math.PI / 4;
-  stRoof.scale.set(1.2, 1.0, 2.8);
-  stRoof.position.y = 3.9;
-  stRoof.castShadow = true;
-  stationBuilding.add(stRoof);
+  // Mái ngói đỏ dốc chữ A kiểu Âu (Gable Roof 2 mái chuẩn kiến trúc)
+  const roofRedMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
+  const ridgeMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.4 });
 
-  // Hiên che sân ga cột xanh
+  // Mái dốc cánh trái
+  const roofSlopeL = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.16, 11.2), roofRedMat);
+  roofSlopeL.rotation.z = Math.PI / 6;
+  roofSlopeL.position.set(-0.95, 3.82, 0);
+  roofSlopeL.castShadow = true;
+  stationBuilding.add(roofSlopeL);
+
+  // Mái dốc cánh phải
+  const roofSlopeR = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.16, 11.2), roofRedMat);
+  roofSlopeR.rotation.z = -Math.PI / 6;
+  roofSlopeR.position.set(0.95, 3.82, 0);
+  roofSlopeR.castShadow = true;
+  stationBuilding.add(roofSlopeR);
+
+  // Sống mái / đòn nóc chạy dọc đỉnh mái
+  const ridgeBeam = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 11.3), ridgeMat);
+  ridgeBeam.position.set(0, 4.45, 0);
+  stationBuilding.add(ridgeBeam);
+
+  // Tường hồi tam giác 2 đầu nhà (Gable End Walls)
+  const triangleShape = new THREE.Shape();
+  triangleShape.moveTo(-1.8, 3.2);
+  triangleShape.lineTo(0, 4.35);
+  triangleShape.lineTo(1.8, 3.2);
+  triangleShape.closePath();
+  const gableGeo = new THREE.ShapeGeometry(triangleShape);
+  const wallMatWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6 });
+
+  [-5.26, 5.26].forEach((gz) => {
+    const gableWall = new THREE.Mesh(gableGeo, wallMatWhite);
+    gableWall.position.set(0, 0, gz);
+    if (gz > 0) gableWall.rotation.y = Math.PI;
+    stationBuilding.add(gableWall);
+  });
+
+  // Hiên che sân ga cột xanh vươn ra đón khách
   const porchRoof = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 0.15, 11),
+    new THREE.BoxGeometry(2.2, 0.14, 11.2),
     new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6 })
   );
-  porchRoof.position.set(2.4, 2.7, 0);
+  porchRoof.rotation.z = -0.15;
+  porchRoof.position.set(2.5, 2.75, 0);
+  porchRoof.castShadow = true;
   stationBuilding.add(porchRoof);
 
   const columnMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.5 });
   for (let cz = -4.5; cz <= 4.5; cz += 3.0) {
     const col = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.7), columnMat);
     col.position.set(3.4, 1.35, cz);
+    col.castShadow = true;
     stationBuilding.add(col);
   }
 
@@ -983,7 +1034,7 @@ function buildCanalAndRailway() {
     { x: 122, z: 12, color: 0xf97316, rot: 0.25 },
   ];
 
-  const wallMatWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
+  const villageWallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
   chimneySmokePuffs = [];
 
   villageHouses.forEach((vh, vIdx) => {
@@ -992,7 +1043,7 @@ function buildCanalAndRailway() {
     houseGroup.rotation.y = vh.rot;
 
     // Tường nhà trắng
-    const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 3.8), wallMatWhite);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 3.8), villageWallMat);
     body.position.y = 1.6;
     body.castShadow = true;
     houseGroup.add(body);
@@ -1039,51 +1090,63 @@ function buildCanalAndRailway() {
   // --------------------------------------------------------------------------
   // F. Đàn cừu trắng muốt đầu đen trên sườn đồi xanh & Bóng thoại (như ảnh 2)
   // --------------------------------------------------------------------------
+  const sheepBaseX = 108;
+  const sheepBaseZ = -45;
+  const sheepBaseY = getEastHillSurfaceY(sheepBaseX, sheepBaseZ) + 0.1; // ~ 4.6m
   const sheepGroup = new THREE.Group();
-  sheepGroup.position.set(120, 3.5, -62);
+  sheepGroup.position.set(sheepBaseX, sheepBaseY, sheepBaseZ);
 
   const woolMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
   const sheepBlackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
 
   const sheepCoords = [
     { x: 0, z: 0, rot: 0.3 },
-    { x: 2.2, z: -1.2, rot: -0.5 },
-    { x: -1.8, z: 1.5, rot: 0.8 },
-    { x: 3.5, z: 1.8, rot: 2.1 },
-    { x: 1.2, z: 3.2, rot: 1.2 },
-    { x: -3.2, z: -1.5, rot: -1.8 },
-    { x: 4.8, z: -0.5, rot: -0.2 },
+    { x: 2.5, z: -1.4, rot: -0.5 },
+    { x: -2.2, z: 1.8, rot: 0.8 },
+    { x: 4.2, z: 1.6, rot: 2.1 },
+    { x: 1.5, z: 3.5, rot: 1.2 },
+    { x: -3.6, z: -1.8, rot: -1.8 },
+    { x: 5.2, z: -0.8, rot: -0.2 },
   ];
 
   sheepCoords.forEach((sc, sIdx) => {
     const oneSheep = new THREE.Group();
-    oneSheep.position.set(sc.x, 0, sc.z);
+    const wy = getEastHillSurfaceY(sc.x + sheepBaseX, sc.z + sheepBaseZ) - sheepBaseY;
+    oneSheep.position.set(sc.x, wy, sc.z);
     oneSheep.rotation.y = sc.rot;
 
-    // Thân lông xù trắng
-    const bodyWool = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 1), woolMat);
-    bodyWool.scale.set(1.0, 0.85, 1.35);
-    bodyWool.position.y = 0.65;
+    // Thân lông xù trắng lớn, bồng bềnh
+    const bodyWool = new THREE.Mesh(new THREE.DodecahedronGeometry(0.85, 1), woolMat);
+    bodyWool.scale.set(1.05, 0.9, 1.4);
+    bodyWool.position.y = 0.85;
     bodyWool.castShadow = true;
     oneSheep.add(bodyWool);
 
-    // Đầu đen
-    const sheepHead = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.35, 0.42), sheepBlackMat);
-    sheepHead.position.set(0, 0.82, 0.72);
+    // Đầu cừu đen
+    const sheepHead = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, 0.55), sheepBlackMat);
+    sheepHead.position.set(0, 1.05, 0.85);
     oneSheep.add(sheepHead);
 
+    // Mắt trắng tròn
+    [-0.15, 0.15].forEach((mx) => {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      eye.position.set(mx, 1.15, 1.13);
+      oneSheep.add(eye);
+    });
+
     // Tai vểnh hai bên
-    [-0.22, 0.22].forEach((ex) => {
-      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.1), sheepBlackMat);
-      ear.position.set(ex, 0.92, 0.65);
+    [-0.28, 0.28].forEach((ex) => {
+      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.1, 0.12), sheepBlackMat);
+      ear.position.set(ex, 1.18, 0.78);
       oneSheep.add(ear);
     });
 
-    // 4 chân đen ngắn
-    [-0.24, 0.24].forEach((lx) => {
-      [-0.35, 0.35].forEach((lz) => {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), sheepBlackMat);
-        leg.position.set(lx, 0.2, lz);
+    // 4 chân đen vững chãi
+    [-0.32, 0.32].forEach((lx) => {
+      [-0.45, 0.45].forEach((lz) => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.55, 6), sheepBlackMat);
+        leg.position.set(lx, 0.28, lz);
+        leg.castShadow = true;
         oneSheep.add(leg);
       });
     });
@@ -1094,19 +1157,19 @@ function buildCanalAndRailway() {
 
   // Bóng thoại hoạt hình đáng yêu (như ảnh 2: "I could dance all afternoon!")
   const speechBubble = new THREE.Mesh(
-    new THREE.BoxGeometry(3.6, 1.2, 0.1),
+    new THREE.BoxGeometry(4.2, 1.4, 0.12),
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
   );
-  speechBubble.position.set(2.5, 3.2, 0.5);
+  speechBubble.position.set(2.5, 4.2, 0.5);
   speechBubble.rotation.y = -Math.PI / 4;
   sheepGroup.add(speechBubble);
 
   const bubbleTail = new THREE.Mesh(
-    new THREE.ConeGeometry(0.35, 0.6, 3),
+    new THREE.ConeGeometry(0.4, 0.7, 3),
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
   );
   bubbleTail.rotation.z = Math.PI;
-  bubbleTail.position.set(1.6, 2.3, 0.5);
+  bubbleTail.position.set(1.6, 3.2, 0.5);
   sheepGroup.add(bubbleTail);
 
   sheepGroup.userData = {
@@ -2275,7 +2338,9 @@ function buildLandscaping() {
     const rad = 6 + Math.random() * 38;
     const x = 126 + Math.cos(ang) * rad;
     const z = -45 + Math.sin(ang) * (rad * 1.5);
-    const y = 1.0 + Math.random() * 10.0;
+    // Tránh mọc đè vào bãi chăn thả đàn cừu (108, -45)
+    if (Math.hypot(x - 108, z - (-45)) < 14) continue;
+    const y = Math.max(0.5, getEastHillSurfaceY(x, z));
     const s = 0.85 + Math.random() * 0.55;
 
     dummy.position.set(x, y + 1.1 * s, z);
@@ -2314,14 +2379,16 @@ function buildLandscaping() {
     });
   }
 
-  // D. Rừng cây trên đồi DK2 Vườn Lan
-  for (let i = 0; i < 50; i++) {
+  // D. Rừng cây trên đồi DK2 Vườn Lan (Tránh đè lên Ao cá và Đàn gà)
+  for (let i = 0; i < 60; i++) {
     if (tIdx >= roundTreeCount) break;
     const ang = Math.random() * Math.PI * 2;
     const rad = 8 + Math.random() * 34;
     const x = CONFIG.HILLS.dk2.position.x + Math.cos(ang) * rad;
     const z = CONFIG.HILLS.dk2.position.z + Math.sin(ang) * rad;
-    const y = 2.0 + Math.random() * 12.0;
+    // Tránh đè lên Ao cá đồi sinh thái (-98, -56) và Đàn gà thả đồi (-112, -36)
+    if (Math.hypot(x - (-98), z - (-56)) < 13 || Math.hypot(x - (-112), z - (-36)) < 12) continue;
+    const y = Math.max(0.5, getDK2HillSurfaceY(x, z));
     const s = 0.9 + Math.random() * 0.5;
 
     dummy.position.set(x, y + 1.1 * s, z);
@@ -2358,6 +2425,10 @@ function buildLandscaping() {
     let pz = -110 + (p / pineCount) * 160 + (Math.random() - 0.5) * 15;
     if (px > 31 && px < 57 && pz > -20 && pz < -4) {
       px += 18;
+    }
+    // Tránh che đàn cừu
+    if (px > 98 && px < 118 && pz > -55 && pz < -35) {
+      px = 125;
     }
     const py = 0.5 + Math.random() * 6;
     const ps = 0.75 + Math.random() * 0.45;
@@ -3925,8 +3996,11 @@ function buildVolleyballCourt() {
 // Ao cá đồi sinh thái DK2 (Theo mũi tên ảnh 2)
 // ============================================================================
 function buildDK2HillPond() {
+  const pondBaseX = -98;
+  const pondBaseZ = -56;
+  const pondBaseY = getDK2HillSurfaceY(pondBaseX, pondBaseZ) + 0.6; // ~ 9.2m
   const pondGroup = new THREE.Group();
-  pondGroup.position.set(-110, 5.2, -63);
+  pondGroup.position.set(pondBaseX, pondBaseY, pondBaseZ);
   pondGroup.userData = {
     id: 'aoCaDK2',
     title: 'Ao cá đồi sinh thái DK2',
@@ -3934,6 +4008,14 @@ function buildDK2HillPond() {
     desc: 'Hồ cá sinh thái tự nhiên trên sườn đồi bậc thang DK2, nguồn nước mát tự nhiên nuôi thả các loài cá Koi và cá chép cảnh. Điểm dừng chân thư giãn lý tưởng ngắm toàn cảnh nhà máy từ trên cao.',
     zone: 'DK2',
   };
+
+  // Bệ kè đá bậc thang đồi nâng đỡ lòng hồ kiên cố
+  const terraceGeo = new THREE.CylinderGeometry(9.6, 11.2, 3.2, 28);
+  const terraceMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9, flatShading: true });
+  const terraceBase = new THREE.Mesh(terraceGeo, terraceMat);
+  terraceBase.position.y = -1.6;
+  terraceBase.receiveShadow = true;
+  pondGroup.add(terraceBase);
 
   // 1. Natural Granite Boulder Retaining Rim
   const boulderMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.9, flatShading: true });
@@ -4113,8 +4195,11 @@ function buildDK2HillPond() {
 // Đàn gà thả đồi sinh thái DK2 (Theo mũi tên ảnh 2)
 // ============================================================================
 function buildFreeRangeChickens() {
+  const flockBaseX = -112;
+  const flockBaseZ = -36;
+  const flockBaseY = getDK2HillSurfaceY(flockBaseX, flockBaseZ) + 0.1; // ~ 2.8m
   const flockGroup = new THREE.Group();
-  flockGroup.position.set(-122, 4.0, -48);
+  flockGroup.position.set(flockBaseX, flockBaseY, flockBaseZ);
   flockGroup.userData = {
     id: 'doiGaDK2',
     title: 'Đàn gà thả đồi sinh thái DK2',
@@ -4127,70 +4212,72 @@ function buildFreeRangeChickens() {
   const coopMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
   const strawMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85, flatShading: true });
 
-  const coopWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.8, 2.4), coopMat);
-  coopWall.position.set(-4.0, 0.9, -3.0);
+  const coopY = getDK2HillSurfaceY(-4.0 + flockBaseX, -3.0 + flockBaseZ) - flockBaseY;
+  const coopWall = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.0, 2.6), coopMat);
+  coopWall.position.set(-4.0, coopY + 1.0, -3.0);
   coopWall.castShadow = true;
   flockGroup.add(coopWall);
 
-  const coopRoof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.2, 4), strawMat);
+  const coopRoof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.4, 4), strawMat);
   coopRoof.rotation.y = Math.PI / 4;
-  coopRoof.position.set(-4.0, 2.3, -3.0);
+  coopRoof.position.set(-4.0, coopY + 2.5, -3.0);
   coopRoof.castShadow = true;
   flockGroup.add(coopRoof);
 
   // Feeding trough with corn grains
-  const trough = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.2, 0.4), coopMat);
-  trough.position.set(-1.8, 0.1, -1.5);
+  const trY = getDK2HillSurfaceY(-1.8 + flockBaseX, -1.5 + flockBaseZ) - flockBaseY;
+  const trough = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.25, 0.45), coopMat);
+  trough.position.set(-1.8, trY + 0.12, -1.5);
   flockGroup.add(trough);
 
   const corn = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, 0.08, 0.3),
+    new THREE.BoxGeometry(2.0, 0.10, 0.35),
     new THREE.MeshBasicMaterial({ color: 0xfacc15 })
   );
-  corn.position.set(-1.8, 0.22, -1.5);
+  corn.position.set(-1.8, trY + 0.25, -1.5);
   flockGroup.add(corn);
 
   // 2. 12 Low-Poly Chickens & Roosters
   const createChicken = (isRooster, isChick, colorHex) => {
     const chk = new THREE.Group();
-    const scale = isChick ? 0.35 : (isRooster ? 1.15 : 0.9);
+    const scale = isChick ? 0.55 : (isRooster ? 1.6 : 1.3);
 
     const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.75, flatShading: true });
     const redMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
     const yellowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
     // Torso
-    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 1), bodyMat);
+    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.26, 1), bodyMat);
     body.scale.set(1.0, 0.85, 1.3);
-    body.position.y = 0.32;
+    body.position.y = 0.35;
     body.castShadow = true;
     chk.add(body);
 
     // Head & Neck group (rotates during pecking)
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.45, 0.24);
+    headGroup.position.set(0, 0.48, 0.26);
 
-    const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.14), bodyMat);
+    const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.16), bodyMat);
     headGroup.add(headMesh);
 
     // Beak
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 4), yellowMat);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.14, 4), yellowMat);
     beak.rotation.x = Math.PI / 2;
-    beak.position.set(0, -0.02, 0.12);
+    beak.position.set(0, -0.02, 0.13);
     headGroup.add(beak);
 
     // Red Comb
     const comb = new THREE.Mesh(
-      new THREE.BoxGeometry(0.03, isRooster ? 0.14 : 0.06, isRooster ? 0.16 : 0.08),
+      new THREE.BoxGeometry(0.035, isRooster ? 0.16 : 0.08, isRooster ? 0.18 : 0.10),
       redMat
     );
-    comb.position.set(0, isRooster ? 0.12 : 0.08, 0.02);
+    comb.position.set(0, isRooster ? 0.14 : 0.09, 0.02);
     headGroup.add(comb);
 
     // Wattles under beak (for roosters)
     if (isRooster) {
-      const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.08, 0.05), redMat);
-      wattle.position.set(0, -0.10, 0.08);
+      const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.09, 0.06), redMat);
+      wattle.position.set(0, -0.11, 0.09);
       headGroup.add(wattle);
     }
 
@@ -4201,24 +4288,24 @@ function buildFreeRangeChickens() {
       // Magnificent arched sickle feathers
       const tailFeatherMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
       for (let tf = 0; tf < 3; tf++) {
-        const feather = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.12), tailFeatherMat);
+        const feather = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.42, 0.14), tailFeatherMat);
         feather.rotation.x = -Math.PI / 3 - tf * 0.15;
         feather.rotation.y = (tf - 1) * 0.15;
-        feather.position.set((tf - 1) * 0.04, 0.42, -0.32);
+        feather.position.set((tf - 1) * 0.04, 0.46, -0.35);
         chk.add(feather);
       }
     } else if (!isChick) {
-      const henTail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.10), bodyMat);
+      const henTail = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.18, 0.12), bodyMat);
       henTail.rotation.x = -Math.PI / 4;
-      henTail.position.set(0, 0.40, -0.28);
+      henTail.position.set(0, 0.42, -0.30);
       chk.add(henTail);
     }
 
     // Legs
-    const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.22, 4);
-    [-0.08, 0.08].forEach((lx) => {
+    const legGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.25, 4);
+    [-0.09, 0.09].forEach((lx) => {
       const leg = new THREE.Mesh(legGeo, yellowMat);
-      leg.position.set(lx, 0.11, 0);
+      leg.position.set(lx, 0.12, 0);
       chk.add(leg);
     });
 
@@ -4247,7 +4334,10 @@ function buildFreeRangeChickens() {
 
   chickenConfigs.forEach((cfg, idx) => {
     const chkObj = createChicken(cfg.isRooster, cfg.isChick, cfg.color);
-    chkObj.mesh.position.set(cfg.x, 0, cfg.z);
+    const wx = cfg.x + flockBaseX;
+    const wz = cfg.z + flockBaseZ;
+    const wy = getDK2HillSurfaceY(wx, wz) - flockBaseY;
+    chkObj.mesh.position.set(cfg.x, wy, cfg.z);
     chkObj.mesh.rotation.y = cfg.rot;
     flockGroup.add(chkObj.mesh);
 
@@ -5041,7 +5131,7 @@ function createBuildingLabels() {
     { text: '🌉 Cầu vòm đỏ (Red Arch)', pos: new THREE.Vector3(95, 5.5, -49), id: 'redArchBridge' },
     { text: '🚉 Ga xe lửa DK Station', pos: new THREE.Vector3(88, 5.0, -2), id: 'dkStation' },
     { text: '⛵ Thuyền chèo đò trên sông', pos: new THREE.Vector3(89.5, 1.8, -8), id: 'rowingBoat' },
-    { text: '🐑 Đàn cừu trên đồi cỏ', pos: new THREE.Vector3(120, 6.0, -62), id: 'sheepFlock' },
+    { text: '🐑 Đàn cừu trên đồi cỏ', pos: new THREE.Vector3(108, 6.8, -45), id: 'sheepFlock' },
     { text: '🌾 Cối xay gió sinh thái', pos: new THREE.Vector3(55, 34.0, -108), id: 'windmill' },
 
     // DK2
@@ -5050,8 +5140,8 @@ function createBuildingLabels() {
     { text: '🏍️ Sân kiểm định xe DK2', pos: new THREE.Vector3(-75, 2.5, -15), id: 'xuongDK2' },
     { text: 'Sân xe thành phẩm DK2', pos: new THREE.Vector3(-78, 2.0, -45), id: 'sanThanhPhamDK2' },
     { text: 'Vườn Lan trên đồi', pos: new THREE.Vector3(-130, 22.0, -82), id: 'vuonLanDK2' },
-    { text: '🐟 Ao cá đồi sinh thái', pos: new THREE.Vector3(-110, 8.5, -63), id: 'aoCaDK2' },
-    { text: '🐓 Đàn gà thả đồi', pos: new THREE.Vector3(-122, 6.5, -48), id: 'doiGaDK2' },
+    { text: '🐟 Ao cá đồi sinh thái', pos: new THREE.Vector3(-98, 11.5, -56), id: 'aoCaDK2' },
+    { text: '🐓 Đàn gà thả đồi', pos: new THREE.Vector3(-112, 5.2, -36), id: 'doiGaDK2' },
     { text: 'Hồ sinh thái tròn', pos: new THREE.Vector3(-108, 3.0, -65), id: 'hoTronDK2' },
   ];
 

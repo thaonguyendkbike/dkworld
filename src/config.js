@@ -346,8 +346,8 @@ export const CONFIG = {
       name: 'Ga xe lửa DK Station',
     },
     sheepFlock: {
-      pos: { x: 135, y: 18, z: -48 },
-      target: { x: 120, y: 5, z: -62 },
+      pos: { x: 122, y: 12, z: -32 },
+      target: { x: 108, y: 4.8, z: -45 },
       name: 'Đàn cừu trên đồi cỏ',
     },
     river: {
@@ -376,13 +376,13 @@ export const CONFIG = {
       name: 'Sân bóng chuyền DK1',
     },
     aoCaDK2: {
-      pos: { x: -92, y: 18, z: -45 },
-      target: { x: -110, y: 5.5, z: -63 },
+      pos: { x: -80, y: 16, z: -42 },
+      target: { x: -98, y: 9.4, z: -56 },
       name: 'Ao cá đồi sinh thái DK2',
     },
     doiGaDK2: {
-      pos: { x: -105, y: 16, z: -28 },
-      target: { x: -125, y: 4.5, z: -48 },
+      pos: { x: -98, y: 9, z: -22 },
+      target: { x: -112, y: 3.2, z: -36 },
       name: 'Đàn gà thả đồi DK2',
     },
   },
