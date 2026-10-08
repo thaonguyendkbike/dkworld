@@ -166,7 +166,7 @@ function init() {
   window.addEventListener('resize', onWindowResize);
 
   // Start Animation Loop
-  animate();
+  animate(performance.now());
 }
 
 // ============================================================================
@@ -3601,6 +3601,7 @@ function updateAnimatedObjects(delta, time) {
     if (trainProgress < 0) trainProgress += 1.0;
 
     const getCurveT = (val) => {
+      if (typeof val !== 'number' || isNaN(val)) return 0.001;
       let t = val % 1.0;
       if (t < 0) t += 1.0;
       return Math.min(Math.max(t, 0.0001), 0.9999);
@@ -4292,30 +4293,36 @@ let lastTime = performance.now();
 function animate(time) {
   requestAnimationFrame(animate);
 
-  const delta = Math.min((time - lastTime) / 1000, 0.1);
-  lastTime = time;
+  const currentTime = typeof time === 'number' ? time : performance.now();
+  const rawDelta = (currentTime - lastTime) / 1000;
+  const delta = (!isNaN(rawDelta) && rawDelta > 0) ? Math.min(rawDelta, 0.1) : 0.016;
+  lastTime = currentTime;
 
   if (cameraTween) {
-    cameraTween(time);
+    cameraTween(currentTime);
   } else {
     controls.update();
   }
 
   // Update animated objects (Vehicles, train, people, flags, birds)
-  updateAnimatedObjects(delta, time);
+  try {
+    updateAnimatedObjects(delta, currentTime);
+  } catch (err) {
+    console.warn('Animation update error:', err);
+  }
 
   // Update rain effect
   updateRain(delta);
 
   // Subtle water ripples
   if (waterCanalMesh) {
-    waterCanalMesh.material.opacity = 0.8 + Math.sin(time * 0.002) * 0.05;
+    waterCanalMesh.material.opacity = 0.8 + Math.sin(currentTime * 0.002) * 0.05;
   }
   if (waterRoundPondMesh) {
-    waterRoundPondMesh.material.opacity = 0.8 + Math.cos(time * 0.002) * 0.05;
+    waterRoundPondMesh.material.opacity = 0.8 + Math.cos(currentTime * 0.002) * 0.05;
   }
   if (waterKoiMesh) {
-    waterKoiMesh.material.opacity = 0.8 + Math.sin(time * 0.003) * 0.04;
+    waterKoiMesh.material.opacity = 0.8 + Math.sin(currentTime * 0.003) * 0.04;
   }
 
   // Update compass needle rotation
