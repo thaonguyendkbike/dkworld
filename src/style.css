@@ -416,6 +416,19 @@ html, body {
   gap: 8px;
 }
 
+.campus-zones-pill {
+  gap: 8px;
+}
+
+.zone-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
 .stat-badge {
   font-size: 0.72rem;
   font-weight: 600;
