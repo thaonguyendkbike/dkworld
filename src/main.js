@@ -94,6 +94,10 @@ let animatedVehicles = [];
 let evChargingRings = [];
 let vehicleHeadlights = [];
 
+// Cute Speech Bubbles (Người, Gà, Cừu)
+let activeSpeechBubbles = [];
+let nextSpeechTimer = 2.2;
+
 // DK2 Hillside Eco-Pond, Chickens & Pigeons
 let hillPondKoiFishes = [];
 let hillPondWater;
@@ -8501,6 +8505,214 @@ function updateLabels() {
 }
 
 // ============================================================================
+// CUTE SPEECH BUBBLES: Người, Gà, Cừu phát ngôn đáng yêu ngẫu nhiên
+// ============================================================================
+const CUTE_SPEECHES = {
+  chicken: {
+    icon: '🐥',
+    typeClass: 'type-chicken',
+    heightOffset: 0.55,
+    quotes: [
+      "Cục ta cục tác! Thóc trên đồi ngon quá~ 🌾",
+      "Ò ó o o! DK Bike chào buổi sáng tươi đẹp! ☀️",
+      "Hôm nay đồi DK2 lộng gió mát rượi nè! 🍃",
+      "Chạy bộ thể dục xíu cho khoẻ đôi chân 🐣",
+      "Chip chip~ Đợi mẹ gà với các con ơi! 🐥✨",
+      "Ngắm các bạn xe điện chạy bên dưới vui mắt ghê! 🛵",
+      "Mổ trúng hạt bắp vàng ngọt lịm căng diều rùi~ 🌽",
+      "Đỉnh đồi nhìn bao quát cả 2 nhà máy đẹp mê hồn! 📸",
+      "Cục cục tác! Bộ lông vàng hôm nay mượt chưa nè? 💛",
+      "Ghé vườn hoa cạnh chuồng chụp ảnh sống ảo hông? 🌸"
+    ]
+  },
+  sheep: {
+    icon: '🐑',
+    typeClass: 'type-sheep',
+    heightOffset: 0.75,
+    quotes: [
+      "Beee~ Cỏ sườn đồi xanh ngọt lịm à nha 🍀",
+      "Gió mát quá chừng, buồn ngủ rùi nè... ☁️💤",
+      "Cục bông gòn di động xin chào mọi người! 🐑✨",
+      "Hít một hơi thật sâu đầy hương hoa cỏ thơm ngát 🌸",
+      "Beee beee~ Tàu hỏa hơi nước đỏ chạy qua kìa! 🚂💨",
+      "Lông mình hôm nay bồng bềnh như mây trên trời chưa? 🧶",
+      "Bên bờ sông máng nước có khóm hoa dại xinh ghê! 🌼",
+      "Chúc các cô chú công nhân DK Bike một ngày tràn năng lượng! 🌿"
+    ]
+  },
+  human: {
+    icon: '👷',
+    typeClass: 'type-human',
+    heightOffset: 1.95,
+    quotes: [
+      "Mẻ xe Roma SX hôm nay nước sơn bóng loáng xuất sắc! ✨",
+      "Động cơ IP67 test ngập nước 10/10 êm ru! 🛵💦",
+      "Sắp tới giờ ăn trưa rồi, cơm Nhà Ăn ngon lắm nha! 🍱",
+      "Vừa KCS xong lô xe Creer E xuất xưởng phục vụ khách hàng! 🛠️",
+      "Pin Lithium thế hệ mới nạp siêu nhanh vượt mong đợi! ⚡",
+      "Làm cốc cà phê ngắm đài phun nước DK chill thật ☕⛲",
+      "Khuôn viên nhà máy xanh mát như resort sinh thái vậy 🌿",
+      "Pha đập bóng chuyền uy lực chuẩn chỉ quá anh em ơi! 🏐🔥",
+      "Cứu bóng đỉnh chóp! Hiệp này xưởng mình quyết thắng! 👏🏆",
+      "Cổng an ninh số 1 thông thoáng, chào mừng quý đối tác! 🫡",
+      "Tu tu xình xịch~ Tàu vừa cập bến ga DK Station! 🚂💨",
+      "Vườn Lan trên đồi hôm nay hoa nở rực rỡ ngát hương 🌺",
+      "Trạm sạc nhanh 45 phút là đầy ắp năng lượng vi vu rồi 🔋⚡",
+      "DK Bike tự hào xe điện thương hiệu Việt chất lượng cao! 🇻🇳🛵"
+    ]
+  }
+};
+
+function triggerRandomSpeechBubble() {
+  if (activeSpeechBubbles.length >= 2) return;
+
+  const tempV = new THREE.Vector3();
+  const tempWorldPos = new THREE.Vector3();
+
+  // 1. Phân loại đối tượng: Gà (35%), Cừu (25%), Người (40%)
+  const r = Math.random();
+  let category = r < 0.35 ? 'chicken' : (r < 0.60 ? 'sheep' : 'human');
+
+  // Thu thập danh sách đối tượng khả dụng
+  const getCandidates = (cat) => {
+    if (cat === 'chicken') {
+      return hillChickens.map(c => ({ mesh: c.mesh, type: 'chicken' }));
+    } else if (cat === 'sheep') {
+      return fluffySheeps.map(s => ({ mesh: s, type: 'sheep' }));
+    } else {
+      const people = [];
+      wanderingPedestrians.forEach(p => people.push({ mesh: p.mesh, type: 'human', icon: '👷' }));
+      walkingWorkers.forEach(w => people.push({ mesh: w.mesh, type: 'human', icon: '🛠️' }));
+      volleyballPlayers.forEach(vp => people.push({ mesh: vp.group, type: 'human', icon: '🏐' }));
+      if (bikeRiderGroup) people.push({ mesh: bikeRiderGroup, type: 'human', icon: '🛵' });
+      return people;
+    }
+  };
+
+  let pool = getCandidates(category);
+
+  // Lọc đối tượng đang nằm trong khung hình camera (Screen Frustum Visibility)
+  const isVisibleOnScreen = (item) => {
+    if (!item.mesh) return false;
+    item.mesh.getWorldPosition(tempWorldPos);
+    tempV.copy(tempWorldPos);
+    tempV.project(camera);
+    // Nằm trong góc nhìn phía trước camera và không tràn lề mép
+    return tempV.z < 1.0 && tempV.x > -0.85 && tempV.x < 0.85 && tempV.y > -0.85 && tempV.y < 0.85;
+  };
+
+  let visibleCandidates = pool.filter(isVisibleOnScreen);
+
+  // Nếu category được chọn không nằm trong góc nhìn camera, thử các category khác để người dùng luôn thấy bubble
+  if (visibleCandidates.length === 0) {
+    const allCats = ['human', 'chicken', 'sheep'];
+    for (const c of allCats) {
+      const altPool = getCandidates(c);
+      visibleCandidates = altPool.filter(isVisibleOnScreen);
+      if (visibleCandidates.length > 0) {
+        category = c;
+        break;
+      }
+    }
+  }
+
+  // Nếu vẫn không tìm thấy ai trong khung hình, lấy ngẫu nhiên 1 con bất kỳ
+  const speaker = visibleCandidates.length > 0
+    ? visibleCandidates[Math.floor(Math.random() * visibleCandidates.length)]
+    : pool[Math.floor(Math.random() * pool.length)];
+
+  if (!speaker || !speaker.mesh) return;
+
+  const config = CUTE_SPEECHES[category];
+  const quote = config.quotes[Math.floor(Math.random() * config.quotes.length)];
+  const icon = speaker.icon || config.icon;
+
+  // Tạo HTML bubble element
+  const el = document.createElement('div');
+  el.className = `cute-speech-bubble ${config.typeClass}`;
+  el.innerHTML = `
+    <span class="speech-icon">${icon}</span>
+    <span class="speech-text">${quote}</span>
+    <div class="speech-tail"></div>
+  `;
+
+  // Hiệu ứng tương tác: Bấm vào bong bóng phát ra trái tim/ngôi sao bay lên
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const heart = document.createElement('div');
+    heart.className = 'speech-heart-float';
+    heart.innerText = Math.random() < 0.5 ? '❤️' : '✨';
+    heart.style.left = `${e.clientX}px`;
+    heart.style.top = `${e.clientY - 10}px`;
+    document.body.appendChild(heart);
+    setTimeout(() => heart.remove(), 800);
+  });
+
+  document.body.appendChild(el);
+
+  activeSpeechBubbles.push({
+    el,
+    speakerMesh: speaker.mesh,
+    heightOffset: config.heightOffset,
+    ttl: 3.8, // Hiển thị trong 3.8 giây
+    leaving: false
+  });
+}
+
+function updateCuteSpeechBubbles(delta) {
+  // Đếm ngược xuất hiện bubble tiếp theo
+  nextSpeechTimer -= delta;
+  if (nextSpeechTimer <= 0) {
+    triggerRandomSpeechBubble();
+    // Thời gian giãn cách ngẫu nhiên từ 4.5s đến 7.5s
+    nextSpeechTimer = 4.5 + Math.random() * 3.0;
+  }
+
+  if (activeSpeechBubbles.length === 0) return;
+
+  const tempWorldPos = new THREE.Vector3();
+  const tempV = new THREE.Vector3();
+
+  for (let i = activeSpeechBubbles.length - 1; i >= 0; i--) {
+    const b = activeSpeechBubbles[i];
+    b.ttl -= delta;
+
+    // Kích hoạt animation biến mất khi sắp hết hạn (còn 0.35s)
+    if (b.ttl <= 0.35 && !b.leaving) {
+      b.leaving = true;
+      b.el.classList.add('is-leaving');
+    }
+
+    // Khi hết hạn hoàn toàn, xóa khỏi DOM
+    if (b.ttl <= 0) {
+      b.el.remove();
+      activeSpeechBubbles.splice(i, 1);
+      continue;
+    }
+
+    // Tính toán vị trí 3D -> 2D màn hình
+    b.speakerMesh.getWorldPosition(tempWorldPos);
+    tempWorldPos.y += b.heightOffset;
+
+    tempV.copy(tempWorldPos);
+    tempV.project(camera);
+
+    // Nếu nằm sau camera thì ẩn tạm
+    if (tempV.z > 1.0) {
+      b.el.style.display = 'none';
+      continue;
+    }
+
+    const sx = (tempV.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-(tempV.y * 0.5) + 0.5) * window.innerHeight;
+
+    b.el.style.display = 'flex';
+    b.el.style.left = `${sx}px`;
+    b.el.style.top = `${sy}px`;
+  }
+}
+
+// ============================================================================
 // 18. Camera Presets Smooth Transitions
 // ============================================================================
 let cameraTween = null;
@@ -8962,6 +9174,9 @@ function animate(time) {
 
   // Update 3D labels
   updateLabels();
+
+  // Update cute speech bubbles (Người, Gà, Cừu)
+  updateCuteSpeechBubbles(delta);
 
   // Render scene
   renderer.render(scene, camera);
