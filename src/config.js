@@ -32,13 +32,13 @@ export const CONFIG = {
   // Khối 3: Ánh sáng đậm ấm, tương phản cao, nắng góc thấp (Grand Valley Aesthetic)
   LIGHTING: {
     day: {
-      ambientColor: 0xbae6fd,
-      ambientIntensity: 0.58, // Hạ ambient để tăng độ tương phản sáng-tối sắc nét
-      sunColor: 0xfff7ed, // Nắng vàng ấm rực rỡ
-      sunIntensity: 2.85,
-      sunPosition: { x: 125, y: 78, z: 90 }, // Nắng góc thấp đổ bóng dài có chiều sâu
+      ambientColor: 0x93c5fd, // Bầu trời xanh lam mát dịu cho mảng tối, tương phản cao
+      ambientIntensity: 0.46, // Hạ ambient để mảng tối sâu và mảng sáng nổi khối sắc nét
+      sunColor: 0xffeed4,     // Nắng vàng mật ong ấm áp rực rỡ (Sun-Kissed Golden Warm)
+      sunIntensity: 3.35,     // Nắng rực rỡ bắt sáng lấp lánh trên đa giác flat-shading
+      sunPosition: { x: 130, y: 72, z: 85 }, // Nắng góc thấp đổ bóng dài có chiều sâu đậm chất Anime
       skyColor: 0x38bdf8,
-      groundColor: 0x166534, // Phản xạ xanh lá đậm ấm từ thảm cỏ
+      groundColor: 0x15803d, // Phản xạ xanh lá đậm ấm từ thảm cỏ
       skyGradient: { top: 0x1d4ed8, bottom: 0xcfeafe },
     },
     sunset: {
@@ -307,12 +307,12 @@ export const CONFIG = {
       height: 25,
       color: 0x16a34a,
     },
-    // Đồi mới sinh thái (Đồi gà & bồ câu rộng lớn hơn đồi vườn lan, đỉnh phẳng trồng hoa)
+    // Đồi mới sinh thái (Giảm kích thước vừa vặn xinh xắn, đỉnh phẳng & ngập tràn hoa)
     dk2NewHill: {
-      position: { x: -148, y: 0, z: -38 },
-      radius: 66,     // To hơn đồi vườn lan (radius 54)
-      flatRadius: 24, // Đỉnh đồi phẳng rộng lớn để đi dạo, trồng hoa, nuôi gà và bồ câu
-      height: 18.5,
+      position: { x: -142, y: 0, z: -38 },
+      radius: 46,     // Giảm từ 66 xuống 46 để hài hòa với khuôn viên
+      flatRadius: 15.0,// Đỉnh đồi phẳng vừa vặn 15m
+      height: 15.5,   // Cao độ 15.5m thoai thoải
       color: 0x22c55e,
     },
   },
