@@ -3598,10 +3598,17 @@ function updateAnimatedObjects(delta, time) {
   // 3. Đoàn tàu hơi nước uốn lượn cong trên đường ray & Dải khói mây trắng khổng lồ (như ảnh 1)
   if (railwayCurve && trainCars.length > 0) {
     trainProgress = (trainProgress + delta * 0.034) % 1.0;
+    if (trainProgress < 0) trainProgress += 1.0;
+
+    const getCurveT = (val) => {
+      let t = val % 1.0;
+      if (t < 0) t += 1.0;
+      return Math.min(Math.max(t, 0.0001), 0.9999);
+    };
 
     // Cập nhật vị trí và góc quay chuẩn tiếp tuyến cho từng toa xe
     trainCars.forEach((car) => {
-      const tCar = (trainProgress - car.offsetT + 1.0) % 1.0;
+      const tCar = getCurveT(trainProgress - car.offsetT);
       const pos = railwayCurve.getPointAt(tCar);
       const tangent = railwayCurve.getTangentAt(tCar);
 
@@ -3610,9 +3617,9 @@ function updateAnimatedObjects(delta, time) {
     });
 
     // Cập nhật Dải khói mây trắng khổng lồ (Giant Puffy Cloud Trail) uốn khúc theo đoàn tàu (như ảnh 1)
-    const tLoco = trainProgress;
+    const tLoco = getCurveT(trainProgress);
     trainSmokeTrail.forEach((smokeItem, sIdx) => {
-      const tSmoke = (tLoco - 0.012 - sIdx * 0.014 + 1.0) % 1.0;
+      const tSmoke = getCurveT(tLoco - 0.012 - sIdx * 0.014);
       const smokePos = railwayCurve.getPointAt(tSmoke);
 
       // Khói bốc cao dần lên và bồng bềnh nhịp nhàng
