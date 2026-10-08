@@ -268,14 +268,29 @@ export const CONFIG = {
     bridgeArchColor: 0xdc2626, // Cầu vòm đỏ rực rỡ như ảnh 1
   },
 
-  // Sông / Máng nước xanh ngọc trong vắt (như ảnh 2)
+  // Sông / Máng nước uốn lượn song song với đường tàu (Khối 4)
   CANAL: {
-    positionX: 86.0,
-    length: 180,
-    width: 9.0,
+    width: 9.5,
+    depth: 1.8,
     waterColor: 0x38bdf8, // Nước xanh ngọc trong veo
     sandColor: 0xfde68a,
-    depth: 1.8,
+    offsetFromRail: 8.5, // Chạy song song cách tim đường sắt 8.5m
+  },
+
+  // Khối 4: Hệ thống Nước, Sông máng & Ao cá đồi sinh thái (Stylized Water System)
+  WATER: {
+    shallowColor: 0x38bdf8, // Xanh ngọc trong vắt sát bờ
+    deepColor: 0x0369a1,    // Xanh đậm sẫm có chiều sâu giữa dòng
+    foamColor: 0xffffff,    // Viền bọt trắng ở bờ
+    waveSpeed: 0.85,        // Tốc độ sóng chuyển động chậm
+    waveFrequency: 0.35,
+    opacity: 0.90,
+    hillPond: {
+      radiusX: 16.5,        // Tăng kích thước ao cá trên đồi DK2
+      radiusZ: 12.0,
+      terraceRadius: 18.5,
+      terraceHeight: 3.6,
+    },
   },
 
   // Bờ kè đá chống sạt lở (Retaining Wall)

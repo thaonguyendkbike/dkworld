@@ -14,6 +14,7 @@ const windUniforms = {
 let scene, camera, renderer, controls;
 let dirLight, hemiLight, ambientLight;
 let skyDomeMaterial;
+let stylizedWaterMaterials = [];
 let currentEnv = 'day';
 let isRaining = false;
 let rainParticles;
@@ -622,140 +623,114 @@ function buildRetainingWall() {
   }
 }
 
-// Tuyến đường sắt cong, Cầu vòm đỏ, Ga xe lửa DK Station, Sông máng & Đàn cừu (Toàn diện theo 3 ảnh mẫu)
-function buildCanalAndRailway() {
-  // --------------------------------------------------------------------------
-  // A. Sông máng nước uốn lượn xanh ngọc trong vắt, bãi cát ven bờ (như ảnh 2)
-  // --------------------------------------------------------------------------
-  const canalConfig = CONFIG.CANAL;
-  const canalLength = 175;
+// ============================================================================
+// Shader Nước Cách Điệu: Màu theo độ sâu, viền bọt trắng & gợn sóng mưa (Khối 4)
+// ============================================================================
+function createStylizedWaterMaterial(isCurvedCanal = false) {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: windUniforms.uWindTime,
+      uShallowColor: { value: new THREE.Color(CONFIG.WATER.shallowColor) },
+      uDeepColor: { value: new THREE.Color(CONFIG.WATER.deepColor) },
+      uFoamColor: { value: new THREE.Color(CONFIG.WATER.foamColor) },
+      uSunColor: { value: new THREE.Color(CONFIG.LIGHTING.day.sunColor) },
+      uSunDir: { value: new THREE.Vector3(125, 78, 90).normalize() },
+      uIsCurvedCanal: { value: isCurvedCanal ? 1.0 : 0.0 },
+      uIsRaining: { value: isRaining ? 1.0 : 0.0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      varying vec3 vNormal;
+      uniform float uTime;
+      uniform float uIsRaining;
 
-  // Lòng sông đáy cát vàng
-  const canalBed = new THREE.Mesh(
-    new THREE.BoxGeometry(canalConfig.width + 5.0, 1.8, canalLength),
-    new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.9 })
-  );
-  canalBed.position.set(89.0, -2.4, -35);
-  scene.add(canalBed);
+      void main() {
+        vUv = uv;
+        vec3 transformed = position;
 
-  // Mặt nước xanh ngọc trong veo
-  waterCanalMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(canalConfig.width + 3.0, canalLength),
-    new THREE.MeshStandardMaterial({
-      color: canalConfig.waterColor,
-      roughness: 0.12,
-      metalness: 0.5,
-      transparent: true,
-      opacity: 0.88,
-    })
-  );
-  waterCanalMesh.rotation.x = -Math.PI / 2;
-  waterCanalMesh.position.set(89.0, -1.4, -35);
-  waterCanalMesh.receiveShadow = true;
-  scene.add(waterCanalMesh);
+        // Gợn sóng lăn tăn nhẹ nhàng
+        float wave = sin(transformed.x * 0.4 + uTime * 1.3) * cos(transformed.z * 0.4 - uTime * 1.0) * 0.04;
+        if (uIsRaining > 0.5) {
+          wave += sin(length(transformed.xz) * 5.0 - uTime * 7.0) * 0.03;
+        }
+        transformed.y += wave;
 
-  // Dải bãi cát vàng thoai thoải viền 2 bên bờ sông (như ảnh 2)
-  const sandMat = new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.95, flatShading: true });
-  const sandLeft = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, canalLength), sandMat);
-  sandLeft.position.set(82.2, -1.2, -35);
-  scene.add(sandLeft);
+        vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        vNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uShallowColor;
+      uniform vec3 uDeepColor;
+      uniform vec3 uFoamColor;
+      uniform vec3 uSunColor;
+      uniform vec3 uSunDir;
+      uniform float uTime;
+      uniform float uIsCurvedCanal;
+      uniform float uIsRaining;
 
-  const sandRight = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.4, canalLength), sandMat);
-  sandRight.position.set(95.6, -1.2, -35);
-  scene.add(sandRight);
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      varying vec3 vNormal;
 
-  // Thuyền gỗ mộc mạc có người chèo đò đứng giữa dòng sông (như ảnh 2)
-  const boatGroup = new THREE.Group();
-  boatGroup.position.set(89.5, -1.3, -8);
+      void main() {
+        // Độ sâu nước: với mương cong dùng uv.x, với ao hồ tròn dùng khoảng cách tâm
+        float depth;
+        if (uIsCurvedCanal > 0.5) {
+          depth = 1.0 - abs(vUv.x - 0.5) * 2.0; // 0 ở bờ, 1 ở giữa dòng
+        } else {
+          float dist = length(vUv - vec2(0.5)) * 2.0;
+          depth = clamp(1.0 - dist, 0.0, 1.0);
+        }
 
-  const boatHull = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.6, 4.2),
-    new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
-  );
-  boatHull.castShadow = true;
-  boatGroup.add(boatHull);
+        // Chuyển sắc độ màu theo độ sâu nước (Xanh ngọc ở bờ -> Xanh đậm ở giữa)
+        vec3 waterCol = mix(uShallowColor, uDeepColor, smoothstep(0.08, 0.72, depth));
 
-  // Người chèo đò
-  const boatman = createCharacter({ shirtColor: 0xef4444, pantsColor: 0x1e293b, hatColor: 0xfef08a, isDriver: true });
-  boatman.position.set(0, 0.25, 0.4);
-  boatGroup.add(boatman);
+        // Họa tiết vệt sáng khúc xạ đáy nước chuyển động chậm (Animated Caustics)
+        float c1 = sin(vWorldPosition.x * 0.55 + uTime * 0.85) * cos(vWorldPosition.z * 0.55 - uTime * 0.65);
+        float c2 = cos(vWorldPosition.x * 0.9 - uTime * 0.5) * sin(vWorldPosition.z * 0.9 + uTime * 0.75);
+        float caustic = pow(clamp(c1 + c2, 0.0, 1.0), 3.0) * 0.36;
+        waterCol += caustic * vec3(1.0);
 
-  // Mái chèo gỗ
-  const oar = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.04, 2.8),
-    new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.7 })
-  );
-  oar.rotation.z = Math.PI / 4;
-  oar.position.set(0.6, 0.7, 0.2);
-  boatGroup.add(oar);
+        // Viền bọt trắng uốn lượn sát mép bờ cát
+        float shoreEdge = (uIsCurvedCanal > 0.5) ? abs(vUv.x - 0.5) * 2.0 : length(vUv - vec2(0.5)) * 2.0;
+        float foamNoise = sin(vWorldPosition.z * 2.0 + uTime * 2.2) * 0.04;
+        float foam = smoothstep(0.85 + foamNoise, 0.98, shoreEdge) * 0.88;
+        waterCol = mix(waterCol, uFoamColor, foam);
 
-  boatGroup.userData = {
-    id: 'rowingBoat',
-    title: 'Thuyền nan du ngoạn sinh thái trên sông',
-    type: 'boat',
-    desc: 'Hoạt động chèo thuyền thư giãn trên dòng sông máng nước trong vắt bao quanh khuôn viên DK Bike.',
-    zone: 'Sông Máng Nước',
-  };
-  boatHull.userData = boatGroup.userData;
-  scene.add(boatGroup);
-  interactiveObjects.push(boatHull);
-  rowingBoat = boatGroup;
+        // Hiệu ứng hạt mưa tạo vòng sóng tròn lan tỏa khi trời mưa
+        if (uIsRaining > 0.5) {
+          float rip1 = sin(length(mod(vWorldPosition.xz, 5.0) - 2.5) * 9.0 - uTime * 8.0);
+          float rip2 = sin(length(mod(vWorldPosition.xz + 2.0, 6.0) - 3.0) * 8.0 - uTime * 9.0);
+          float rainRipples = max(0.0, rip1 * 0.5 + rip2 * 0.5);
+          waterCol += rainRipples * 0.25 * vec3(1.0);
+        }
 
-  // Lá sen tròn to khuyết chữ V (Lily Pads) nổi bồng bềnh quanh thuyền (như ảnh 2)
-  const lilyMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.6, side: THREE.DoubleSide });
-  const lilyFlowerMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 });
-  lotusLeaves = [];
+        // Vệt phản chiếu ánh nắng lấp lánh (Specular Highlights)
+        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+        vec3 halfDir = normalize(uSunDir + viewDir);
+        float spec = pow(max(dot(vNormal, halfDir), 0.0), 36.0);
+        waterCol += spec * uSunColor * 0.45;
 
-  const lilyPositions = [
-    { x: 88.0, z: -5.0, s: 1.1 },
-    { x: 91.2, z: -6.5, s: 0.9 },
-    { x: 87.5, z: -11.0, s: 1.3 },
-    { x: 90.8, z: -12.5, s: 1.0 },
-    { x: 89.2, z: -15.0, s: 1.4 },
-    { x: 87.0, z: -2.0, s: 0.8 },
-    { x: 91.5, z: -1.0, s: 1.2 },
-  ];
-
-  lilyPositions.forEach((lp, lIdx) => {
-    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.85 * lp.s, 12, 0.4, Math.PI * 1.85), lilyMat);
-    pad.rotation.x = -Math.PI / 2;
-    pad.position.set(lp.x, -1.35, lp.z);
-    scene.add(pad);
-    lotusLeaves.push(pad);
-
-    if (lIdx % 2 === 0) {
-      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25 * lp.s), lilyFlowerMat);
-      flower.position.set(lp.x + 0.1, -1.25, lp.z - 0.1);
-      scene.add(flower);
-    }
+        gl_FragColor = vec4(waterCol, 0.90);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
   });
 
-  // Đàn cá xanh bơi lội dưới sông (như ảnh 2)
-  riverFishGroup = new THREE.Group();
-  riverFishGroup.position.set(89.0, -1.5, -9);
-  const fishMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 });
+  stylizedWaterMaterials.push(mat);
+  return mat;
+}
 
-  for (let f = 0; f < 8; f++) {
-    const fMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 5), fishMat);
-    fMesh.rotation.x = Math.PI / 2;
-    const fAngle = (f / 8) * Math.PI * 2;
-    fMesh.position.set(Math.cos(fAngle) * 1.6, 0, Math.sin(fAngle) * 1.6);
-    fMesh.rotation.y = -fAngle + Math.PI / 2;
-    riverFishGroup.add(fMesh);
-  }
-  scene.add(riverFishGroup);
-
-  // Cầu gỗ mộc bắc qua khúc sông ở mạn Nam
-  const woodBridge = new THREE.Mesh(
-    new THREE.BoxGeometry(canalConfig.width + 3.5, 0.35, 3.2),
-    new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 })
-  );
-  woodBridge.position.set(89.0, -0.9, 18);
-  woodBridge.castShadow = true;
-  scene.add(woodBridge);
-
+// Tuyến đường sắt cong, Cầu vòm đỏ, Ga xe lửa DK Station & Mương nước uốn cong song song
+function buildCanalAndRailway() {
   // --------------------------------------------------------------------------
-  // B. Tuyến đường sắt cong uốn lượn (Curved Railway) bằng CatmullRomCurve3
+  // B. Khởi tạo tuyến đường sắt cong uốn lượn (Curved Railway) trước tiên
   // --------------------------------------------------------------------------
   const railCurvePoints = [
     new THREE.Vector3(122, 0.3, -118),
@@ -769,6 +744,233 @@ function buildCanalAndRailway() {
     new THREE.Vector3(116.0, 0.4, 68),
   ];
   railwayCurve = new THREE.CatmullRomCurve3(railCurvePoints);
+
+  // --------------------------------------------------------------------------
+  // A. Mương nước thủy lợi uốn lượn 100% song song với đường tàu (Theo yêu cầu)
+  // --------------------------------------------------------------------------
+  const canalWidth = CONFIG.CANAL.width; // 9.5m
+  const canalOffset = CONFIG.CANAL.offsetFromRail; // 8.5m chạy song song
+  const segments = 120;
+
+  // Mảng dữ liệu hình học mặt nước mương cong
+  const waterPositions = [];
+  const waterUvs = [];
+  const waterIndices = [];
+
+  // Mảng dữ liệu đáy mương cát vàng
+  const bedPositions = [];
+  const bedUvs = [];
+  const bedIndices = [];
+
+  // Mảng dữ liệu bờ cát thoai thoải 2 bên (Bờ Tây và Bờ Đông)
+  const sandLPositions = [];
+  const sandLUvs = [];
+  const sandLIndices = [];
+
+  const sandRPositions = [];
+  const sandRUvs = [];
+  const sandRIndices = [];
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const pt = railwayCurve.getPointAt(t);
+    const tan = railwayCurve.getTangentAt(t);
+    const norm = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+
+    // Tim mương nước uốn cong song song cách tim đường sắt 8.5m
+    const cCenter = pt.clone().sub(norm.clone().multiplyScalar(canalOffset));
+
+    const waterY = -1.35;
+    const bedY = -2.35;
+    const bankY = -1.15;
+
+    const wHalf = canalWidth / 2;
+    const wLeft = cCenter.clone().sub(norm.clone().multiplyScalar(wHalf));
+    const wRight = cCenter.clone().add(norm.clone().multiplyScalar(wHalf));
+
+    // Bờ cát mở rộng 2.6m mỗi bên
+    const sLeftOuter = cCenter.clone().sub(norm.clone().multiplyScalar(wHalf + 2.6));
+    const sRightOuter = cCenter.clone().add(norm.clone().multiplyScalar(wHalf + 2.6));
+
+    // 1. Mặt nước (Water ribbon)
+    waterPositions.push(wLeft.x, waterY, wLeft.z);
+    waterPositions.push(wRight.x, waterY, wRight.z);
+    waterUvs.push(0, t);
+    waterUvs.push(1, t);
+
+    // 2. Đáy mương (Canal bed)
+    bedPositions.push(wLeft.x, bedY, wLeft.z);
+    bedPositions.push(wRight.x, bedY, wRight.z);
+    bedUvs.push(0, t);
+    bedUvs.push(1, t);
+
+    // 3. Bờ cát trái (Bờ Tây giáp nhà máy)
+    sandLPositions.push(sLeftOuter.x, bankY, sLeftOuter.z);
+    sandLPositions.push(wLeft.x, waterY + 0.05, wLeft.z);
+    sandLUvs.push(0, t);
+    sandLUvs.push(1, t);
+
+    // 4. Bờ cát phải (Bờ Đông giáp đường ray)
+    sandRPositions.push(wRight.x, waterY + 0.05, wRight.z);
+    sandRPositions.push(sRightOuter.x, bankY, sRightOuter.z);
+    sandRUvs.push(0, t);
+    sandRUvs.push(1, t);
+
+    if (i < segments) {
+      const idx = i * 2;
+      waterIndices.push(idx, idx + 1, idx + 2);
+      waterIndices.push(idx + 1, idx + 3, idx + 2);
+
+      bedIndices.push(idx, idx + 1, idx + 2);
+      bedIndices.push(idx + 1, idx + 3, idx + 2);
+
+      sandLIndices.push(idx, idx + 1, idx + 2);
+      sandLIndices.push(idx + 1, idx + 3, idx + 2);
+
+      sandRIndices.push(idx, idx + 1, idx + 2);
+      sandRIndices.push(idx + 1, idx + 3, idx + 2);
+    }
+  }
+
+  // Khởi tạo Mesh Mặt Nước Cách Điệu uốn cong
+  const waterGeo = new THREE.BufferGeometry();
+  waterGeo.setAttribute('position', new THREE.Float32BufferAttribute(waterPositions, 3));
+  waterGeo.setAttribute('uv', new THREE.Float32BufferAttribute(waterUvs, 2));
+  waterGeo.setIndex(waterIndices);
+  waterGeo.computeVertexNormals();
+
+  const waterCanalMat = createStylizedWaterMaterial(true);
+  waterCanalMesh = new THREE.Mesh(waterGeo, waterCanalMat);
+  waterCanalMesh.receiveShadow = true;
+  scene.add(waterCanalMesh);
+
+  // Khởi tạo Mesh Đáy Mương
+  const bedGeo = new THREE.BufferGeometry();
+  bedGeo.setAttribute('position', new THREE.Float32BufferAttribute(bedPositions, 3));
+  bedGeo.setAttribute('uv', new THREE.Float32BufferAttribute(bedUvs, 2));
+  bedGeo.setIndex(bedIndices);
+  bedGeo.computeVertexNormals();
+  const bedMat = new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.95 });
+  const canalBed = new THREE.Mesh(bedGeo, bedMat);
+  canalBed.receiveShadow = true;
+  scene.add(canalBed);
+
+  // Khởi tạo Bờ Cát Thoai Thoải 2 bên
+  const sandMat = new THREE.MeshStandardMaterial({ color: CONFIG.GROUND.sandColor, roughness: 0.95, flatShading: true });
+
+  const sandLGeo = new THREE.BufferGeometry();
+  sandLGeo.setAttribute('position', new THREE.Float32BufferAttribute(sandLPositions, 3));
+  sandLGeo.setAttribute('uv', new THREE.Float32BufferAttribute(sandLUvs, 2));
+  sandLGeo.setIndex(sandLIndices);
+  sandLGeo.computeVertexNormals();
+  const sandLeft = new THREE.Mesh(sandLGeo, sandMat);
+  sandLeft.receiveShadow = true;
+  scene.add(sandLeft);
+
+  const sandRGeo = new THREE.BufferGeometry();
+  sandRGeo.setAttribute('position', new THREE.Float32BufferAttribute(sandRPositions, 3));
+  sandRGeo.setAttribute('uv', new THREE.Float32BufferAttribute(sandRUvs, 2));
+  sandRGeo.setIndex(sandRIndices);
+  sandRGeo.computeVertexNormals();
+  const sandRight = new THREE.Mesh(sandRGeo, sandMat);
+  sandRight.receiveShadow = true;
+  scene.add(sandRight);
+
+  // Thuyền nan & người chèo đò đứng giữa dòng mương cong (t = 0.52)
+  const bPt = railwayCurve.getPointAt(0.52);
+  const bTan = railwayCurve.getTangentAt(0.52);
+  const bNorm = new THREE.Vector3(-bTan.z, 0, bTan.x).normalize();
+  const boatPos = bPt.clone().sub(bNorm.clone().multiplyScalar(canalOffset));
+
+  const boatGroup = new THREE.Group();
+  boatGroup.position.set(boatPos.x, -1.32, boatPos.z);
+  boatGroup.rotation.y = Math.atan2(bTan.x, bTan.z);
+
+  const boatHull = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.6, 4.2),
+    new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
+  );
+  boatHull.castShadow = true;
+  boatGroup.add(boatHull);
+
+  const boatman = createCharacter({ shirtColor: 0xef4444, pantsColor: 0x1e293b, hatColor: 0xfef08a, isDriver: true });
+  boatman.position.set(0, 0.25, 0.4);
+  boatGroup.add(boatman);
+
+  const oar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.04, 2.8),
+    new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.7 })
+  );
+  oar.rotation.z = Math.PI / 4;
+  oar.position.set(0.6, 0.7, 0.2);
+  boatGroup.add(oar);
+
+  boatGroup.userData = {
+    id: 'rowingBoat',
+    title: 'Thuyền nan du ngoạn sinh thái trên sông máng',
+    type: 'boat',
+    desc: 'Hoạt động chèo thuyền thư giãn trên dòng sông máng nước trong vắt uốn lượn song song với tuyến đường sắt DK Bike.',
+    zone: 'Sông Máng Nước',
+  };
+  boatHull.userData = boatGroup.userData;
+  scene.add(boatGroup);
+  interactiveObjects.push(boatHull);
+  rowingBoat = boatGroup;
+
+  // Lá sen tròn to khuyết chữ V (Lily Pads) & hoa súng nổi trên mương cong
+  const lilyMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.6, side: THREE.DoubleSide });
+  const lilyFlowerMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 });
+  lotusLeaves = [];
+
+  const lilyCurveT = [0.44, 0.47, 0.50, 0.55, 0.58, 0.62];
+  lilyCurveT.forEach((lt, lIdx) => {
+    const lPt = railwayCurve.getPointAt(lt);
+    const lTan = railwayCurve.getTangentAt(lt);
+    const lNorm = new THREE.Vector3(-lTan.z, 0, lTan.x).normalize();
+    const lPos = lPt.clone().sub(lNorm.clone().multiplyScalar(canalOffset + (lIdx % 2 === 0 ? 1.5 : -1.5)));
+
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.85, 12, 0.4, Math.PI * 1.85), lilyMat);
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(lPos.x, -1.33, lPos.z);
+    scene.add(pad);
+    lotusLeaves.push(pad);
+
+    if (lIdx % 2 === 0) {
+      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25), lilyFlowerMat);
+      flower.position.set(lPos.x + 0.1, -1.23, lPos.z - 0.1);
+      scene.add(flower);
+    }
+  });
+
+  // Đàn cá xanh bơi lội dưới sông máng
+  riverFishGroup = new THREE.Group();
+  riverFishGroup.position.set(boatPos.x, -1.45, boatPos.z);
+  const fishMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 });
+
+  for (let f = 0; f < 8; f++) {
+    const fMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 5), fishMat);
+    fMesh.rotation.x = Math.PI / 2;
+    const fAngle = (f / 8) * Math.PI * 2;
+    fMesh.position.set(Math.cos(fAngle) * 1.6, 0, Math.sin(fAngle) * 1.6);
+    fMesh.rotation.y = -fAngle + Math.PI / 2;
+    riverFishGroup.add(fMesh);
+  }
+  scene.add(riverFishGroup);
+
+  // Cầu gỗ mộc bắc qua khúc mương cong ở mạn Nam (t = 0.72)
+  const brPt = railwayCurve.getPointAt(0.72);
+  const brTan = railwayCurve.getTangentAt(0.72);
+  const brNorm = new THREE.Vector3(-brTan.z, 0, brTan.x).normalize();
+  const bridgePos = brPt.clone().sub(brNorm.clone().multiplyScalar(canalOffset));
+
+  const woodBridge = new THREE.Mesh(
+    new THREE.BoxGeometry(canalWidth + 3.0, 0.35, 3.2),
+    new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 })
+  );
+  woodBridge.position.set(bridgePos.x, -0.9, bridgePos.z);
+  woodBridge.rotation.y = Math.atan2(brTan.x, brTan.z) + Math.PI / 2;
+  woodBridge.castShadow = true;
+  scene.add(woodBridge);
 
   // Nền đá cát ballast uốn cong theo tim ray (như ảnh 1 & 3)
   const ballastTube = new THREE.Mesh(
@@ -1782,7 +1984,7 @@ function buildNhaDieuHanhDK2() {
 
   waterKoiMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(6.4, 8.4),
-    new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.7, transparent: true, opacity: 0.85 })
+    createStylizedWaterMaterial(false)
   );
   waterKoiMesh.rotation.x = -Math.PI / 2;
   waterKoiMesh.position.set(cfg.width / 2 + 4.5, 0.55, 0);
@@ -2118,8 +2320,8 @@ function buildDK2HillAndOrchidGarden() {
   scene.add(pondRim);
 
   waterRoundPondMesh = new THREE.Mesh(
-    new THREE.CircleGeometry(pondCfg.radius, 24),
-    new THREE.MeshStandardMaterial({ color: pondCfg.waterColor, roughness: 0.1, metalness: 0.7, transparent: true, opacity: 0.85 })
+    new THREE.CircleGeometry(pondCfg.radius, 32),
+    createStylizedWaterMaterial(false)
   );
   waterRoundPondMesh.rotation.x = -Math.PI / 2;
   waterRoundPondMesh.position.set(pondCfg.position.x, pondCfg.position.y + pondCfg.height / 2 + 0.05, pondCfg.position.z);
@@ -2452,8 +2654,8 @@ function isForestExcludedZone(x, z) {
   if (x > 86 && x < 94 && z > -105 && z < 65) return true;
   // Đồng cỏ chăn thả đàn cừu sinh thái
   if (Math.hypot(x - 108, z - (-45)) < 15.5) return true;
-  // Ao cá đồi sinh thái và sàn gỗ câu cá DK2
-  if (Math.hypot(x - (-98), z - (-56)) < 14.0) return true;
+  // Ao cá đồi sinh thái và sàn gỗ câu cá DK2 (Mở rộng hồ theo yêu cầu)
+  if (Math.hypot(x - (-98), z - (-56)) < 21.5) return true;
   // Bãi nuôi đàn gà thả đồi và máng ăn DK2
   if (Math.hypot(x - (-112), z - (-36)) < 12.5) return true;
   // Hành lang an toàn đường ray tàu hỏa
@@ -4472,7 +4674,7 @@ function buildVolleyballCourt() {
 }
 
 // ============================================================================
-// Ao cá đồi sinh thái DK2 (Theo mũi tên ảnh 2)
+// Ao cá đồi sinh thái DK2 (Theo mũi tên ảnh 2 - Tăng kích thước lớn & Nước cách điệu)
 // ============================================================================
 function buildDK2HillPond() {
   const pondBaseX = -98;
@@ -4482,174 +4684,198 @@ function buildDK2HillPond() {
   pondGroup.position.set(pondBaseX, pondBaseY, pondBaseZ);
   pondGroup.userData = {
     id: 'aoCaDK2',
-    title: 'Ao cá đồi sinh thái DK2',
+    title: 'Ao cá đồi sinh thái DK2 (Hồ sinh thái mở rộng)',
     type: 'landscape',
-    desc: 'Hồ cá sinh thái tự nhiên trên sườn đồi bậc thang DK2, nguồn nước mát tự nhiên nuôi thả các loài cá Koi và cá chép cảnh. Điểm dừng chân thư giãn lý tưởng ngắm toàn cảnh nhà máy từ trên cao.',
+    desc: 'Hồ cá sinh thái tự nhiên trên sườn đồi bậc thang DK2 được mở rộng quy mô lớn, nguồn nước trong xanh mát lành nuôi thả các loài cá Koi và cá chép Nhật. Điểm dừng chân thư giãn có sàn gỗ ngắm toàn cảnh khuôn viên nhà máy.',
     zone: 'DK2',
   };
 
+  const hpCfg = CONFIG.WATER.hillPond;
+  const radiusX = hpCfg.radiusX; // 16.5m
+  const radiusZ = hpCfg.radiusZ; // 12.0m
+
   // Bệ kè đá bậc thang đồi nâng đỡ lòng hồ kiên cố
-  const terraceGeo = new THREE.CylinderGeometry(9.6, 11.2, 3.2, 28);
+  const terraceGeo = new THREE.CylinderGeometry(hpCfg.terraceRadius, hpCfg.terraceRadius + 2.5, hpCfg.terraceHeight, 36);
   const terraceMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9, flatShading: true });
   const terraceBase = new THREE.Mesh(terraceGeo, terraceMat);
-  terraceBase.position.y = -1.6;
+  terraceBase.position.y = -hpCfg.terraceHeight / 2;
   terraceBase.receiveShadow = true;
   pondGroup.add(terraceBase);
 
-  // 1. Natural Granite Boulder Retaining Rim
+  // 1. Natural Granite & Mossy Boulder Retaining Rim (48 tảng đá viền hồ tự nhiên)
   const boulderMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.9, flatShading: true });
   const mossMat = new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.85, flatShading: true });
-  const boulderGeo = new THREE.DodecahedronGeometry(0.9, 1);
-  const boulderCount = 26;
-  const radiusX = 8.5;
-  const radiusZ = 6.2;
+  const boulderGeo = new THREE.DodecahedronGeometry(1.0, 1);
+  const boulderCount = 48;
 
   for (let i = 0; i < boulderCount; i++) {
     const angle = (i / boulderCount) * Math.PI * 2;
-    const bx = Math.cos(angle) * (radiusX + (Math.sin(angle * 3) * 0.6));
-    const bz = Math.sin(angle) * (radiusZ + (Math.cos(angle * 2) * 0.5));
-    const s = 0.75 + Math.random() * 0.45;
+    const bx = Math.cos(angle) * (radiusX + Math.sin(angle * 4) * 0.75);
+    const bz = Math.sin(angle) * (radiusZ + Math.cos(angle * 3) * 0.65);
+    const s = 0.85 + Math.random() * 0.6;
 
     const boulder = new THREE.Mesh(boulderGeo, i % 3 === 0 ? mossMat : boulderMat);
-    boulder.position.set(bx, (Math.random() - 0.5) * 0.2, bz);
+    boulder.position.set(bx, (Math.random() - 0.5) * 0.25, bz);
     boulder.scale.set(s, s * 0.8, s);
-    boulder.rotation.set(Math.random(), Math.random(), Math.random());
+    boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
     boulder.castShadow = true;
     boulder.receiveShadow = true;
     pondGroup.add(boulder);
   }
 
-  // 2. Crystal Emerald Water Surface
-  const waterGeo = new THREE.CircleGeometry(radiusX - 0.4, 32);
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x0284c7, // Vibrant azure mountain water
-    roughness: 0.08,
-    metalness: 0.65,
-    transparent: true,
-    opacity: 0.88,
+  // 2. Bờ cát thoai thoải viền trong bờ đá hồ cá
+  const sandRimGeo = new THREE.RingGeometry(radiusX - 1.5, radiusX + 0.2, 48);
+  const sandRimMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.GROUND.sandColor,
+    roughness: 0.95,
+    side: THREE.DoubleSide,
   });
+  const sandRim = new THREE.Mesh(sandRimGeo, sandRimMat);
+  sandRim.rotation.x = -Math.PI / 2;
+  sandRim.scale.set(1.0, radiusZ / radiusX, 1.0);
+  sandRim.position.y = 0.04;
+  sandRim.receiveShadow = true;
+  pondGroup.add(sandRim);
+
+  // 3. Mặt nước hồ cách điệu (Stylized Shader Nước với Gradient độ sâu & Vệt Caustics)
+  const waterGeo = new THREE.CircleGeometry(radiusX - 0.2, 48);
+  const waterMat = createStylizedWaterMaterial(false);
   hillPondWater = new THREE.Mesh(waterGeo, waterMat);
   hillPondWater.rotation.x = -Math.PI / 2;
   hillPondWater.scale.set(1.0, radiusZ / radiusX, 1.0);
   hillPondWater.position.y = 0.08;
   pondGroup.add(hillPondWater);
 
-  // 3. Floating Lotus Pads & Pink Blossoms
+  // 4. 24 Floating Lotus Pads & 10 Pink Blossoms (Quần thể hoa sen & lá súng mặt nước)
   const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7, flatShading: true });
   const flowerMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.5 });
   const centerMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
-  for (let l = 0; l < 12; l++) {
-    const lang = (l / 12) * Math.PI * 2 + Math.random() * 0.4;
-    const lradX = (radiusX * 0.3) + Math.random() * (radiusX * 0.45);
-    const lradZ = (radiusZ * 0.3) + Math.random() * (radiusZ * 0.45);
+  for (let l = 0; l < 24; l++) {
+    const lang = (l / 24) * Math.PI * 2 + Math.random() * 0.3;
+    const lradX = (radiusX * 0.25) + Math.random() * (radiusX * 0.55);
+    const lradZ = (radiusZ * 0.25) + Math.random() * (radiusZ * 0.55);
     const lx = Math.cos(lang) * lradX;
     const lz = Math.sin(lang) * lradZ;
 
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.02, 7), leafMat);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.02, 7), leafMat);
     pad.position.set(lx, 0.10, lz);
     pad.rotation.y = Math.random() * Math.PI;
     pondGroup.add(pad);
 
-    // 5 Lotus Flowers
     if (l % 2 === 0) {
       const fl = new THREE.Group();
       fl.position.set(lx, 0.12, lz);
       for (let p = 0; p < 6; p++) {
-        const petal = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.15, 4), flowerMat);
+        const petal = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 4), flowerMat);
         petal.rotation.z = Math.PI / 4;
         petal.rotation.y = (p / 6) * Math.PI * 2;
         fl.add(petal);
       }
-      const stamen = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), centerMat);
-      stamen.position.y = 0.06;
+      const stamen = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), centerMat);
+      stamen.position.y = 0.07;
       fl.add(stamen);
       pondGroup.add(fl);
     }
   }
 
-  // 4. Wooden Viewing Deck & Footbridge
+  // 5. Sàn gỗ ngắm cảnh & Cầu tàu câu cá nhô ra mặt hồ (Wooden Viewing Deck)
   const timberMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 });
   const deckGroup = new THREE.Group();
-  deckGroup.position.set(radiusX * 0.55, 0.15, -radiusZ * 0.2);
+  deckGroup.position.set(radiusX * 0.62, 0.15, -radiusZ * 0.15);
 
-  // Deck floor
-  const deckFloor = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.08, 4.0), timberMat);
+  // Deck floor (6.0m x 4.8m)
+  const deckFloor = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.10, 5.0), timberMat);
   deckFloor.receiveShadow = true;
   deckGroup.add(deckFloor);
 
   // Deck pilings
   const pileMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9 });
   [
-    { x: -1.6, z: -1.8 },
-    { x: 1.6, z: -1.8 },
-    { x: -1.6, z: 1.8 },
-    { x: 1.6, z: 1.8 },
+    { x: -2.3, z: -2.2 },
+    { x: 2.3, z: -2.2 },
+    { x: -2.3, z: 2.2 },
+    { x: 2.3, z: 2.2 },
+    { x: 0, z: -2.2 },
+    { x: 0, z: 2.2 },
   ].forEach((pp) => {
-    const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.4, 6), pileMat);
-    pile.position.set(pp.x, -0.65, pp.z);
+    const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.8, 6), pileMat);
+    pile.position.set(pp.x, -0.85, pp.z);
     deckGroup.add(pile);
   });
 
   // Deck railings
-  const railPostGeo = new THREE.BoxGeometry(0.06, 0.9, 0.06);
-  const railBarGeo = new THREE.BoxGeometry(0.04, 0.06, 4.0);
+  const railPostGeo = new THREE.BoxGeometry(0.08, 0.95, 0.08);
+  const railBarGeo = new THREE.BoxGeometry(0.05, 0.08, 5.0);
   const railPost1 = new THREE.Mesh(railPostGeo, timberMat);
-  railPost1.position.set(-1.7, 0.45, -1.9);
+  railPost1.position.set(-2.5, 0.48, -2.4);
   deckGroup.add(railPost1);
   const railPost2 = new THREE.Mesh(railPostGeo, timberMat);
-  railPost2.position.set(-1.7, 0.45, 1.9);
+  railPost2.position.set(-2.5, 0.48, 2.4);
   deckGroup.add(railPost2);
   const handrail = new THREE.Mesh(railBarGeo, timberMat);
-  handrail.position.set(-1.7, 0.85, 0);
+  handrail.position.set(-2.5, 0.9, 0);
   deckGroup.add(handrail);
 
-  // Friendly Caretaker in conical hat feeding fish
+  // Đèn lồng gỗ trên góc sàn ngắm cảnh
+  const lanternMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+  const lanternPost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 6), lanternMat);
+  lanternPost.position.set(-2.4, 0.7, 2.3);
+  deckGroup.add(lanternPost);
+  const lanternGlow = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.28, 0.24), glowMat);
+  lanternGlow.position.set(-2.4, 1.4, 2.3);
+  deckGroup.add(lanternGlow);
+
+  // Người nông dân đội nón lá đang rắc thức ăn cho cá
   const feeder = createCharacter({
     shirtColor: 0x16a34a,
     pantsColor: 0x334155,
     hatType: 'conical',
     role: 'farmer',
   });
-  feeder.position.set(-1.2, 0.04, 0);
+  feeder.position.set(-1.8, 0.05, 0);
   feeder.rotation.y = -Math.PI / 2;
   deckGroup.add(feeder);
 
   pondGroup.add(deckGroup);
 
-  // 5. 8 Animated Low-Poly Koi Fish
+  // 6. 16 Animated Low-Poly Koi Fish (Đàn cá Koi 16 con tung tăng bơi lội vòng quanh hồ)
   const koiColors = [
     { name: 'Kohaku', body: 0xffffff, spot: 0xef4444 }, // White & Red
     { name: 'Sanke', body: 0xffffff, spot: 0x0f172a }, // White & Black
     { name: 'Ogon', body: 0xf59e0b, spot: 0xfbbf24 }, // Golden
     { name: 'Hi Utsuri', body: 0xdc2626, spot: 0x18181b }, // Red & Black
+    { name: 'Showa', body: 0x18181b, spot: 0xef4444 }, // Black & Red
+    { name: 'Shiro', body: 0xffffff, spot: 0x334155 }, // White & Gray
   ];
 
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 16; k++) {
     const fGroup = new THREE.Group();
     const colorInfo = koiColors[k % koiColors.length];
     const bodyMat = new THREE.MeshStandardMaterial({ color: colorInfo.body, roughness: 0.35 });
     const spotMat = new THREE.MeshStandardMaterial({ color: colorInfo.spot, roughness: 0.35 });
 
     // Sleek koi body
-    const body = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.52, 6), bodyMat);
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.6, 6), bodyMat);
     body.rotation.x = Math.PI / 2;
     fGroup.add(body);
 
     // Color spot on back
-    const spot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.22), spotMat);
-    spot.position.set(0, 0.05, 0.05);
+    const spot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.26), spotMat);
+    spot.position.set(0, 0.06, 0.06);
     fGroup.add(spot);
 
     // Fin & Tail
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.18), spotMat);
-    tail.position.set(0, 0, -0.32);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.18, 0.22), spotMat);
+    tail.position.set(0, 0, -0.36);
     fGroup.add(tail);
 
-    const orbitRadiusX = 3.0 + (k % 4) * 1.1;
-    const orbitRadiusZ = 2.0 + (k % 4) * 0.8;
-    const speed = 0.5 + Math.random() * 0.3;
-    const initialAngle = (k / 8) * Math.PI * 2;
+    // Phân bổ bán kính bơi lội phủ đều hồ lớn 16.5m x 12.0m
+    const orbitRadiusX = 4.2 + (k % 5) * 2.2 + (k > 8 ? 1.0 : 0);
+    const orbitRadiusZ = 3.0 + (k % 5) * 1.6 + (k > 8 ? 0.7 : 0);
+    const speed = 0.45 + (k % 4) * 0.12;
+    const initialAngle = (k / 16) * Math.PI * 2;
 
     pondGroup.add(fGroup);
     hillPondKoiFishes.push({
@@ -4661,8 +4887,8 @@ function buildDK2HillPond() {
       radiusZ: orbitRadiusZ,
       speed: speed,
       angle: initialAngle,
-      baseY: -0.05 - (k % 3) * 0.04,
-      phase: k * 1.5,
+      baseY: -0.05 - (k % 4) * 0.04,
+      phase: k * 1.4,
     });
   }
 
@@ -5960,6 +6186,11 @@ function setupEventListeners() {
       isRaining = !isRaining;
       rainBtn.classList.toggle('active', isRaining);
       if (rainParticles) rainParticles.visible = isRaining;
+      stylizedWaterMaterials.forEach((m) => {
+        if (m.uniforms && m.uniforms.uIsRaining) {
+          m.uniforms.uIsRaining.value = isRaining ? 1.0 : 0.0;
+        }
+      });
     });
   }
 
