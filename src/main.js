@@ -49,10 +49,12 @@ let volleyballPlayers = [];
 let volleyballRallyProgress = 0;
 let volleyballCourtGroup;
 
-// DK2 Hillside Eco-Pond & Chickens
+// DK2 Hillside Eco-Pond, Chickens & Pigeons
 let hillPondKoiFishes = [];
 let hillPondWater;
 let hillChickens = [];
+let hillPigeons = [];
+let flyingPigeonsGroup, flyingPigeonMeshes = [];
 
 // Interactive Objects, Doors & Activities
 let interactiveObjects = [];
@@ -452,14 +454,22 @@ function getDK2HillSurfaceY(x, z) {
     if (y1 > maxY) maxY = y1;
   }
 
-  // 2. Đồi mới phía Tây Nam (Khu chuồng gà & đàn gà thả đồi theo khoanh tròn đỏ)
+  // 2. Đồi mới sinh thái (Đồi gà & bồ câu to hơn đồi vườn lan, đỉnh phẳng rộng lớn)
   if (CONFIG.HILLS.dk2NewHill) {
-    const hx2 = CONFIG.HILLS.dk2NewHill.position.x; // -142
+    const hx2 = CONFIG.HILLS.dk2NewHill.position.x; // -148
     const hz2 = CONFIG.HILLS.dk2NewHill.position.z; // -38
-    const r2 = CONFIG.HILLS.dk2NewHill.radius;     // 34
+    const r2 = CONFIG.HILLS.dk2NewHill.radius;     // 66m (to hơn đồi chính 54m)
+    const flatR = CONFIG.HILLS.dk2NewHill.flatRadius || 24; // 24m đỉnh phẳng
+    const apex2 = CONFIG.HILLS.dk2NewHill.height || 18.5;   // 18.5m cao độ
     const dist2 = Math.hypot(x - hx2, z - hz2);
     if (dist2 < r2) {
-      const y2 = -1.0 + 15.5 * (1 - dist2 / r2);
+      let y2;
+      if (dist2 <= flatR) {
+        y2 = apex2; // Đỉnh phẳng hoàn hảo để đi dạo, trồng hoa và nuôi chim gà
+      } else {
+        const slopeT = (dist2 - flatR) / (r2 - flatR);
+        y2 = -0.5 + (apex2 + 0.5) * Math.pow(1.0 - slopeT, 1.15); // Sườn dốc thoai thoải
+      }
       if (y2 > maxY) maxY = y2;
     }
   }
@@ -2313,14 +2323,17 @@ function buildDK2HillAndOrchidGarden() {
   hill.receiveShadow = true;
   scene.add(hill);
 
-  // 2. Đồi mới chuồng gà DK2 (Theo khoanh tròn đỏ trên ảnh phía Tây Nam)
+  // 2. Đồi mới sinh thái (To hơn đồi chính, đỉnh phẳng rộng lớn để đi dạo, trồng hoa và nuôi chim gà)
   if (CONFIG.HILLS.dk2NewHill) {
     const nhCfg = CONFIG.HILLS.dk2NewHill;
+    const flatR = nhCfg.flatRadius || 24;
+    const baseR = nhCfg.radius || 66;
+    const h = nhCfg.height || 18.5;
     const newHill = new THREE.Mesh(
-      new THREE.ConeGeometry(nhCfg.radius, nhCfg.height, 11),
+      new THREE.CylinderGeometry(flatR, baseR, h, 20),
       new THREE.MeshStandardMaterial({ color: nhCfg.color, roughness: 0.9, flatShading: true })
     );
-    newHill.position.set(nhCfg.position.x, nhCfg.height / 2 - 1.5, nhCfg.position.z);
+    newHill.position.set(nhCfg.position.x, h / 2 - 0.2, nhCfg.position.z);
     newHill.receiveShadow = true;
     scene.add(newHill);
   }
@@ -2358,7 +2371,7 @@ function buildDK2HillAndOrchidGarden() {
 function buildDK2EcoTrail() {
   const trailGroup = new THREE.Group();
 
-  // 10 điểm uốn lượn tự nhiên theo địa hình kết nối liên hoàn 4 điểm đến
+  // 12 điểm uốn lượn tự nhiên theo địa hình kết nối liên hoàn: Sân DK2 -> Vườn Lan -> Ao Cá -> Đỉnh đồi phẳng
   const trailPoints = [
     new THREE.Vector3(-92, 0.2, -48),    // 1. Chân đồi / Cuối sân xe thành phẩm DK2
     new THREE.Vector3(-96, 3.8, -58),    // 2. Leo dốc thoai thoải
@@ -2367,15 +2380,17 @@ function buildDK2EcoTrail() {
     new THREE.Vector3(-108, 15.6, -88),  // 5. Đến sảnh Vườn Lan trên đồi
     new THREE.Vector3(-118, 16.6, -84),  // 6. Lối dạo sỏi nối Vườn Lan qua Ao Cá
     new THREE.Vector3(-126, 17.2, -78),  // 7. Đến bờ Ao Cá đồi sinh thái & sàn gỗ
-    new THREE.Vector3(-133, 15.5, -64),  // 8. Uốn qua yên ngựa sườn núi
-    new THREE.Vector3(-137, 11.8, -50),  // 9. Xuống dốc thoai thoải sang Đồi mới
-    new THREE.Vector3(-140, 8.8, -36),   // 10. Đến khu chuồng gà & đồng cỏ thả đồi
+    new THREE.Vector3(-134, 17.6, -64),  // 8. Uốn qua yên ngựa sườn núi
+    new THREE.Vector3(-140, 18.2, -50),  // 9. Lên đồi mới sinh thái
+    new THREE.Vector3(-145, 18.5, -42),  // 10. Chạm đỉnh đồi phẳng rộng lớn (+18.5m)
+    new THREE.Vector3(-148, 18.5, -34),  // 11. Đường dạo qua thảm hoa rực rỡ
+    new THREE.Vector3(-153, 18.5, -28),  // 12. Vòng qua tháp bồ câu & chuồng gà đồi
   ];
 
   const trailCurve = new THREE.CatmullRomCurve3(trailPoints);
 
   // Thân đường mòn lát sỏi dăm & đá phiến tự nhiên (Rustic Stone/Gravel Path)
-  const trailGeo = new THREE.TubeGeometry(trailCurve, 120, 1.25, 4, false);
+  const trailGeo = new THREE.TubeGeometry(trailCurve, 140, 1.25, 4, false);
   const trailMat = new THREE.MeshStandardMaterial({
     color: 0xd6d3d1, // Đá phiến xám sáng tự nhiên
     roughness: 0.92,
@@ -2389,7 +2404,7 @@ function buildDK2EcoTrail() {
   // Bờ viền cọc gỗ Rustic & Cọc đèn solar dẫn đường ban đêm
   const stakeMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
   const lanternMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-  const sampleCount = 36;
+  const sampleCount = 42;
 
   for (let s = 0; s <= sampleCount; s++) {
     const t = s / sampleCount;
@@ -2410,11 +2425,12 @@ function buildDK2EcoTrail() {
     }
   }
 
-  // 3 Biển chỉ dẫn sinh thái bằng gỗ (Directional Trail Signposts)
+  // 4 Biển chỉ dẫn sinh thái bằng gỗ (Directional Trail Signposts)
   const signLocations = [
     { pt: new THREE.Vector3(-92, 0.2, -46), rotY: 0 },
     { pt: new THREE.Vector3(-110, 15.6, -85), rotY: Math.PI / 4 },
     { pt: new THREE.Vector3(-128, 17.2, -76), rotY: -Math.PI / 3 },
+    { pt: new THREE.Vector3(-144, 18.5, -42), rotY: -Math.PI / 4 },
   ];
 
   signLocations.forEach((sg) => {
@@ -2728,8 +2744,8 @@ function isForestExcludedZone(x, z) {
   if (Math.hypot(x - (-108), z - (-88)) < 16.0) return true;
   // Ao cá đồi sinh thái DK2 vị trí mới cạnh Vườn Lan (-132, -76)
   if (Math.hypot(x - (-132), z - (-76)) < 21.5) return true;
-  // Bãi nuôi đàn gà trên Đồi mới DK2 (-138, -34)
-  if (Math.hypot(x - (-138), z - (-34)) < 16.0) return true;
+  // Đỉnh đồi phẳng rộng lớn Đồi Gà & Bồ Câu DK2 (-148, -38)
+  if (Math.hypot(x - (-148), z - (-38)) < 26.0) return true;
   // Tuyến đường mòn sinh thái DK2 (Hành lang đi bộ không bị cây chắn)
   const trailWaypoints = [
     [-92, -48], [-97, -58], [-102, -70], [-106, -80],
@@ -4983,55 +4999,290 @@ function buildDK2HillPond() {
 }
 
 // ============================================================================
-// Đàn gà thả đồi sinh thái DK2 (Dịch chuyển sang Đồi mới theo hướng mũi tên)
+// Đồi Sinh Thái Mới DK2: Vườn Hoa Rực Rỡ, Đàn Gà & Đàn Chim Bồ Câu Châu Âu
 // ============================================================================
 function buildFreeRangeChickens() {
-  const flockBaseX = -138;
-  const flockBaseZ = -34;
-  const flockBaseY = getDK2HillSurfaceY(flockBaseX, flockBaseZ) + 0.1; // ~ 8.5m trên Đồi mới
+  const flockBaseX = -148;
+  const flockBaseZ = -38;
+  const flockBaseY = 18.5; // Đỉnh đồi phẳng rộng lớn (+18.5m)
   const flockGroup = new THREE.Group();
   flockGroup.position.set(flockBaseX, flockBaseY, flockBaseZ);
   flockGroup.userData = {
     id: 'doiGaDK2',
-    title: 'Đàn gà thả đồi mới DK2 (Đồi sinh thái)',
+    title: 'Đồi sinh thái DK2: Vườn hoa, Đàn gà & Chim bồ câu',
     type: 'livestock',
-    desc: 'Mô hình nông nghiệp sinh thái tuần hoàn trên ngọn đồi mới DK2 theo hướng mũi tên. Đàn gà thả tự nhiên trên thảm cỏ xanh, có chuồng gỗ ấm áp và máng ăn thóc vàng óng.',
+    desc: 'Đỉnh đồi phẳng rộng lớn kiểu mẫu: Vườn hoa khoe sắc, tháp chuồng chim bồ câu châu Âu 2 tầng và khu chăn thả đàn gà tự nhiên trên thảm cỏ xanh.',
     zone: 'DK2',
   };
 
-  // 1. Rustic Wooden Chicken Coop / Shelter (Chuồng gà gỗ mái rơm)
-  const coopMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
-  const strawMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85, flatShading: true });
+  // Shared Materials
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
+  const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
+  const roofRedMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.75, flatShading: true });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0xa8a29e, roughness: 0.9, flatShading: true });
+  const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.9 });
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.85 });
+  const cornMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  const waterMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.1 });
 
-  const coopY = getDK2HillSurfaceY(-4.0 + flockBaseX, -3.0 + flockBaseZ) - flockBaseY;
-  const coopWall = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.0, 2.6), coopMat);
-  coopWall.position.set(-4.0, coopY + 1.0, -3.0);
-  coopWall.castShadow = true;
-  flockGroup.add(coopWall);
-
-  const coopRoof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.4, 4), strawMat);
-  coopRoof.rotation.y = Math.PI / 4;
-  coopRoof.position.set(-4.0, coopY + 2.5, -3.0);
-  coopRoof.castShadow = true;
-  flockGroup.add(coopRoof);
-
-  // Feeding trough with corn grains
-  const trY = getDK2HillSurfaceY(-1.8 + flockBaseX, -1.5 + flockBaseZ) - flockBaseY;
-  const trough = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.25, 0.45), coopMat);
-  trough.position.set(-1.8, trY + 0.12, -1.5);
-  flockGroup.add(trough);
-
-  const corn = new THREE.Mesh(
-    new THREE.BoxGeometry(2.0, 0.10, 0.35),
-    new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+  // --------------------------------------------------------------------------
+  // 1. Thảm cỏ xanh mượt đỉnh đồi & Lối đi dạo đá phiến (Flat Plateau Walkways)
+  // --------------------------------------------------------------------------
+  const plateauLawn = new THREE.Mesh(
+    new THREE.CircleGeometry(23.5, 32),
+    new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 })
   );
-  corn.position.set(-1.8, trY + 0.25, -1.5);
-  flockGroup.add(corn);
+  plateauLawn.rotation.x = -Math.PI / 2;
+  plateauLawn.position.y = 0.02;
+  plateauLawn.receiveShadow = true;
+  flockGroup.add(plateauLawn);
 
-  // 2. 12 Low-Poly Chickens & Roosters
+  // Stepping stone pathways connecting garden zones
+  const stonePavingPositions = [
+    // Lối vào từ đường mòn
+    { x: 3.5, z: -4.0, s: 1.4 }, { x: 2.2, z: -3.0, s: 1.3 }, { x: 1.0, z: -2.0, s: 1.5 },
+    // Quảng trường trung tâm
+    { x: 0, z: 0, s: 2.2 }, { x: -1.2, z: 0.8, s: 1.8 }, { x: 1.2, z: 0.5, s: 1.7 },
+    // Rẽ sang tháp bồ câu
+    { x: 2.8, z: -0.8, s: 1.3 }, { x: 4.5, z: -1.5, s: 1.4 }, { x: 6.0, z: -2.0, s: 1.6 },
+    // Rẽ sang khu vườn hoa
+    { x: -0.5, z: 2.6, s: 1.3 }, { x: -0.8, z: 4.5, s: 1.4 }, { x: 1.2, z: 3.8, s: 1.3 },
+    { x: 2.5, z: 5.5, s: 1.5 }, { x: -2.5, z: 5.2, s: 1.4 },
+    // Rẽ sang khu chuồng gà
+    { x: -2.8, z: -1.0, s: 1.3 }, { x: -4.8, z: -1.8, s: 1.4 }, { x: -6.8, z: -2.5, s: 1.5 },
+    // Rẽ sang chòi nghỉ ngắm cảnh
+    { x: -3.5, z: 2.0, s: 1.2 }, { x: -6.0, z: 3.8, s: 1.4 }, { x: -8.5, z: 5.2, s: 1.6 },
+  ];
+
+  const stoneGeo = new THREE.CylinderGeometry(0.65, 0.72, 0.08, 7);
+  stonePavingPositions.forEach((sp) => {
+    const slab = new THREE.Mesh(stoneGeo, stoneMat);
+    slab.position.set(sp.x, 0.05, sp.z);
+    slab.scale.set(sp.s, 1.0, sp.s);
+    slab.rotation.y = Math.random() * Math.PI;
+    slab.receiveShadow = true;
+    flockGroup.add(slab);
+  });
+
+  // Chòi nghỉ chân & Ghế gỗ ngắm cảnh đỉnh đồi (Pergola & Bench)
+  const pergola = new THREE.Group();
+  pergola.position.set(-9.5, 0, 5.8);
+  pergola.rotation.y = Math.PI / 4;
+
+  // 4 cột gỗ
+  const colGeo = new THREE.CylinderGeometry(0.08, 0.09, 2.6, 6);
+  [[-1.4, -0.9], [1.4, -0.9], [-1.4, 0.9], [1.4, 0.9]].forEach(([cx, cz]) => {
+    const col = new THREE.Mesh(colGeo, darkWoodMat);
+    col.position.set(cx, 1.3, cz);
+    col.castShadow = true;
+    pergola.add(col);
+  });
+  // Xà ngang pergola
+  const beamMat = new THREE.MeshStandardMaterial({ color: 0x5c2b0e, roughness: 0.8 });
+  for (let b = -1.5; b <= 1.5; b += 0.6) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 2.2), beamMat);
+    beam.position.set(b, 2.65, 0);
+    beam.castShadow = true;
+    pergola.add(beam);
+  }
+  // Ghế băng gỗ
+  const benchSeat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.6), woodMat);
+  benchSeat.position.set(0, 0.45, -0.4);
+  benchSeat.castShadow = true;
+  pergola.add(benchSeat);
+  const benchBack = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.45, 0.08), woodMat);
+  benchBack.position.set(0, 0.85, -0.68);
+  benchBack.castShadow = true;
+  pergola.add(benchBack);
+  flockGroup.add(pergola);
+
+  // --------------------------------------------------------------------------
+  // 2. Vườn hoa rực rỡ đỉnh đồi (Flower Gardens: Marigolds, Lavender, Roses, Daisies)
+  // --------------------------------------------------------------------------
+  const flowerBedGroup = new THREE.Group();
+
+  // Helper: Tạo luống hoa với viền đá cuội
+  const createFlowerBed = (bx, bz, radius, flowerTypes) => {
+    const bed = new THREE.Group();
+    bed.position.set(bx, 0, bz);
+
+    // Đất nâu phì nhiêu
+    const soil = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius + 0.2, 0.22, 16),
+      new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.95 })
+    );
+    soil.position.y = 0.11;
+    soil.receiveShadow = true;
+    bed.add(soil);
+
+    // Viền đá cuội mộc mạc quanh bồn hoa
+    const borderStonesCount = Math.floor(radius * 10);
+    const borderStoneGeo = new THREE.DodecahedronGeometry(0.18, 0);
+    for (let bs = 0; bs < borderStonesCount; bs++) {
+      const angle = (bs / borderStonesCount) * Math.PI * 2;
+      const bStone = new THREE.Mesh(borderStoneGeo, darkStoneMat);
+      bStone.position.set(Math.cos(angle) * (radius + 0.15), 0.12, Math.sin(angle) * (radius + 0.15));
+      bStone.scale.set(1.0 + Math.random() * 0.4, 0.8, 1.0 + Math.random() * 0.4);
+      bStone.castShadow = true;
+      bed.add(bStone);
+    }
+
+    // Các khóm hoa rực rỡ
+    const flowerGeo = new THREE.SphereGeometry(0.14, 6, 5);
+    const leafGeo = new THREE.ConeGeometry(0.18, 0.35, 4);
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+
+    const numFlowers = Math.floor(radius * radius * 14);
+    for (let f = 0; f < numFlowers; f++) {
+      const r = Math.sqrt(Math.random()) * (radius * 0.88);
+      const theta = Math.random() * Math.PI * 2;
+      const fx = Math.cos(theta) * r;
+      const fz = Math.sin(theta) * r;
+      const fType = flowerTypes[f % flowerTypes.length];
+
+      // Cuống lá
+      const leaves = new THREE.Mesh(leafGeo, stemMat);
+      leaves.position.set(fx, 0.22 + Math.random() * 0.08, fz);
+      leaves.rotation.y = Math.random() * Math.PI;
+      bed.add(leaves);
+
+      // Bông hoa màu sắc
+      const bloomMat = new THREE.MeshStandardMaterial({
+        color: fType.color,
+        roughness: 0.6,
+        flatShading: true,
+      });
+      const bloom = new THREE.Mesh(flowerGeo, bloomMat);
+      bloom.position.set(fx, leaves.position.y + 0.15, fz);
+      bloom.scale.set(fType.scale, fType.scale * 0.9, fType.scale);
+      bloom.castShadow = true;
+      bed.add(bloom);
+    }
+    return bed;
+  };
+
+  // Vườn 1: Cúc Vạn Thọ vàng óng & hoa cam rực rỡ (Zone A)
+  flowerBedGroup.add(createFlowerBed(2.8, 6.5, 3.2, [
+    { color: 0xfacc15, scale: 1.25 }, // Cúc vàng chanh
+    { color: 0xf59e0b, scale: 1.35 }, // Vàng nghệ
+    { color: 0xf97316, scale: 1.15 }, // Cam tươi
+  ]));
+
+  // Vườn 2: Cẩm Tú Cầu Tím & Oải Hương Lavender (Zone B)
+  flowerBedGroup.add(createFlowerBed(-2.5, 7.5, 2.8, [
+    { color: 0xa855f7, scale: 1.4 },  // Tím hoa cà
+    { color: 0x8b5cf6, scale: 1.3 },  // Tím oải hương
+    { color: 0xc084fc, scale: 1.2 },  // Tím phấn
+  ]));
+
+  // Vườn 3: Hoa Hồng Nhung Đỏ & Cúc Họa Mi Trắng (Zone C)
+  flowerBedGroup.add(createFlowerBed(7.5, 4.2, 2.5, [
+    { color: 0xbe123c, scale: 1.3 },  // Hồng nhung đỏ
+    { color: 0xf43f5e, scale: 1.2 },  // Hồng thắm
+    { color: 0xffffff, scale: 1.1 },  // Cúc họa mi trắng
+    { color: 0xfde047, scale: 0.9 },  // Nhụy vàng
+  ]));
+
+  // Vườn 4: Luống hoa dại ngũ sắc đón khách dọc lối vào (Zone D)
+  flowerBedGroup.add(createFlowerBed(-5.8, -6.5, 2.6, [
+    { color: 0xec4899, scale: 1.2 },
+    { color: 0xfbbf24, scale: 1.1 },
+    { color: 0x38bdf8, scale: 1.1 },
+    { color: 0xffffff, scale: 1.2 },
+  ]));
+
+  flockGroup.add(flowerBedGroup);
+
+  // --------------------------------------------------------------------------
+  // 3. Khu Chăn Thả Đàn Gà Đồi (Chicken Farm, Rustic Wooden Coop, Fence & Flock)
+  // --------------------------------------------------------------------------
+  const chickenYard = new THREE.Group();
+  chickenYard.position.set(-8.5, 0, -3.5);
+
+  // Chuồng gà gỗ lớn mái ngói đỏ (Rustic Chicken Coop)
+  const coopWall = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.2, 3.0), woodMat);
+  coopWall.position.set(0, 1.3, 0);
+  coopWall.castShadow = true;
+  chickenYard.add(coopWall);
+
+  // Mái ngói đôi dốc cao
+  const coopRoof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.4, 4), roofRedMat);
+  coopRoof.rotation.y = Math.PI / 4;
+  coopRoof.position.set(0, 2.8, 0);
+  coopRoof.scale.set(1.15, 1.0, 1.35);
+  coopRoof.castShadow = true;
+  chickenYard.add(coopRoof);
+
+  // Cửa chuồng gà & Cầu thang gỗ cho gà leo vào tổ
+  const coopDoor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 0.9, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x1f2937 })
+  );
+  coopDoor.position.set(1.0, 0.65, 1.54);
+  chickenYard.add(coopDoor);
+
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.06, 1.4), darkWoodMat);
+  ramp.position.set(1.0, 0.28, 2.15);
+  ramp.rotation.x = Math.PI / 8;
+  ramp.castShadow = true;
+  chickenYard.add(ramp);
+
+  // Hàng rào gỗ mộc chăn thả (Split-rail wooden fence)
+  const fenceMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.9 });
+  const fencePostGeo = new THREE.CylinderGeometry(0.06, 0.07, 1.1, 5);
+  const fenceRailGeo = new THREE.BoxGeometry(2.4, 0.08, 0.05);
+
+  const fencePoints = [
+    [-3.2, 2.8], [-0.8, 3.2], [1.6, 3.2], [4.0, 2.8],
+    [4.8, 0.8], [4.8, -1.6], [4.0, -3.2],
+  ];
+  fencePoints.forEach(([fx, fz], idx) => {
+    const post = new THREE.Mesh(fencePostGeo, fenceMat);
+    post.position.set(fx, 0.55, fz);
+    post.castShadow = true;
+    chickenYard.add(post);
+
+    if (idx < fencePoints.length - 1) {
+      const next = fencePoints[idx + 1];
+      const mx = (fx + next[0]) / 2;
+      const mz = (fz + next[1]) / 2;
+      const angle = Math.atan2(next[1] - fz, next[0] - fx);
+      const len = Math.hypot(next[0] - fx, next[1] - fz);
+
+      [0.4, 0.8].forEach((ry) => {
+        const rail = new THREE.Mesh(fenceRailGeo, fenceMat);
+        rail.position.set(mx, ry, mz);
+        rail.rotation.y = -angle;
+        rail.scale.set(len / 2.4, 1.0, 1.0);
+        rail.castShadow = true;
+        chickenYard.add(rail);
+      });
+    }
+  });
+
+  // Máng ăn thóc dài & Máng nước
+  const trough = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.28, 0.5), woodMat);
+  trough.position.set(1.8, 0.14, 0.5);
+  chickenYard.add(trough);
+
+  const corn = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.4), cornMat);
+  corn.position.set(1.8, 0.26, 0.5);
+  chickenYard.add(corn);
+
+  const waterBasin = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.38, 0.22, 10), stoneMat);
+  waterBasin.position.set(0.6, 0.11, -1.6);
+  chickenYard.add(waterBasin);
+
+  const basinWater = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.05, 10), waterMat);
+  basinWater.position.set(0.6, 0.2, -1.6);
+  chickenYard.add(basinWater);
+
+  flockGroup.add(chickenYard);
+
+  // 12 Con gà (2 Gà trống, 6 Gà mái, 4 Gà con)
   const createChicken = (isRooster, isChick, colorHex) => {
     const chk = new THREE.Group();
-    const scale = isChick ? 0.55 : (isRooster ? 1.6 : 1.3);
+    const scale = isChick ? 0.55 : (isRooster ? 1.65 : 1.3);
 
     const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.75, flatShading: true });
     const redMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
@@ -5044,7 +5295,7 @@ function buildFreeRangeChickens() {
     body.castShadow = true;
     chk.add(body);
 
-    // Head & Neck group (rotates during pecking)
+    // Head & Neck
     const headGroup = new THREE.Group();
     headGroup.position.set(0, 0.48, 0.26);
 
@@ -5057,38 +5308,32 @@ function buildFreeRangeChickens() {
     beak.position.set(0, -0.02, 0.13);
     headGroup.add(beak);
 
-    // Red Comb
+    // Comb
     const comb = new THREE.Mesh(
-      new THREE.BoxGeometry(0.035, isRooster ? 0.16 : 0.08, isRooster ? 0.18 : 0.10),
+      new THREE.BoxGeometry(0.035, isRooster ? 0.18 : 0.08, isRooster ? 0.2 : 0.1),
       redMat
     );
-    comb.position.set(0, isRooster ? 0.14 : 0.09, 0.02);
+    comb.position.set(0, isRooster ? 0.15 : 0.09, 0.02);
     headGroup.add(comb);
 
-    // Wattles under beak (for roosters)
     if (isRooster) {
-      const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.09, 0.06), redMat);
+      const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.1, 0.06), redMat);
       wattle.position.set(0, -0.11, 0.09);
       headGroup.add(wattle);
-    }
 
-    chk.add(headGroup);
-
-    // Tail Feathers
-    if (isRooster) {
       // Magnificent arched sickle feathers
       const tailFeatherMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
       for (let tf = 0; tf < 3; tf++) {
-        const feather = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.42, 0.14), tailFeatherMat);
+        const feather = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.45, 0.15), tailFeatherMat);
         feather.rotation.x = -Math.PI / 3 - tf * 0.15;
         feather.rotation.y = (tf - 1) * 0.15;
         feather.position.set((tf - 1) * 0.04, 0.46, -0.35);
         chk.add(feather);
       }
     } else if (!isChick) {
-      const henTail = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.18, 0.12), bodyMat);
+      const henTail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.18, 0.12), bodyMat);
       henTail.rotation.x = -Math.PI / 4;
-      henTail.position.set(0, 0.42, -0.30);
+      henTail.position.set(0, 0.42, -0.3);
       chk.add(henTail);
     }
 
@@ -5104,31 +5349,27 @@ function buildFreeRangeChickens() {
     return { mesh: chk, head: headGroup };
   };
 
-  // Positions on the grassy hill slope
   const chickenConfigs = [
-    // 2 Roosters (Gà trống dũng mãnh)
-    { isRooster: true, isChick: false, color: 0xd97706, x: 0.5, z: 0.8, rot: 0.5 },
-    { isRooster: true, isChick: false, color: 0x9a3412, x: -3.2, z: 1.2, rot: -1.2 },
-    // 6 Hens (Gà mái béo tốt)
-    { isRooster: false, isChick: false, color: 0xd97706, x: -1.0, z: -0.5, rot: 1.8 },
-    { isRooster: false, isChick: false, color: 0x78350f, x: 1.8, z: -1.2, rot: -0.4 },
-    { isRooster: false, isChick: false, color: 0xf8fafc, x: -0.5, z: 2.2, rot: 2.4 },
-    { isRooster: false, isChick: false, color: 0xb45309, x: 2.5, z: 1.5, rot: -2.1 },
-    { isRooster: false, isChick: false, color: 0xd97706, x: -2.4, z: -1.8, rot: 0.8 },
-    { isRooster: false, isChick: false, color: 0xf8fafc, x: 3.2, z: -0.2, rot: -1.5 },
-    // 4 Baby Chicks (Gà con lon ton)
-    { isRooster: false, isChick: true, color: 0xfde047, x: -1.4, z: -0.8, rot: 1.2 },
-    { isRooster: false, isChick: true, color: 0xfde047, x: -1.1, z: -1.0, rot: 0.4 },
-    { isRooster: false, isChick: true, color: 0xfde047, x: -0.7, z: -0.7, rot: -0.8 },
-    { isRooster: false, isChick: true, color: 0xfde047, x: -0.9, z: -0.2, rot: 2.0 },
+    // 2 Gà trống oai vệ
+    { isRooster: true, isChick: false, color: 0xd97706, x: -6.5, z: -2.8, rot: 0.5 },
+    { isRooster: true, isChick: false, color: 0x9a3412, x: -10.2, z: -1.5, rot: -1.2 },
+    // 6 Gà mái béo tốt
+    { isRooster: false, isChick: false, color: 0xd97706, x: -7.5, z: -3.8, rot: 1.8 },
+    { isRooster: false, isChick: false, color: 0x78350f, x: -5.8, z: -4.5, rot: -0.4 },
+    { isRooster: false, isChick: false, color: 0xf8fafc, x: -8.0, z: -1.2, rot: 2.4 },
+    { isRooster: false, isChick: false, color: 0xb45309, x: -5.0, z: -2.0, rot: -2.1 },
+    { isRooster: false, isChick: false, color: 0xd97706, x: -9.5, z: -4.2, rot: 0.8 },
+    { isRooster: false, isChick: false, color: 0xf8fafc, x: -4.2, z: -3.5, rot: -1.5 },
+    // 4 Gà con lon ton quanh mẹ
+    { isRooster: false, isChick: true, color: 0xfde047, x: -7.2, z: -4.1, rot: 1.2 },
+    { isRooster: false, isChick: true, color: 0xfde047, x: -7.7, z: -4.3, rot: 0.4 },
+    { isRooster: false, isChick: true, color: 0xfde047, x: -7.0, z: -3.5, rot: -0.8 },
+    { isRooster: false, isChick: true, color: 0xfde047, x: -7.3, z: -3.3, rot: 2.0 },
   ];
 
   chickenConfigs.forEach((cfg, idx) => {
     const chkObj = createChicken(cfg.isRooster, cfg.isChick, cfg.color);
-    const wx = cfg.x + flockBaseX;
-    const wz = cfg.z + flockBaseZ;
-    const wy = getDK2HillSurfaceY(wx, wz) - flockBaseY;
-    chkObj.mesh.position.set(cfg.x, wy, cfg.z);
+    chkObj.mesh.position.set(cfg.x, 0, cfg.z);
     chkObj.mesh.rotation.y = cfg.rot;
     flockGroup.add(chkObj.mesh);
 
@@ -5140,6 +5381,227 @@ function buildFreeRangeChickens() {
       peckSpeed: 2.5 + Math.random() * 2.0,
     });
   });
+
+  // --------------------------------------------------------------------------
+  // 4. Tháp Chuồng Chim Bồ Câu Châu Âu & Đàn Chim Bồ Câu (Dovecote & Pigeons)
+  // --------------------------------------------------------------------------
+  const dovecoteGroup = new THREE.Group();
+  dovecoteGroup.position.set(7.5, 0, -2.5);
+
+  // Bệ đá móng tháp
+  const dovecoteBase = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.4, 8), stoneMat);
+  dovecoteBase.position.y = 0.2;
+  dovecoteBase.castShadow = true;
+  dovecoteGroup.add(dovecoteBase);
+
+  // Trụ gỗ lớn chịu lực
+  const mainPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 2.6, 8), darkWoodMat);
+  mainPillar.position.y = 1.5;
+  mainPillar.castShadow = true;
+  dovecoteGroup.add(mainPillar);
+
+  // Tầng 1 chuồng chim bát giác
+  const dovecoteTier1 = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1.3, 6), woodMat);
+  dovecoteTier1.position.y = 3.25;
+  dovecoteTier1.castShadow = true;
+  dovecoteGroup.add(dovecoteTier1);
+
+  // Lan can / Sàn đậu vòng quanh tầng 1
+  const balconyDeck = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.65, 0.1, 6), darkWoodMat);
+  balconyDeck.position.y = 2.65;
+  balconyDeck.castShadow = true;
+  dovecoteGroup.add(balconyDeck);
+
+  // Tầng 2 chuồng chim
+  const dovecoteTier2 = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.1, 1.0, 6), woodMat);
+  dovecoteTier2.position.y = 4.3;
+  dovecoteTier2.castShadow = true;
+  dovecoteGroup.add(dovecoteTier2);
+
+  // Mái nón dốc cao màu ngói đỏ mộc
+  const dovecoteRoof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.6, 6), roofRedMat);
+  dovecoteRoof.position.y = 5.5;
+  dovecoteRoof.castShadow = true;
+  dovecoteGroup.add(dovecoteRoof);
+
+  // Chóp kim loại đỉnh mái
+  const spire = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.08, 0.7, 5),
+    new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.6, roughness: 0.3 })
+  );
+  spire.position.y = 6.45;
+  dovecoteGroup.add(spire);
+
+  // Các ô cửa vòm nhỏ xinh (Nesting holes) quanh tháp
+  const holeMat = new THREE.MeshBasicMaterial({ color: 0x1c1917 });
+  const holeGeo = new THREE.BoxGeometry(0.24, 0.32, 0.1);
+  for (let h = 0; h < 6; h++) {
+    const ang = (h / 6) * Math.PI * 2;
+    // Tầng 1
+    const h1 = new THREE.Mesh(holeGeo, holeMat);
+    h1.position.set(Math.cos(ang) * 1.36, 3.25, Math.sin(ang) * 1.36);
+    h1.rotation.y = -ang + Math.PI / 2;
+    dovecoteGroup.add(h1);
+    // Tầng 2
+    const h2 = new THREE.Mesh(holeGeo, holeMat);
+    h2.position.set(Math.cos(ang) * 1.02, 4.3, Math.sin(ang) * 1.02);
+    h2.rotation.y = -ang + Math.PI / 2;
+    dovecoteGroup.add(h2);
+  }
+
+  // Khay thóc/hạt kê cho bồ câu ăn
+  const pigeonFeeder = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.45, 0.15, 8), stoneMat);
+  pigeonFeeder.position.set(1.6, 0.5, 1.2);
+  dovecoteGroup.add(pigeonFeeder);
+
+  const pigeonGrains = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.5, 0.06, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfde047 })
+  );
+  pigeonGrains.position.set(1.6, 0.58, 1.2);
+  dovecoteGroup.add(pigeonGrains);
+
+  flockGroup.add(dovecoteGroup);
+
+  // Helper: Tạo mô hình chim bồ câu
+  const createPigeon = (colorHex, isFlying = false) => {
+    const pig = new THREE.Group();
+    const pMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.7, flatShading: true });
+    const beakMat = new THREE.MeshBasicMaterial({ color: 0xfde68a });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+    const pinkLegMat = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
+
+    // Thân bồ câu (Torso)
+    const pBody = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 1), pMat);
+    pBody.scale.set(0.9, 0.95, 1.4);
+    pBody.position.y = 0.22;
+    pBody.castShadow = true;
+    pig.add(pBody);
+
+    // Đầu & Cổ
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.32, 0.18);
+
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), pMat);
+    headGroup.add(headMesh);
+
+    // Mỏ chim
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.11, 4), beakMat);
+    beak.rotation.x = Math.PI / 2;
+    beak.position.set(0, -0.02, 0.1);
+    headGroup.add(beak);
+
+    // Mắt nhỏ
+    [-0.07, 0.07].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 4, 4), eyeMat);
+      eye.position.set(ex, 0.02, 0.06);
+      headGroup.add(eye);
+    });
+
+    pig.add(headGroup);
+
+    // Đuôi xòe quạt ngắn
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.03, 0.22), pMat);
+    tail.rotation.x = -Math.PI / 8;
+    tail.position.set(0, 0.25, -0.25);
+    pig.add(tail);
+
+    let leftWing = null, rightWing = null;
+    if (isFlying) {
+      // 2 Cánh dang rộng để đập cánh bay lượn
+      const wingGeo = new THREE.BoxGeometry(0.52, 0.03, 0.24);
+      leftWing = new THREE.Mesh(wingGeo, pMat);
+      leftWing.position.set(-0.32, 0.28, 0);
+      pig.add(leftWing);
+
+      rightWing = new THREE.Mesh(wingGeo, pMat);
+      rightWing.position.set(0.32, 0.28, 0);
+      pig.add(rightWing);
+    } else {
+      // Chân bồ câu nhỏ
+      [-0.06, 0.06].forEach((lx) => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.15, 4), pinkLegMat);
+        leg.position.set(lx, 0.08, 0);
+        pig.add(leg);
+      });
+    }
+
+    return { mesh: pig, head: headGroup, leftWing, rightWing };
+  };
+
+  // Chim bồ câu đậu trên tháp chuồng chim (3 con)
+  const perchedConfigs = [
+    { x: 7.5, y: 6.35, z: -2.5, rot: 0.8 },      // Đậu trên đỉnh chóp mái
+    { x: 6.2, y: 2.72, z: -2.0, rot: -0.6 },     // Đậu trên sàn ban công tầng 1
+    { x: 8.6, y: 2.72, z: -2.8, rot: 2.2 },      // Đậu trên sàn ban công
+  ];
+  perchedConfigs.forEach((cfg) => {
+    const pig = createPigeon(0xf8fafc, false);
+    pig.mesh.position.set(cfg.x, cfg.y, cfg.z);
+    pig.mesh.rotation.y = cfg.rot;
+    flockGroup.add(pig.mesh);
+    hillPigeons.push({
+      mesh: pig.mesh,
+      head: pig.head,
+      isPecking: false,
+    });
+  });
+
+  // Chim bồ câu dạo chơi, mổ hạt trên bãi cỏ & lối đi (5 con)
+  const groundPigeonConfigs = [
+    { x: 5.8, z: -0.5, color: 0xf8fafc, rot: 1.2 },
+    { x: 8.8, z: -1.2, color: 0x94a3b8, rot: -0.8 }, // Xám bạc
+    { x: 6.5, z: 1.8, color: 0xf8fafc, rot: 2.5 },
+    { x: 1.5, z: 1.2, color: 0xe2e8f0, rot: -1.5 },
+    { x: 4.0, z: 3.5, color: 0xf8fafc, rot: 0.4 },  // Bên luống hoa
+  ];
+  groundPigeonConfigs.forEach((cfg) => {
+    const pig = createPigeon(cfg.color, false);
+    pig.mesh.position.set(cfg.x, 0, cfg.z);
+    pig.mesh.rotation.y = cfg.rot;
+    flockGroup.add(pig.mesh);
+    hillPigeons.push({
+      mesh: pig.mesh,
+      head: pig.head,
+      isPecking: true,
+      peckTimer: Math.random() * 8,
+      peckSpeed: 3.0 + Math.random() * 2.0,
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // 5. Đàn Chim Bồ Câu Bay Lượn Chao Cánh Trên Đỉnh Đồi (Flying Pigeons)
+  // --------------------------------------------------------------------------
+  flyingPigeonsGroup = new THREE.Group();
+  flyingPigeonsGroup.position.set(flockBaseX, flockBaseY + 11.5, flockBaseZ);
+  flyingPigeonMeshes = [];
+
+  const flyingPigeonConfigs = [
+    { radius: 10.5, angle: 0, baseY: 0, phase: 0 },
+    { radius: 13.0, angle: (Math.PI * 2) / 3, baseY: 1.2, phase: 1.8 },
+    { radius: 11.8, angle: (Math.PI * 4) / 3, baseY: -0.8, phase: 3.5 },
+  ];
+
+  flyingPigeonConfigs.forEach((fc) => {
+    const fp = createPigeon(0xffffff, true);
+    const fx = Math.cos(fc.angle) * fc.radius;
+    const fz = Math.sin(fc.angle) * fc.radius;
+    fp.mesh.position.set(fx, fc.baseY, fz);
+    // Quay đầu theo hướng bay tiếp tuyến vòng tròn
+    fp.mesh.rotation.y = -fc.angle + Math.PI / 2;
+    fp.mesh.rotation.z = -0.15; // Nghiêng cánh khi liệng cua
+    flyingPigeonsGroup.add(fp.mesh);
+
+    flyingPigeonMeshes.push({
+      mesh: fp.mesh,
+      leftWing: fp.leftWing,
+      rightWing: fp.rightWing,
+      baseY: fc.baseY,
+      phase: fc.phase,
+    });
+  });
+
+  scene.add(flyingPigeonsGroup);
 
   scene.add(flockGroup);
   interactiveObjects.push(flockGroup);
@@ -5808,6 +6270,28 @@ function updateAnimatedObjects(delta, time) {
     }
     chk.mesh.rotation.y += Math.sin(time * 0.001 + chk.id) * 0.005;
   });
+
+  // 22. Đàn chim bồ câu mổ hạt và gật đầu trên bãi cỏ đồi DK2
+  hillPigeons.forEach((pig) => {
+    if (pig.isPecking) {
+      pig.peckTimer += delta * pig.peckSpeed;
+      const isPeck = Math.sin(pig.peckTimer) > 0.3;
+      if (pig.head) {
+        pig.head.rotation.x = isPeck ? 0.45 + Math.sin(pig.peckTimer * 5) * 0.2 : 0;
+      }
+    }
+  });
+
+  // 23. Đàn chim bồ câu trắng bay lượn chao cánh trên bầu trời đỉnh đồi
+  if (flyingPigeonsGroup) {
+    flyingPigeonsGroup.rotation.y += delta * 0.38;
+    flyingPigeonMeshes.forEach((fp) => {
+      const flap = Math.sin(time * 0.012 + fp.phase) * 0.45;
+      if (fp.leftWing) fp.leftWing.rotation.z = flap;
+      if (fp.rightWing) fp.rightWing.rotation.z = -flap;
+      fp.mesh.position.y = fp.baseY + Math.sin(time * 0.003 + fp.phase) * 0.35;
+    });
+  }
 }
 
 
@@ -5942,7 +6426,7 @@ function createBuildingLabels() {
     { text: 'Sân xe thành phẩm DK2', pos: new THREE.Vector3(-78, 2.0, -45), id: 'sanThanhPhamDK2' },
     { text: 'Vườn Lan trên đồi', pos: new THREE.Vector3(-108, 21.0, -88), id: 'vuonLanDK2' },
     { text: '🐟 Ao cá đồi sinh thái', pos: new THREE.Vector3(-132, 22.0, -76), id: 'aoCaDK2' },
-    { text: '🐓 Đàn gà thả đồi (Đồi mới)', pos: new THREE.Vector3(-138, 12.0, -34), id: 'doiGaDK2' },
+    { text: '🕊️ Đồi hoa & chim gà', pos: new THREE.Vector3(-148, 25.5, -38), id: 'doiGaDK2' },
     { text: '🌿 Đường mòn sinh thái DK2', pos: new THREE.Vector3(-96, 5.5, -60), id: 'ecoTrailDK2' },
   ];
 

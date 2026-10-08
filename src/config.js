@@ -307,11 +307,12 @@ export const CONFIG = {
       height: 25,
       color: 0x16a34a,
     },
-    // Đồi mới cho chuồng gà và đàn gà thả đồi (Theo khoanh tròn đỏ trên ảnh)
+    // Đồi mới sinh thái (Đồi gà & bồ câu rộng lớn hơn đồi vườn lan, đỉnh phẳng trồng hoa)
     dk2NewHill: {
-      position: { x: -142, y: 0, z: -38 },
-      radius: 34,
-      height: 15,
+      position: { x: -148, y: 0, z: -38 },
+      radius: 66,     // To hơn đồi vườn lan (radius 54)
+      flatRadius: 24, // Đỉnh đồi phẳng rộng lớn để đi dạo, trồng hoa, nuôi gà và bồ câu
+      height: 18.5,
       color: 0x22c55e,
     },
   },
@@ -423,14 +424,14 @@ export const CONFIG = {
       name: 'Sân bóng chuyền DK1',
     },
     aoCaDK2: {
-      pos: { x: -80, y: 16, z: -42 },
-      target: { x: -98, y: 9.4, z: -56 },
+      pos: { x: -108, y: 28, z: -60 },
+      target: { x: -126, y: 17.2, z: -78 },
       name: 'Ao cá đồi sinh thái DK2',
     },
     doiGaDK2: {
-      pos: { x: -98, y: 9, z: -22 },
-      target: { x: -112, y: 3.2, z: -36 },
-      name: 'Đàn gà thả đồi DK2',
+      pos: { x: -126, y: 29, z: -16 },
+      target: { x: -148, y: 18.5, z: -38 },
+      name: 'Đồi sinh thái: Vườn hoa, Đàn gà & Chim bồ câu DK2',
     },
   },
 
