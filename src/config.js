@@ -419,9 +419,19 @@ export const CONFIG = {
       name: 'Trạm sạc xe điện thông minh',
     },
     volleyball: {
-      pos: { x: 56, y: 14, z: 4 },
-      target: { x: 44, y: 1.5, z: -12 },
+      pos: { x: 63, y: 14, z: 4 },
+      target: { x: 51, y: 1.5, z: -12 },
       name: 'Sân bóng chuyền DK1',
+    },
+    fountain: {
+      pos: { x: 36.6, y: 8, z: -2 },
+      target: { x: 36.6, y: 1.5, z: -12 },
+      name: 'Đài phun nước biểu tượng DK (5m)',
+    },
+    stagingBikes: {
+      pos: { x: 52, y: 16, z: -20 },
+      target: { x: 65, y: 2, z: -48 },
+      name: 'Khu tập kết xe máy điện DK Bike',
     },
     aoCaDK2: {
       pos: { x: -108, y: 28, z: -60 },
