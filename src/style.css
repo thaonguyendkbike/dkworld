@@ -197,6 +197,12 @@ html, body {
   font-weight: 700;
 }
 
+#btn-toggle-doors.active {
+  background: var(--color-accent-green);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+}
+
 /* ==========================================================================
    Building Detail Card (Sidebar / Modal)
    ========================================================================== */

@@ -332,5 +332,107 @@ export const CONFIG = {
       target: { x: 88, y: 2, z: -40 },
       name: 'Kênh & Đường ray',
     },
+    logistics: {
+      pos: { x: 45, y: 18, z: -20 },
+      target: { x: 58, y: 3, z: -32 },
+      name: 'Khu bốc dỡ & Cửa xưởng Nhà B',
+    },
+    chargingHub: {
+      pos: { x: 20, y: 15, z: -15 },
+      target: { x: 28, y: 2, z: -24 },
+      name: 'Trạm sạc xe điện thông minh',
+    },
+  },
+
+  // Hệ thống vật thể chi tiết, thiết bị & tiện ích
+  OBJECTS: {
+    // Biển chào & Pylon cổng chính
+    pylons: [
+      { id: 'pylonDK1', name: 'Cổng chính DK1', pos: { x: 74, y: 0, z: -15 }, text: 'DK BIKE FACTORY 1', color: 0xffb703 },
+      { id: 'pylonDK2', name: 'Cổng chính DK2', pos: { x: -22, y: 0, z: -18 }, text: 'DK BIKE HQ & LOGISTICS', color: 0x0284c7 },
+    ],
+
+    // Cửa cuốn công nghiệp (Roller Shutter Doors) xưởng B
+    shutterDoors: [
+      { id: 'doorB1', name: 'Cửa cuốn chính Xưởng B', pos: { x: 58.0, y: 0, z: -33.2 }, width: 5.5, height: 4.2, isOpen: false },
+      { id: 'doorB2', name: 'Cửa xuất nhập hàng Xưởng B', pos: { x: 72.0, y: 0, z: -33.2 }, width: 5.0, height: 4.2, isOpen: false },
+      { id: 'doorD21', name: 'Cửa Kho Linh kiện D2.1', pos: { x: -70.0, y: 0, z: -62.4 }, width: 4.5, height: 3.8, isOpen: false },
+    ],
+
+    // Trạm sạc xe máy điện siêu tốc (DK Fast EV Charging)
+    chargingStations: [
+      { id: 'chargerDK1', name: 'Trạm sạc nhanh DK1 (Sân Nhà A)', pos: { x: 26.0, y: 0, z: -24.0 } },
+      { id: 'chargerDK2', name: 'Trạm sạc trung tâm DK2 (Sân xe)', pos: { x: -50.0, y: 0, z: -32.0 } },
+    ],
+
+    // Bãi đỗ xe ô tô cán bộ / Ban giám đốc
+    executiveCars: [
+      { id: 'car1', model: 'SUV Ban Giám Đốc', color: 0x0f172a, pos: { x: 18.0, y: 0, z: -22.0 }, rotY: 0 },
+      { id: 'car2', model: 'Sedan Kỹ thuật R&D', color: 0xffffff, pos: { x: 14.5, y: 0, z: -22.0 }, rotY: 0 },
+      { id: 'carPickup', model: 'Xe bán tải Pickup Logistics', color: 0x3b82f6, pos: { x: -38.0, y: 0, z: -20.0 }, rotY: Math.PI / 2 },
+    ],
+
+    // Tiện ích hạ tầng (PCCC, Trạm biến áp, Thùng rác)
+    utilities: {
+      hydrants: [
+        { x: 52, z: -24 },
+        { x: 76, z: -33 },
+        { x: -35, z: -22 },
+        { x: -65, z: -62 },
+      ],
+      substation: { x: 42, y: 0, z: -66, name: 'Trạm biến áp 3 pha 560kVA' },
+      recycleBins: [
+        { x: 24, z: -20 },
+        { x: -26, z: -22 },
+        { x: 56, z: -30 },
+      ],
+    },
+  },
+
+  // Danh mục thông tin nhân sự và hoạt động
+  CHARACTERS: {
+    kcs: {
+      name: 'Kỹ sư KCS: Lê Tuấn Anh',
+      role: 'Kiểm soát chất lượng xuất xưởng',
+      activity: 'Đang kiểm tra thông số phanh và pin dòng xe DK Roma SX trên tablet chuyên dụng.',
+      zone: 'Sân KCS / Đường thử Nhà B',
+    },
+    forkliftDriver: {
+      name: 'Tài xế xe nâng: Trần Văn Hùng',
+      role: 'Vận hành logistics xuất nhập xưởng',
+      activity: 'Đang vận chuyển pallet cụm động cơ điện và bộ điều khiển IC vào cửa xưởng B.',
+      zone: 'Cửa bốc dỡ Xưởng B',
+    },
+    guardDK1: {
+      name: 'Bảo vệ: Hoàng Văn Minh',
+      role: 'Kiểm soát an ninh Cổng chính DK1',
+      activity: 'Điều phối barrier tự động cho xe tải logistics và khách ra vào nhà máy.',
+      zone: 'Bốt gác Cổng DK1',
+    },
+    guardDK2: {
+      name: 'Bảo vệ: Triệu Quốc Bảo',
+      role: 'Kiểm soát an ninh Cổng chính DK2',
+      activity: 'Quản lý vé xe, kiểm tra thẻ từ nhân viên và đối tác vào khu nhà điều hành.',
+      zone: 'Bốt gác Cổng DK2',
+    },
+    logisticsLead: {
+      name: 'Quản lý kho: Đỗ Thanh Nga',
+      role: 'Trưởng ban điều phối Logistics & Xuất khẩu',
+      activity: 'Kiểm đếm lô hàng 60 xe máy điện DK Creer E chuẩn bị đóng container xuất đi các tỉnh.',
+      zone: 'Sân thành phẩm DK2',
+    },
+    rndStaff: {
+      name: 'Kỹ thuật viên R&D: Nguyễn Đức Thành',
+      role: 'Nghiên cứu phát triển kiểu dáng & khí động học',
+      activity: 'Di chuyển trên cầu vượt tầng 2 mang bản vẽ kỹ thuật từ Nhà A sang xưởng lắp ráp B.',
+      zone: 'Cầu vượt nối Nhà A - B',
+    },
+    orchidGardener: {
+      name: 'Nghệ nhân cây cảnh: Bác Bùi Văn Thắng',
+      role: 'Chăm sóc cảnh quan sinh thái Vườn Lan',
+      activity: 'Tưới và chăm sóc giàn phong lan rừng Lạng Sơn trên đỉnh đồi cao +16m.',
+      zone: 'Vườn Lan Đỉnh Đồi DK2',
+    },
   },
 };
+

@@ -49,21 +49,35 @@
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         <span>Vườn Lan trên đồi</span>
       </button>
+      <button class="preset-btn" id="btn-view-logistics" data-view="logistics" title="Khu bốc dỡ & Cửa xưởng Nhà B">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <span>Bốc dỡ & Xưởng</span>
+      </button>
+      <button class="preset-btn" id="btn-view-charging" data-view="chargingHub" title="Trạm sạc xe máy điện thông minh">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>Trạm sạc EV</span>
+      </button>
       <button class="preset-btn" id="btn-view-railway" data-view="railway" title="Đường ray & Kênh thoát nước">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="3" x2="4" y2="21"/><line x1="20" y1="3" x2="20" y2="21"/><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
         <span>Kênh & Ray</span>
       </button>
     </nav>
 
-    <!-- Environment Controls: Time & Weather -->
+    <!-- Environment Controls: Time & Weather & Door Action -->
     <div class="env-controls">
+      <div class="control-group action-toggles">
+        <button class="icon-toggle-btn" id="btn-toggle-doors" title="Mở / Đóng cửa cuốn công nghiệp Xưởng B">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 3h12a1 1 0 0 1 1 1v3H5V4a1 1 0 0 1 1-1zM5 11h14M5 15h14"/></svg>
+          <span class="btn-text" id="btn-door-text">Cửa xưởng: Đóng</span>
+        </button>
+      </div>
       <div class="control-group time-toggles" role="group" aria-label="Thời gian trong ngày">
         <button class="toggle-btn active" id="btn-time-day" data-time="day" title="Ban ngày">☀️ Ngày</button>
         <button class="toggle-btn" id="btn-time-sunset" data-time="sunset" title="Hoàng hôn">🌅 Chiều</button>
         <button class="toggle-btn" id="btn-time-night" data-time="night" title="Ban đêm">🌙 Đêm</button>
       </div>
       <div class="control-group action-toggles">
-        <button class="icon-toggle-btn" id="btn-toggle-labels" title="Bật/Tắt nhãn công trình">
+        <button class="icon-toggle-btn active" id="btn-toggle-labels" title="Bật/Tắt nhãn công trình">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           <span class="btn-text">Nhãn</span>
         </button>
