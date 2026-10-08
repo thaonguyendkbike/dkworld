@@ -1511,7 +1511,194 @@ function buildRoadsAndTestTrack() {
 }
 
 // ============================================================================
-// 6. DK1: Buildings
+// Architectural Detail Helpers (Khối 5: Nâng chi tiết công trình chuẩn Drone)
+// ============================================================================
+
+// 1. Dải cửa sổ công nghiệp có đố kính (Mullioned Window Strips)
+function createWindowStripWithMullions(parent, x, y, z, width, height, rotY, mullionSpacing, windowMat) {
+  const winGroup = new THREE.Group();
+  winGroup.position.set(x, y, z);
+  winGroup.rotation.y = rotY;
+
+  // Mặt kính phẳng
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(width, height), windowMat);
+  winGroup.add(glass);
+
+  // Khung viền kim loại xám đen
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+  const frameThick = 0.05;
+  const frameDepth = 0.08;
+
+  // Thanh trên & dưới
+  [-height / 2, height / 2].forEach((fy) => {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(width, frameThick, frameDepth), frameMat);
+    bar.position.set(0, fy, 0.02);
+    winGroup.add(bar);
+  });
+
+  // Thanh 2 bên
+  [-width / 2, width / 2].forEach((fx) => {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(frameThick, height, frameDepth), frameMat);
+    bar.position.set(fx, 0, 0.02);
+    winGroup.add(bar);
+  });
+
+  // Các đố kính dọc (Vertical Mullions)
+  if (mullionSpacing > 0) {
+    const count = Math.floor(width / mullionSpacing);
+    for (let m = 1; m < count; m++) {
+      const mx = -width / 2 + m * mullionSpacing;
+      const mBar = new THREE.Mesh(new THREE.BoxGeometry(frameThick * 0.8, height - frameThick, frameDepth * 0.8), frameMat);
+      mBar.position.set(mx, 0, 0.02);
+      winGroup.add(mBar);
+    }
+  }
+
+  parent.add(winGroup);
+  return winGroup;
+}
+
+// 2. Dàn Pin năng lượng mặt trời áp mái (Rooftop Photovoltaic Solar Arrays)
+function createSolarPanelGrid(parent, cx, cy, cz, width, depth, tiltAngleX = 0.18) {
+  const solarGroup = new THREE.Group();
+  solarGroup.position.set(cx, cy, cz);
+
+  const panelMat = new THREE.MeshStandardMaterial({
+    color: 0x172554, // Xanh navy đậm óng ánh tinh thể silic
+    roughness: 0.15,
+    metalness: 0.85,
+  });
+  const aluFrameMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.6 });
+
+  const panelW = 1.6;
+  const panelD = 2.4;
+  const numX = Math.max(1, Math.floor(width / (panelW + 0.3)));
+  const numZ = Math.max(1, Math.floor(depth / (panelD + 0.4)));
+
+  const startX = -((numX - 1) * (panelW + 0.3)) / 2;
+  const startZ = -((numZ - 1) * (panelD + 0.4)) / 2;
+
+  for (let ix = 0; ix < numX; ix++) {
+    for (let iz = 0; iz < numZ; iz++) {
+      const px = startX + ix * (panelW + 0.3);
+      const pz = startZ + iz * (panelD + 0.4);
+
+      const onePanel = new THREE.Group();
+      onePanel.position.set(px, 0.25, pz);
+      onePanel.rotation.x = tiltAngleX; // Nghiêng đón nắng hướng Nam
+
+      // Khung nhôm
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(panelW, 0.06, panelD), aluFrameMat);
+      frame.castShadow = true;
+      onePanel.add(frame);
+
+      // Mặt tế bào quang điện
+      const cell = new THREE.Mesh(new THREE.PlaneGeometry(panelW - 0.1, panelD - 0.1), panelMat);
+      cell.rotation.x = -Math.PI / 2;
+      cell.position.y = 0.035;
+      onePanel.add(cell);
+
+      // Chân giá đỡ thép
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, 0.06), aluFrameMat);
+      leg.position.set(0, -0.15, -panelD / 2 + 0.2);
+      onePanel.add(leg);
+
+      solarGroup.add(onePanel);
+    }
+  }
+
+  parent.add(solarGroup);
+  return solarGroup;
+}
+
+// 3. Ống thoát nước mưa công nghiệp (Rainwater Downspouts)
+function createRainwaterDownspouts(parent, width, height, depth, color = 0x64748b) {
+  const pipeMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 });
+  const hopperMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 });
+
+  const corners = [
+    { x: width / 2 + 0.12, z: depth / 2 + 0.12 },
+    { x: -width / 2 - 0.12, z: depth / 2 + 0.12 },
+    { x: width / 2 + 0.12, z: -depth / 2 - 0.12 },
+    { x: -width / 2 - 0.12, z: -depth / 2 - 0.12 },
+  ];
+
+  corners.forEach((c) => {
+    // Phễu thu nước máng xối trên mái
+    const hopper = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.45, 5), hopperMat);
+    hopper.position.set(c.x, height - 0.2, c.z);
+    parent.add(hopper);
+
+    // Ống đứng xả nước
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, height - 0.6, 6), pipeMat);
+    pipe.position.set(c.x, (height - 0.6) / 2, c.z);
+    pipe.castShadow = true;
+    parent.add(pipe);
+
+    // Cút cong xả ra rãnh thoát nước ở chân tường
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.3), pipeMat);
+    boot.position.set(c.x, 0.1, c.z + (c.z > 0 ? 0.12 : -0.12));
+    parent.add(boot);
+  });
+}
+
+// 4. Thang thoát hiểm thép ngoài trời (External Steel Fire Escape Stairs)
+function createFireEscapeStairs(parent, x, z, totalHeight, numStories, color = 0x334155) {
+  const stairGroup = new THREE.Group();
+  stairGroup.position.set(x, 0, z);
+
+  const steelMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.5 });
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.4 });
+
+  const storyHeight = totalHeight / numStories;
+  const platformW = 2.4;
+  const platformD = 1.6;
+
+  // 4 Cột giàn thép chính chạy từ đất lên nóc
+  [[-platformW / 2 + 0.1, -platformD / 2 + 0.1],
+   [platformW / 2 - 0.1, -platformD / 2 + 0.1],
+   [-platformW / 2 + 0.1, platformD / 2 - 0.1],
+   [platformW / 2 - 0.1, platformD / 2 - 0.1]].forEach(([cx, cz]) => {
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.1, totalHeight, 0.1), steelMat);
+    col.position.set(cx, totalHeight / 2, cz);
+    col.castShadow = true;
+    stairGroup.add(col);
+  });
+
+  // Các chiếu nghỉ & đợt thang zíc zắc
+  for (let s = 1; s <= numStories; s++) {
+    const py = s * storyHeight;
+
+    // Chiếu nghỉ mỗi tầng
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(platformW, 0.12, platformD), steelMat);
+    platform.position.set(0, py, 0);
+    platform.castShadow = true;
+    stairGroup.add(platform);
+
+    // Lan can an toàn quanh chiếu nghỉ
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(platformW, 0.9, platformD), railMat);
+    rail.position.set(0, py + 0.45, 0);
+    stairGroup.add(rail);
+
+    // Vế thang nghiêng nối từ tầng dưới lên
+    if (s <= numStories) {
+      const flight = new THREE.Mesh(
+        new THREE.BoxGeometry(0.75, 0.1, Math.hypot(storyHeight, platformD * 0.9)),
+        steelMat
+      );
+      flight.position.set(0, py - storyHeight / 2, 0);
+      flight.rotation.x = Math.atan2(storyHeight, platformD * 0.9);
+      flight.castShadow = true;
+      stairGroup.add(flight);
+    }
+  }
+
+  parent.add(stairGroup);
+  return stairGroup;
+}
+
+// ============================================================================
+// 6. DK1: Buildings (Nâng cấp Khối 5)
 // ============================================================================
 function buildDK1Buildings() {
   buildNhaB();
@@ -1527,23 +1714,26 @@ function buildNhaB() {
   group.position.set(cfg.position.x, 0, cfg.position.z);
   group.userData = { id: 'nhaB', config: cfg };
 
+  // 1. Thân xưởng chính - Tường xám công nghiệp (Wall: Slate Gray 0x475569)
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(cfg.width, cfg.height - 1.5, cfg.depth),
-    new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.6, metalness: 0.2 })
+    new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.65, metalness: 0.2 })
   );
   body.position.y = (cfg.height + 1.5) / 2;
   body.castShadow = true;
   body.receiveShadow = true;
   group.add(body);
 
+  // 2. Chân tường bệ bê tông trắng kem chống bám bẩn (Base Wall: 0xf1f5f9)
   const base = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width + 0.1, 1.5, cfg.depth + 0.1),
+    new THREE.BoxGeometry(cfg.width + 0.15, 1.5, cfg.depth + 0.15),
     new THREE.MeshStandardMaterial({ color: cfg.baseWallColor, roughness: 0.7 })
   );
   base.position.y = 0.75;
   base.castShadow = true;
   group.add(base);
 
+  // 3. Mái xưởng chính màu xám đậm (Roof: Dark Slate 0x1e293b)
   const roof = new THREE.Mesh(
     new THREE.BoxGeometry(cfg.width + 0.8, 0.8, cfg.depth + 0.8),
     new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.5 })
@@ -1552,6 +1742,16 @@ function buildNhaB() {
   roof.castShadow = true;
   group.add(roof);
 
+  // 4. Gờ mái nhô ra sắc nét (Roof Fascia / Parapet Coping)
+  const cornice = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width + 1.2, 0.35, cfg.depth + 1.2),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 })
+  );
+  cornice.position.y = cfg.height + 0.85;
+  cornice.castShadow = true;
+  group.add(cornice);
+
+  // 5. Nóc thông gió & lấy sáng (Monitor Roof)
   const monCfg = cfg.monitorRoof;
   const monitor = new THREE.Mesh(
     new THREE.BoxGeometry(monCfg.width, monCfg.height, monCfg.depth),
@@ -1561,38 +1761,73 @@ function buildNhaB() {
   monitor.castShadow = true;
   group.add(monitor);
 
-  // Roof ventilator fans
-  for (let vz = -8; vz <= 8; vz += 8) {
+  // Quạt hút thông gió xoay tròn trên nóc (Roof Ventilators)
+  for (let vz = -10; vz <= 10; vz += 5.0) {
     const vent = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.6, 0.6, 0.5, 8),
-      new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4 })
+      new THREE.CylinderGeometry(0.55, 0.65, 0.6, 8),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.35, metalness: 0.6 })
     );
-    vent.position.set(0, cfg.height + 0.8 + monCfg.height + 0.25, vz);
+    vent.position.set(0, cfg.height + 0.8 + monCfg.height + 0.3, vz);
     group.add(vent);
     roofVentilators.push(vent);
   }
 
-  // Windows
+  // 6. Tấm lấy sáng mái (Polycarbonate Skylights)
+  const skylightMat = new THREE.MeshStandardMaterial({
+    color: 0xdbeafe,
+    roughness: 0.2,
+    transparent: true,
+    opacity: 0.72,
+  });
+  [-4.8, 4.8].forEach((sx) => {
+    const skylight = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.15, monCfg.depth - 2), skylightMat);
+    skylight.position.set(sx, cfg.height + 0.88, 0);
+    group.add(skylight);
+  });
+
+  // 7. Hệ thống Pin mặt trời trên mái xưởng B (Photovoltaic Solar Arrays)
+  createSolarPanelGrid(group, -7.5, cfg.height + 0.9, 0, 5.5, 24, 0.15);
+  createSolarPanelGrid(group, 7.5, cfg.height + 0.9, 0, 5.5, 24, 0.15);
+
+  // 8. Nhiều dãy cửa sổ công nghiệp có đố kính (Multi-pane window strips with mullions)
   const windowMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.1, metalness: 0.8 });
   windowLights.push(windowMat);
-  for (let story = 1; story <= 3; story++) {
-    const winHeight = 1.0;
-    const winY = 1.5 + (story - 0.5) * 3.8;
-    const winSouth = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 4, winHeight), windowMat);
-    winSouth.position.set(0, winY, cfg.depth / 2 + 0.05);
-    group.add(winSouth);
 
-    const winEast = new THREE.Mesh(new THREE.PlaneGeometry(cfg.depth - 4, winHeight), windowMat);
-    winEast.rotation.y = Math.PI / 2;
-    winEast.position.set(cfg.width / 2 + 0.05, winY, 0);
-    group.add(winEast);
+  for (let story = 1; story <= 3; story++) {
+    const winHeight = 1.1;
+    const winY = 1.6 + (story - 0.5) * 3.8;
+
+    // Mặt Nam (Front quay ra sân giao nhận)
+    createWindowStripWithMullions(group, 0, winY, cfg.depth / 2 + 0.05, cfg.width - 4, winHeight, 0, 2.2, windowMat);
+
+    // Mặt Đông (East - hướng đường chạy thử)
+    createWindowStripWithMullions(group, cfg.width / 2 + 0.05, winY, 0, cfg.depth - 4, winHeight, Math.PI / 2, 2.4, windowMat);
+
+    // Mặt Bắc (North - phía sau)
+    createWindowStripWithMullions(group, 0, winY, -cfg.depth / 2 - 0.05, cfg.width - 6, winHeight, Math.PI, 2.2, windowMat);
+
+    // Mặt Tây (West - phía Nhà C)
+    createWindowStripWithMullions(group, -cfg.width / 2 - 0.05, winY, 0, cfg.depth - 6, winHeight, -Math.PI / 2, 2.4, windowMat);
   }
 
-  // 2 Cửa cuốn công nghiệp Xưởng B (Mặt tiền quay về sân giao nhận phía Nam)
+  // 9. 2 Cửa cuốn công nghiệp Xưởng B (Door B1, B2)
   createShutterDoor(group, -5.5, 0, cfg.depth / 2 + 0.08, 5.4, 4.0, 'doorB1', 'Cửa cuốn chính Xưởng B');
   createShutterDoor(group, 5.5, 0, cfg.depth / 2 + 0.08, 5.0, 4.0, 'doorB2', 'Cửa xuất nhập hàng Xưởng B');
 
-  // Logo Badge "DK Bike"
+  // 10. Ống thoát nước mưa 4 góc tường (Rainwater Downspouts)
+  createRainwaterDownspouts(group, cfg.width, cfg.height, cfg.depth, 0x64748b);
+
+  // 11. Thang thoát hiểm ngoài trời bằng thép (External Steel Fire Escape) ở mặt Bắc
+  createFireEscapeStairs(group, -cfg.width / 2 + 4.5, -cfg.depth / 2 - 1.0, cfg.height, 3, 0x334155);
+
+  // 12. Cụm điều hòa công nghiệp HVAC / Chiller trên mái
+  const chillerMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4 });
+  const chiller = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.2, 1.8), chillerMat);
+  chiller.position.set(-6.5, cfg.height + 1.4, -12);
+  chiller.castShadow = true;
+  group.add(chiller);
+
+  // 13. Logo Badge "DK Bike" vàng cam nổi bật
   createBuildingLogo(group, cfg);
 
   scene.add(group);
@@ -1719,6 +1954,7 @@ function buildNhaA() {
   group.position.set(cfg.position.x, 0, cfg.position.z);
   group.userData = { id: 'nhaA', config: cfg };
 
+  // 1. Thân văn phòng Nhà A - Tường xám xanh thanh lịch (Wall: 0x64748b)
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(cfg.width, cfg.height, cfg.depth),
     new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.65, metalness: 0.15 })
@@ -1728,41 +1964,90 @@ function buildNhaA() {
   body.receiveShadow = true;
   group.add(body);
 
+  // 2. Chân tường trắng kem (Base Wall: 0xf1f5f9)
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width + 0.1, 1.2, cfg.depth + 0.1),
+    new THREE.MeshStandardMaterial({ color: cfg.baseWallColor, roughness: 0.7 })
+  );
+  base.position.y = 0.6;
+  base.castShadow = true;
+  group.add(base);
+
+  // 3. Mái bằng có gờ tường chắn nước (Roof Parapet)
   const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width + 0.6, 0.6, cfg.depth + 0.6),
+    new THREE.BoxGeometry(cfg.width + 0.6, 0.8, cfg.depth + 0.6),
     new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.4 })
   );
-  roof.position.y = cfg.height + 0.3;
+  roof.position.y = cfg.height + 0.4;
   roof.castShadow = true;
   group.add(roof);
 
-  // Blue outdoor escape stairs
-  const stair = new THREE.Mesh(
-    new THREE.BoxGeometry(2.0, cfg.height - 1.5, 3.5),
-    new THREE.MeshStandardMaterial({ color: cfg.stairColor, roughness: 0.5, metalness: 0.5 })
+  const parapetCap = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width + 0.8, 0.25, cfg.depth + 0.8),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3 })
   );
-  stair.position.set(-cfg.width / 2 - 1.0, (cfg.height - 1.5) / 2, 0);
-  stair.castShadow = true;
-  group.add(stair);
+  parapetCap.position.y = cfg.height + 0.9;
+  group.add(parapetCap);
 
-  // Windows
+  // 4. Pin mặt trời trên mái Nhà A (Photovoltaic Solar Arrays)
+  createSolarPanelGrid(group, 0, cfg.height + 0.95, 0, cfg.width - 6, cfg.depth - 4, 0.15);
+
+  // 5. Nhiều dãy cửa sổ văn phòng hiện đại (Continuous ribbon windows with mullions)
   const winMat = new THREE.MeshStandardMaterial({ color: 0xbae6fd, roughness: 0.1, metalness: 0.7 });
   windowLights.push(winMat);
+
   for (let story = 1; story <= 3; story++) {
     const winY = (story - 0.4) * 3.4;
-    const winSouth = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 4, 1.2), winMat);
-    winSouth.position.set(0, winY, cfg.depth / 2 + 0.05);
-    group.add(winSouth);
+    // Mặt Nam (Mặt tiền sảnh chính)
+    createWindowStripWithMullions(group, 0, winY, cfg.depth / 2 + 0.05, cfg.width - 4, 1.3, 0, 2.5, winMat);
+    // Mặt Bắc (Mặt sau)
+    createWindowStripWithMullions(group, 0, winY, -cfg.depth / 2 - 0.05, cfg.width - 4, 1.3, Math.PI, 2.5, winMat);
   }
 
-  // Walkway connector
-  const walkway = new THREE.Mesh(
+  // 6. Sảnh đón chính tầng 1 (Main Entrance Lobby & Canopy)
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.5 });
+  const entranceCanopy = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.22, 2.8), canopyMat);
+  entranceCanopy.position.set(0, 3.6, cfg.depth / 2 + 1.4);
+  entranceCanopy.castShadow = true;
+  group.add(entranceCanopy);
+
+  // Cửa kính thủy lực sảnh đón
+  const glassDoorMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.8 });
+  const entranceDoor = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.8), glassDoorMat);
+  entranceDoor.position.set(0, 1.4, cfg.depth / 2 + 0.08);
+  group.add(entranceDoor);
+
+  // Bậc tam cấp sảnh vào
+  const steps = new THREE.Mesh(
+    new THREE.BoxGeometry(7.5, 0.35, 1.8),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+  );
+  steps.position.set(0, 0.17, cfg.depth / 2 + 0.9);
+  group.add(steps);
+
+  // 7. Thang thoát hiểm thép màu xanh dương (External Blue Fire Escape) ở đầu hồi phía Tây
+  createFireEscapeStairs(group, -cfg.width / 2 - 1.2, 0, cfg.height, 3, cfg.stairColor);
+
+  // 8. Ống thoát nước mưa (Rainwater downspouts)
+  createRainwaterDownspouts(group, cfg.width, cfg.height, cfg.depth, 0x94a3b8);
+
+  // 9. Cầu vượt nối Nhà A sang Nhà B (Skybridge kết nối tầng 2)
+  const walkwayGroup = new THREE.Group();
+  walkwayGroup.position.set(cfg.width / 2 + 4.0, 5.0, 0);
+
+  const bridgeBody = new THREE.Mesh(
     new THREE.BoxGeometry(8.0, 3.2, 3.2),
     new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 })
   );
-  walkway.position.set(cfg.width / 2 + 4.0, 5.0, 0);
-  walkway.castShadow = true;
-  group.add(walkway);
+  bridgeBody.castShadow = true;
+  walkwayGroup.add(bridgeBody);
+
+  // Cửa kính lấy sáng 2 bên cầu vượt
+  const bridgeGlass = new THREE.Mesh(new THREE.BoxGeometry(7.6, 1.6, 3.28), winMat);
+  bridgeGlass.position.y = 0.2;
+  walkwayGroup.add(bridgeGlass);
+
+  group.add(walkwayGroup);
 
   scene.add(group);
   buildingMeshes.push(body);
@@ -1774,6 +2059,7 @@ function buildNhaC() {
   group.position.set(cfg.position.x, 0, cfg.position.z);
   group.userData = { id: 'nhaC', config: cfg };
 
+  // 1. Thân nhà kho & xưởng phụ C - Tường xám (Wall: 0x64748b)
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(cfg.width, cfg.height, cfg.depth),
     new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.7 })
@@ -1783,21 +2069,55 @@ function buildNhaC() {
   body.receiveShadow = true;
   group.add(body);
 
+  // 2. Mái tôn xanh dương công nghiệp chuẩn ảnh drone (Cobalt Industrial Blue 0x0284c7)
   const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width + 0.6, 0.6, cfg.depth + 0.6),
+    new THREE.BoxGeometry(cfg.width + 0.8, 0.6, cfg.depth + 0.8),
     new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.45, metalness: 0.3 })
   );
   roof.position.y = cfg.height + 0.3;
   roof.castShadow = true;
   group.add(roof);
 
-  const solar = new THREE.Mesh(
-    new THREE.PlaneGeometry(cfg.width - 2, cfg.depth - 3),
-    new THREE.MeshStandardMaterial({ color: 0x111c2e, roughness: 0.15, metalness: 0.85 })
+  // Gờ nóc mái tôn (Roof Ridge Cap)
+  const ridge = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width + 0.9, 0.25, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.4 })
   );
-  solar.rotation.x = -Math.PI / 2;
-  solar.position.set(0, cfg.height + 0.62, 0);
-  group.add(solar);
+  ridge.position.y = cfg.height + 0.65;
+  group.add(ridge);
+
+  // 3. Tấm tôn lấy sáng trắng ngà trên mái (Skylight Strip)
+  const skylight = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width - 2.0, 0.1, 1.8),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, transparent: true, opacity: 0.75 })
+  );
+  skylight.position.set(0, cfg.height + 0.62, 2.0);
+  group.add(skylight);
+
+  // 4. Pin mặt trời trên mái Nhà C (Photovoltaic Solar Arrays)
+  createSolarPanelGrid(group, 0, cfg.height + 0.65, -2.0, cfg.width - 3, 4.5, 0.15);
+
+  // 5. Cửa cuốn bốc dỡ hàng hóa tầng trệt (Roller Shutter Door)
+  const doorFrameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+  const doorShutterMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.5 });
+
+  const cDoor = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.6, 0.12), doorShutterMat);
+  cDoor.position.set(0, 1.8, cfg.depth / 2 + 0.06);
+  cDoor.castShadow = true;
+  group.add(cDoor);
+
+  const cDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 3.9, 0.18), doorFrameMat);
+  cDoorFrame.position.set(0, 1.95, cfg.depth / 2 + 0.05);
+  group.add(cDoorFrame);
+
+  // 6. Dãy cửa sổ thông gió lấy sáng
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.1, metalness: 0.8 });
+  windowLights.push(winMat);
+  createWindowStripWithMullions(group, 0, 4.8, cfg.depth / 2 + 0.05, cfg.width - 3, 0.8, 0, 1.8, winMat);
+  createWindowStripWithMullions(group, 0, 4.8, -cfg.depth / 2 - 0.05, cfg.width - 3, 0.8, Math.PI, 1.8, winMat);
+
+  // 7. Ống thoát nước mưa (Downspouts)
+  createRainwaterDownspouts(group, cfg.width, cfg.height, cfg.depth, 0x0284c7);
 
   scene.add(group);
   buildingMeshes.push(body);
@@ -1809,6 +2129,7 @@ function buildNhaAn() {
   group.position.set(cfg.position.x, 0, cfg.position.z);
   group.userData = { id: 'nhaAn', config: cfg };
 
+  // 1. Thân nhà ăn CBNV - Tường xám sáng / trắng kem
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(cfg.width, cfg.height, cfg.depth),
     new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.7 })
@@ -1818,14 +2139,61 @@ function buildNhaAn() {
   body.receiveShadow = true;
   group.add(body);
 
-  const roof = new THREE.Mesh(
-    new THREE.ConeGeometry(cfg.width * 0.7, 3.5, 4),
-    new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.6 })
+  // Chân tường sạch sẽ
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width + 0.1, 1.2, cfg.depth + 0.1),
+    new THREE.MeshStandardMaterial({ color: cfg.baseWallColor, roughness: 0.7 })
   );
-  roof.position.y = cfg.height + 1.75;
+  base.position.y = 0.6;
+  group.add(base);
+
+  // 2. Mái ngói dốc 4 mái màu đỏ tươi (Hip Roof Red 0xef4444)
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(cfg.width * 0.72, 3.8, 4),
+    new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.55, flatShading: true })
+  );
+  roof.position.y = cfg.height + 1.9;
   roof.rotation.y = Math.PI / 4;
+  roof.scale.set(1.0, 1.0, (cfg.depth / cfg.width) * 1.5);
   roof.castShadow = true;
   group.add(roof);
+
+  // Gờ máng xối chân mái ngói
+  const gutterMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.6 });
+  const gutter = new THREE.Mesh(new THREE.BoxGeometry(cfg.width + 0.8, 0.25, cfg.depth + 0.8), gutterMat);
+  gutter.position.y = cfg.height + 0.15;
+  group.add(gutter);
+
+  // 3. Nhiều dãy cửa sổ kính đón nắng rộng thoáng
+  const winMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.1, metalness: 0.3 }); // Ánh đèn nhà ăn ấm cúng
+  windowLights.push(winMat);
+
+  for (let story = 1; story <= 2; story++) {
+    const winY = (story - 0.4) * 4.2;
+    // Mặt Nam (Mặt tiền quay ra đường)
+    createWindowStripWithMullions(group, 0, winY, cfg.depth / 2 + 0.05, cfg.width - 4, 1.6, 0, 2.2, winMat);
+    // Mặt Tây
+    createWindowStripWithMullions(group, -cfg.width / 2 - 0.05, winY, 0, cfg.depth - 3, 1.6, -Math.PI / 2, 2.2, winMat);
+  }
+
+  // 4. Sảnh đón có mái hiên che nắng mưa và bậc tam cấp
+  const porchRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(4.8, 0.2, 2.2),
+    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 })
+  );
+  porchRoof.position.set(0, 3.2, cfg.depth / 2 + 1.1);
+  porchRoof.castShadow = true;
+  group.add(porchRoof);
+
+  const steps = new THREE.Mesh(
+    new THREE.BoxGeometry(5.2, 0.3, 1.4),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+  );
+  steps.position.set(0, 0.15, cfg.depth / 2 + 0.7);
+  group.add(steps);
+
+  // 5. Ống thoát nước mưa
+  createRainwaterDownspouts(group, cfg.width, cfg.height, cfg.depth, 0xb91c1c);
 
   scene.add(group);
   buildingMeshes.push(body);
@@ -1846,11 +2214,20 @@ function buildNhaBaoVeDK1() {
   group.add(body);
 
   const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width + 0.4, 0.4, cfg.depth + 0.4),
+    new THREE.BoxGeometry(cfg.width + 0.6, 0.4, cfg.depth + 0.6),
     new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.4 })
   );
   roof.position.y = cfg.height + 0.2;
   group.add(roof);
+
+  // Cửa sổ kính quan sát an ninh 3 mặt
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.1, metalness: 0.7 });
+  [-cfg.depth / 2 - 0.02, cfg.depth / 2 + 0.02].forEach((wz) => {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 1.2, 1.2), winMat);
+    w.position.set(0, 1.6, wz);
+    if (wz < 0) w.rotation.y = Math.PI;
+    group.add(w);
+  });
 
   scene.add(group);
   buildingMeshes.push(body);
@@ -1862,63 +2239,76 @@ function buildCanopyAndBikes() {
   group.position.set(cfg.position.x, 0, cfg.position.z);
   group.userData = { id: 'maiCheXe', config: cfg };
 
-  const postGeo = new THREE.CylinderGeometry(0.12, 0.12, cfg.height);
-  const postMat = new THREE.MeshStandardMaterial({ color: cfg.frameColor, roughness: 0.5 });
-  for (let z = -cfg.depth / 2 + 1; z <= cfg.depth / 2; z += 5) {
-    const post1 = new THREE.Mesh(postGeo, postMat);
-    post1.position.set(-cfg.width / 2 + 0.4, cfg.height / 2, z);
-    post1.castShadow = true;
-    group.add(post1);
+  // Khung thép hộp sơn tĩnh điện màu xám đen (Frame: 0x1e293b)
+  const postGeo = new THREE.CylinderGeometry(0.1, 0.1, cfg.height, 8);
+  const frameMat = new THREE.MeshStandardMaterial({ color: cfg.frameColor, roughness: 0.4, metalness: 0.6 });
 
-    const post2 = new THREE.Mesh(postGeo, postMat);
-    post2.position.set(cfg.width / 2 - 0.4, cfg.height / 2, z);
-    post2.castShadow = true;
-    group.add(post2);
+  for (let z = -cfg.depth / 2 + 1.5; z <= cfg.depth / 2 - 1.5; z += 4.5) {
+    [-cfg.width / 2 + 0.35, cfg.width / 2 - 0.35].forEach((px) => {
+      const post = new THREE.Mesh(postGeo, frameMat);
+      post.position.set(px, cfg.height / 2, z);
+      post.castShadow = true;
+      group.add(post);
+    });
+
+    // Thanh xà vòm ngang cong nối 2 cột
+    const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, 0.12, 0.15), frameMat);
+    crossBeam.position.set(0, cfg.height + 0.1, z);
+    crossBeam.castShadow = true;
+    group.add(crossBeam);
   }
 
+  // Mái che polycarbonate màu xanh trong suốt chuẩn ảnh drone (Canopy: Blue/Cyan Translucent)
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: cfg.canopyColor, // 0x06b6d4
+    roughness: 0.15,
+    metalness: 0.1,
+    transparent: true,
+    opacity: cfg.opacity, // 0.7
+  });
+
   const canopyRoof = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width, 0.25, cfg.depth),
-    new THREE.MeshStandardMaterial({
-      color: cfg.canopyColor,
-      roughness: 0.2,
-      metalness: 0.1,
-      transparent: true,
-      opacity: cfg.opacity,
-    })
+    new THREE.BoxGeometry(cfg.width + 0.4, 0.15, cfg.depth),
+    canopyMat
   );
-  canopyRoof.position.y = cfg.height;
+  canopyRoof.position.y = cfg.height + 0.18;
   canopyRoof.castShadow = true;
   group.add(canopyRoof);
 
-  // 3-wheel electric bikes
-  const bikeMatRed = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 });
-  const bikeMatCyan = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
-  const bikeMatBlack = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.8 });
+  // Xe điện 3 bánh DK Bike đỗ ngay ngắn dưới mái che
+  const bikeColors = [0xef4444, 0x0284c7, 0xf59e0b, 0x10b981, 0x6366f1];
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.9 });
+  const wheelGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.14, 8);
 
-  for (let z = -cfg.depth / 2 + 2.5; z <= cfg.depth / 2 - 2; z += 3.2) {
+  for (let z = -cfg.depth / 2 + 2.5; z <= cfg.depth / 2 - 2.5; z += 3.2) {
     const bikeGroup = new THREE.Group();
     bikeGroup.position.set(0, 0, z);
 
-    const bMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 1.0), Math.random() > 0.5 ? bikeMatRed : bikeMatCyan);
+    const bColor = bikeColors[Math.abs(Math.floor(z)) % bikeColors.length];
+    const bMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 1.0), new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.4 }));
     bMesh.position.y = 0.55;
     bMesh.castShadow = true;
     bikeGroup.add(bMesh);
 
-    const wheelGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 8);
-    const w1 = new THREE.Mesh(wheelGeo, bikeMatBlack);
-    w1.rotation.z = Math.PI / 2;
-    w1.position.set(-0.6, 0.25, 0.4);
-    bikeGroup.add(w1);
+    // Yên & Tay lái
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.5), new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.8 }));
+    seat.position.set(-0.2, 0.9, 0);
+    bikeGroup.add(seat);
 
-    const w2 = new THREE.Mesh(wheelGeo, bikeMatBlack);
-    w2.rotation.z = Math.PI / 2;
-    w2.position.set(-0.6, 0.25, -0.4);
-    bikeGroup.add(w2);
+    // 3 bánh xe
+    [-0.6].forEach((wx) => {
+      [-0.42, 0.42].forEach((wz) => {
+        const w = new THREE.Mesh(wheelGeo, wheelMat);
+        w.rotation.x = Math.PI / 2;
+        w.position.set(wx, 0.24, wz);
+        bikeGroup.add(w);
+      });
+    });
 
-    const w3 = new THREE.Mesh(wheelGeo, bikeMatBlack);
-    w3.rotation.z = Math.PI / 2;
-    w3.position.set(0.6, 0.25, 0);
-    bikeGroup.add(w3);
+    const wFront = new THREE.Mesh(wheelGeo, wheelMat);
+    wFront.rotation.x = Math.PI / 2;
+    wFront.position.set(0.65, 0.24, 0);
+    bikeGroup.add(wFront);
 
     group.add(bikeGroup);
   }
@@ -3842,27 +4232,42 @@ function buildIndustrialUtilities() {
 
 
 // ============================================================================
-// 12. Flagpoles & Streetlights
+// ============================================================================
+// 12. Infrastructure: Flagpoles, Security Fence, Crosswalks & Streetlights
 // ============================================================================
 function buildFlagsAndStreetlights() {
-  // Flagpole 1: Trước sảnh Nhà A (DK1)
-  createFlagpole(25, 0, -23, 0xef4444);
+  // Cụm 3 Cột cờ trước sảnh Nhà A (DK1): Cờ Tổ quốc ở giữa, Cờ DK Bike, Cờ Xanh Môi trường
+  createFlagpole(23.2, 0, -23.0, 0xffb703, 8.0); // Cờ vàng cam DK Bike
+  createFlagpole(25.0, 0, -23.0, 0xdc2626, 9.2); // Cờ đỏ sao vàng Việt Nam (ở giữa, cao nhất)
+  createFlagpole(26.8, 0, -23.0, 0x0284c7, 8.0); // Cờ xanh dương ISO / Môi trường
 
-  // Flagpole 2: Trước Nhà điều hành DK2
-  createFlagpole(-42, 0, -22, 0xffb703);
+  // Cụm 2 Cột cờ trước Nhà điều hành DK2
+  createFlagpole(-41.0, 0, -22.0, 0xdc2626, 8.5); // Cờ Việt Nam
+  createFlagpole(-43.0, 0, -22.0, 0xffb703, 8.0); // Cờ DK Bike
 
-  // Streetlights along DT234 & Campuses
+  // Hàng rào bảo vệ an ninh song sắt dọc mặt tiền đường ĐT234 (Perimeter Security Fence)
+  buildPerimeterSecurityFences();
+
+  // Vỉa hè, Bó vỉa bê tông & Vạch người đi bộ qua đường (Zebra Crossings)
+  buildSidewalksAndCrosswalks();
+
+  // Đèn đường chiếu sáng đô thị LED dọc trục đường ĐT234 & các tuyến nội bộ (sáng ban đêm)
   const lightPositions = [
     { x: -10, z: -90 },
-    { x: -10, z: -55 },
-    { x: -10, z: -20 },
-    { x: -10, z: 15 },
-    { x: 35, z: -23 },
-    { x: 65, z: -22 },
-    { x: 80, z: -25 },
-    { x: 80, z: -68 },
-    { x: -70, z: -26 },
-    { x: -95, z: -43 },
+    { x: -10, z: -68 },
+    { x: -10, z: -45 },
+    { x: -10, z: -22 },
+    { x: -10, z: 2 },
+    { x: -10, z: 25 },
+    { x: 35, z: -24 },
+    { x: 55, z: -24 },
+    { x: 75, z: -24 },
+    { x: 80, z: -48 },
+    { x: 80, z: -70 },
+    { x: -35, z: -22 },
+    { x: -55, z: -24 },
+    { x: -75, z: -24 },
+    { x: -95, z: -40 },
   ];
 
   lightPositions.forEach((pos) => {
@@ -3870,30 +4275,160 @@ function buildFlagsAndStreetlights() {
   });
 }
 
-function createFlagpole(x, y, z, flagColor) {
+// Hàng rào bảo vệ an ninh song sắt kiên cố mặt tiền ĐT234
+function buildPerimeterSecurityFences() {
+  const fenceMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.6 });
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 });
+  const curbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 });
+
+  const buildFenceSegment = (startX, startZ, endZ) => {
+    const group = new THREE.Group();
+    const len = Math.abs(endZ - startZ);
+    const midZ = (startZ + endZ) / 2;
+
+    // Bệ bê tông bó chân hàng rào
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, len), curbMat);
+    curb.position.set(startX, 0.175, midZ);
+    curb.receiveShadow = true;
+    group.add(curb);
+
+    // Trụ bê tông chịu lực mỗi 4m
+    const numPosts = Math.floor(len / 4.0);
+    for (let p = 0; p <= numPosts; p++) {
+      const pz = startZ - p * 4.0;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.42, 2.3, 0.42), postMat);
+      post.position.set(startX, 1.15, pz);
+      post.castShadow = true;
+      group.add(post);
+
+      // Chóp kim tự tháp trên đỉnh trụ
+      const postCap = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.25, 4), postMat);
+      postCap.position.set(startX, 2.42, pz);
+      postCap.rotation.y = Math.PI / 4;
+      group.add(postCap);
+    }
+
+    // Các gióng ngang & nan song sắt mạ kẽm
+    [0.7, 1.4, 2.05].forEach((ry) => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, len), fenceMat);
+      rail.position.set(startX, ry, midZ);
+      group.add(rail);
+    });
+
+    // Song sắt đứng
+    const picketGeo = new THREE.CylinderGeometry(0.02, 0.02, 1.9, 4);
+    const numPickets = Math.floor(len / 0.3);
+    for (let pi = 0; pi < numPickets; pi++) {
+      const pz = startZ - pi * 0.3;
+      const picket = new THREE.Mesh(picketGeo, fenceMat);
+      picket.position.set(startX, 1.25, pz);
+      group.add(picket);
+    }
+
+    scene.add(group);
+  };
+
+  // Hàng rào mạn DK1 (Bên phải ĐT234): Chừa lối cổng chính DK1 (Z: -12 đến -23)
+  buildFenceSegment(-6.0, -25.0, -85.0);
+  buildFenceSegment(-6.0, -2.0, -10.0);
+
+  // Hàng rào mạn DK2 (Bên trái ĐT234): Chừa lối cổng chính DK2 (Z: -14 đến -26)
+  buildFenceSegment(-14.0, -27.0, -85.0);
+  buildFenceSegment(-14.0, -2.0, -12.0);
+}
+
+// Vỉa hè, Bó vỉa bê tông & Vạch người đi bộ qua đường (Zebra Crossings)
+function buildSidewalksAndCrosswalks() {
+  const whitePaintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const curbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 });
+
+  // 1. Vạch đi bộ qua đường (Zebra Crosswalk) nối Nhà A sang Bãi đỗ xe
+  for (let z = -2; z <= 2; z++) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.45), whitePaintMat);
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(35.0, 0.03, -26.5 + z * 0.85);
+    scene.add(stripe);
+  }
+
+  // 2. Vạch đi bộ qua đường nối Nhà A sang Xưởng B
+  for (let x = -2; x <= 2; x++) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 3.2), whitePaintMat);
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(51.0 + x * 0.85, 0.03, -26.5);
+    scene.add(stripe);
+  }
+
+  // 3. Vạch đi bộ qua đường trước Nhà Ăn CBNV
+  for (let z = -2; z <= 2; z++) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.45), whitePaintMat);
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(34.0, 0.03, -15.0 + z * 0.85);
+    scene.add(stripe);
+  }
+
+  // 4. Bó vỉa hè bê tông (Curb Stones) dọc mép đường trước Nhà A
+  const curbNorth = new THREE.Mesh(new THREE.BoxGeometry(55.0, 0.18, 0.25), curbMat);
+  curbNorth.position.set(40.0, 0.09, -28.35);
+  curbNorth.receiveShadow = true;
+  scene.add(curbNorth);
+
+  const curbSouth = new THREE.Mesh(new THREE.BoxGeometry(55.0, 0.18, 0.25), curbMat);
+  curbSouth.position.set(40.0, 0.09, -24.65);
+  curbSouth.receiveShadow = true;
+  scene.add(curbSouth);
+}
+
+function createFlagpole(x, y, z, flagColor, height = 8.0) {
   const group = new THREE.Group();
   group.position.set(x, y, z);
 
-  // Steel pole
+  // Cột cờ inox bóng mạ crom (Stainless steel pole)
   const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.12, 8.0, 8),
-    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.8 })
+    new THREE.CylinderGeometry(0.06, 0.12, height, 10),
+    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.15, metalness: 0.9 })
   );
-  pole.position.y = 4.0;
+  pole.position.y = height / 2;
   pole.castShadow = true;
   group.add(pole);
 
-  // Flag
-  const flagGeo = new THREE.PlaneGeometry(2.4, 1.5, 8, 4);
+  // Bệ móng đá tròn
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.65, 0.4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 })
+  );
+  base.position.y = 0.2;
+  group.add(base);
+
+  // Quả cầu vàng trên đỉnh cột cờ
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.2, metalness: 0.8 })
+  );
+  ball.position.y = height + 0.1;
+  group.add(ball);
+
+  // Lá cờ vải uốn lượn trong gió
+  const flagW = 2.4;
+  const flagH = 1.5;
+  const flagGeo = new THREE.PlaneGeometry(flagW, flagH, 10, 4);
   const flagMat = new THREE.MeshStandardMaterial({
     color: flagColor,
-    roughness: 0.5,
+    roughness: 0.45,
     side: THREE.DoubleSide,
   });
   const flag = new THREE.Mesh(flagGeo, flagMat);
-  flag.position.set(1.2, 7.2, 0);
+  flag.position.set(flagW / 2 + 0.05, height - flagH / 2 - 0.2, 0);
+  flag.castShadow = true;
   group.add(flag);
   flagMeshes.push(flag);
+
+  // Ngôi sao vàng nếu là cờ đỏ Việt Nam
+  if (flagColor === 0xdc2626) {
+    const starMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const star = new THREE.Mesh(new THREE.CircleGeometry(0.35, 5), starMat);
+    star.position.set(flagW / 2 + 0.05, height - flagH / 2 - 0.2, 0.02);
+    group.add(star);
+  }
 
   scene.add(group);
 }
@@ -3902,31 +4437,33 @@ function createStreetlight(x, y, z) {
   const slGroup = new THREE.Group();
   slGroup.position.set(x, y, z);
 
-  // Pole
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.4, metalness: 0.7 });
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 6.0, 6), poleMat);
-  pole.position.y = 3.0;
+  // Cột thép mạ kẽm cao 6.5m
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.7 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 6.5, 8), poleMat);
+  pole.position.y = 3.25;
+  pole.castShadow = true;
   slGroup.add(pole);
 
-  // Arm & Lamp Head
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 0.2), poleMat);
-  arm.position.set(0.6, 5.9, 0);
+  // Cần vươn đèn đường cong
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.15), poleMat);
+  arm.position.set(0.7, 6.4, 0);
   slGroup.add(arm);
 
-  const lampGeo = new THREE.BoxGeometry(0.6, 0.15, 0.35);
+  // Đèn LED chiếu sáng đô thị
+  const lampGeo = new THREE.BoxGeometry(0.65, 0.14, 0.35);
   const lampMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     emissive: 0x000000,
     roughness: 0.2,
   });
   const lamp = new THREE.Mesh(lampGeo, lampMat);
-  lamp.position.set(1.1, 5.8, 0);
+  lamp.position.set(1.3, 6.32, 0);
   slGroup.add(lamp);
   streetLightLamps.push(lampMat);
 
-  // Spot light for ground illumination at night
-  const light = new THREE.PointLight(0xfef08a, 0, 18);
-  light.position.set(1.1, 5.5, 0);
+  // Nguồn sáng tỏa xuống mặt đường ban đêm (PointLight)
+  const light = new THREE.PointLight(0xfef08a, 0, 22);
+  light.position.set(1.3, 6.0, 0);
   slGroup.add(light);
   streetLightSpotLights.push(light);
 
