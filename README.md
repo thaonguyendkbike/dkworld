@@ -1,4 +1,5 @@
-<img width="1395" height="625" alt="image" src="https://github.com/user-attachments/assets/88645765-847c-4ffc-974e-a96604cd544c" />
+<img width="1864" height="967" alt="image" src="https://github.com/user-attachments/assets/3663622e-dbce-4280-893e-1f352d2da983" />
+
 
 # DK Bike World
 
