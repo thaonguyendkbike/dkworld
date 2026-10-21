@@ -13,17 +13,17 @@ export const CONFIG = {
     fogColorDay: 0xcfeafe, // Sương mù xanh nhạt hòa sắc chân trời
     fogColorSunset: 0xfdba74,
     fogColorNight: 0x0b1120,
-    fogNear: 110,
-    fogFar: 460,
+    fogNear: 220,
+    fogFar: 850,
   },
 
   CAMERA: {
     fov: 42,
-    near: 0.1,
-    far: 1200,
+    near: 1.5,
+    far: 900,
     // Vị trí góc nhìn bao quát toàn bộ liên hoàn DK1 + DK2 (Khối 6: Thấp & gần, isometric diorama)
-    initialPosition: { x: 18, y: 55, z: 80 },
-    initialTarget: { x: -12, y: 6, z: -42 },
+    initialPosition: { x: 80, y: 185, z: 220 },
+    initialTarget: { x: -25, y: -2, z: -50 },
     minDistance: 15,
     maxDistance: 380,
     maxPolarAngle: Math.PI / 2.05,
@@ -109,7 +109,7 @@ export const CONFIG = {
       baseWallColor: 0xe2e8f0,
       roofColor: 0x1e293b,
       monitorRoof: { width: 7.0, height: 2.2, depth: 28.0, color: 0x0f172a },
-      logo: { text: 'DK Bike', color: 0xffb703, size: 2.8 },
+      logo: { text: 'DK Bike', color: 0x184995, size: 2.8 },
       stories: 3,
     },
 
@@ -183,7 +183,7 @@ export const CONFIG = {
       width: 22.0,
       height: 11.5,
       depth: 12.0,
-      position: { x: -36.0, y: 11.5 / 2, z: -32.0 }, // Dịch sang Tây để không lấn đường nhựa DT234 và ao cá Koi
+      position: { x: -36.0, y: 11.5 / 2, z: -10.0 }, // Dịch chuyển 22m theo hướng mũi tên
       wallColor: 0x475569,
       baseWallColor: 0xf8fafc,
       roofColor: 0x1e293b,
@@ -198,7 +198,7 @@ export const CONFIG = {
       width: 62.0,
       height: 6.5,
       depth: 11.0,
-      position: { x: -50.0, y: 6.5 / 2, z: -68.0 }, // Dịch sang phía Đông theo mũi tên, không lấn vào chân đồi
+      position: { x: -50.0, y: 6.5 / 2, z: -46.0 }, // Dịch chuyển 22m theo hướng mũi tên
       wallColor: 0x64748b,
       roofColor: 0x0284c7, // Mái tôn màu xanh dương tươi
       stories: 1,
@@ -210,8 +210,8 @@ export const CONFIG = {
       zone: 'DK2',
       width: 88.0,
       height: 0.1,
-      depth: 22.0,
-      position: { x: -75.0, y: 0.05, z: -15.0 },
+      depth: 21.0,
+      position: { x: -75.0, y: 0.05, z: 7.5 }, // Khớp chính xác với mép Sân thành phẩm (z = -3.0), loại bỏ triệt để dải chồng lấn Z-fighting
       yardColor: 0x94a3b8,
       area: '1.936 m²',
     },
@@ -221,7 +221,7 @@ export const CONFIG = {
       zone: 'DK2',
       width: 75.0,
       depth: 40.0,
-      position: { x: -78.0, y: 0.03, z: -45.0 },
+      position: { x: -78.0, y: 0.03, z: -23.0 }, // Dịch chuyển 22m theo hướng mũi tên
       yardColor: 0x64748b,
       courtColor: 0x22c55e, // Ô sân xanh lá tươi
     },
@@ -232,7 +232,7 @@ export const CONFIG = {
       width: 20.0,
       height: 5.5,
       depth: 20.0,
-      position: { x: -108.0, y: 15.5, z: -88.0 }, // Dịch theo hướng mũi tên xuống triền sườn đồi
+      position: { x: -108.0, y: 15.5, z: -66.0 }, // Dịch chuyển 22m theo hướng mũi tên
       canopyColor: 0x38bdf8,
       opacity: 0.65,
       frameColor: 0x1e293b,
@@ -277,7 +277,7 @@ export const CONFIG = {
     waveFrequency: 0.35,
     opacity: 0.90,
     hillPond: {
-      position: { x: -132.0, z: -76.0 }, // Dịch chuyển lên đỉnh đồi cạnh Vườn Lan theo hướng mũi tên
+      position: { x: -132.0, z: -54.0 }, // Dịch chuyển 22m theo hướng mũi tên
       radiusX: 16.5,                     // Kích thước ao cá lớn
       radiusZ: 12.0,
       terraceRadius: 18.5,
@@ -296,37 +296,37 @@ export const CONFIG = {
   // Sườn đồi cảnh quan phủ xanh
   HILLS: {
     dk1: {
-      position: { x: 45, y: 0, z: -85 },
-      radius: 42,
-      height: 19,
+      position: { x: 50, y: 0, z: -105 }, // Lùi hẳn về phía Bắc để không chèn vào Nhà B và đường tàu
+      radius: 34,
+      height: 22,
       color: 0x22c55e,
     },
     dk2: {
-      position: { x: -120, y: 0, z: -78 },
+      position: { x: -120, y: 0, z: -56 }, // Dịch chuyển 22m theo hướng mũi tên
       radius: 54,
       height: 25,
       color: 0x16a34a,
     },
-    // Đồi mới sinh thái (Giảm kích thước vừa vặn xinh xắn, đỉnh phẳng & ngập tràn hoa)
+    // Đồi mới sinh thái (Dịch chuyển 22m theo hướng mũi tên)
     dk2NewHill: {
-      position: { x: -142, y: 0, z: -38 },
-      radius: 46,     // Giảm từ 66 xuống 46 để hài hòa với khuôn viên
-      flatRadius: 15.0,// Đỉnh đồi phẳng vừa vặn 15m
-      height: 15.5,   // Cao độ 15.5m thoai thoải
+      position: { x: -142, y: 0, z: -16 },
+      radius: 46,
+      flatRadius: 15.0,
+      height: 15.5,
       color: 0x22c55e,
     },
   },
 
-  // Khối 2: Rừng & Cây cối sinh thái (Lush Forest & Flora - Theo phong cách Grand Valley)
+  // Khối 2: Rừng & Cây cối sinh thái (Giảm bớt 30% cây ngoài khuôn viên theo yêu cầu)
   FOREST: {
-    // Số lượng cây và thực vật InstancedMesh (đảm bảo 60 FPS)
-    roundTreeCount: 1500,     // (a) Cây tán tròn low-poly ngẫu nhiên đỉnh
-    pineTreeCount: 850,       // (b) Thông nhiều tầng hình nón
-    autumnTreeCount: 260,     // (c) Cây tán vàng/cam điểm xuyến
-    bushCount: 700,           // (d) Bụi thấp
-    rockCount: 220,           // Đá cuội ven sông và sườn đồi
-    flowerCount: 800,         // Hoa dại nhiều màu
-    grassTuftCount: 600,      // Khóm cỏ tuft
+    // Số lượng cây và thực vật InstancedMesh (đảm bảo cảnh quan thoáng đãng & 60 FPS)
+    roundTreeCount: 3400,     // (a) Cây tán tròn phủ xanh thoáng đãng
+    pineTreeCount: 2500,      // (b) Rừng thông đỉnh đồi & thềm địa hình
+    autumnTreeCount: 650,     // (c) Cây tán vàng/cam thu rực rỡ
+    bushCount: 1600,          // (d) Bụi thấp
+    rockCount: 350,           // Đá cuội ven sông và sườn đồi
+    flowerCount: 1700,        // Hoa dại thung lũng đa sắc
+    grassTuftCount: 1400,     // Khóm cỏ tuft xanh mướt
 
     // Bảng màu rực rỡ phong phú
     colors: {
@@ -349,8 +349,8 @@ export const CONFIG = {
   // Preset vị trí camera chuyển cảnh (Quick Focus)
   PRESETS: {
     overview: {
-      pos: { x: 18, y: 55, z: 80 },
-      target: { x: -12, y: 6, z: -42 },
+      pos: { x: 80, y: 185, z: 220 },
+      target: { x: -25, y: -2, z: -50 },
       name: 'Toàn cảnh liên hoàn DK1 + DK2',
     },
     dk1: {
@@ -359,8 +359,8 @@ export const CONFIG = {
       name: 'Khuôn viên nhà máy DK1',
     },
     dk2: {
-      pos: { x: -35, y: 80, z: 50 },
-      target: { x: -75, y: 5, z: -45 },
+      pos: { x: -35, y: 80, z: 72 },
+      target: { x: -75, y: 5, z: -23 },
       name: 'Khu mở rộng DK2',
     },
     nhaB: {
@@ -369,14 +369,19 @@ export const CONFIG = {
       name: 'Xưởng chính Nhà B (DK1)',
     },
     nhaDieuHanh: {
-      pos: { x: -16, y: 35, z: -10 },
-      target: { x: -36, y: 6, z: -32 },
+      pos: { x: -16, y: 35, z: 12 },
+      target: { x: -36, y: 6, z: -10 },
       name: 'Nhà điều hành DK2 (HQ)',
     },
     vuonLan: {
-      pos: { x: -85, y: 46, z: -55 },
-      target: { x: -118, y: 16, z: -82 },
+      pos: { x: -85, y: 46, z: -33 },
+      target: { x: -118, y: 16, z: -60 },
       name: 'Vườn Lan & Ao cá trên đồi (DK2)',
+    },
+    ecoTrail: {
+      pos: { x: -55, y: 38, z: 24 },
+      target: { x: -115, y: 14, z: -33 },
+      name: 'Tuyến đường đi bộ sinh thái DK2',
     },
     testTrack: {
       pos: { x: 80, y: 40, z: -75 },
@@ -443,21 +448,26 @@ export const CONFIG = {
       target: { x: -148, y: 18.5, z: -38 },
       name: 'Đồi sinh thái: Vườn hoa, Đàn gà & Chim bồ câu DK2',
     },
+    sanXeDK2: {
+      pos: { x: -45, y: 32, z: 28 },
+      target: { x: -75, y: 2, z: 2 },
+      name: 'Sân xe & Thử xe DK2',
+    },
   },
 
   // Hệ thống vật thể chi tiết, thiết bị & tiện ích
   OBJECTS: {
     // Biển chào & Pylon cổng chính
     pylons: [
-      { id: 'pylonDK1', name: 'Cổng chính DK1', pos: { x: 74, y: 0, z: -15 }, text: 'DK BIKE FACTORY 1', color: 0xffb703 },
-      { id: 'pylonDK2', name: 'Cổng chính DK2', pos: { x: -22, y: 0, z: -18 }, text: 'DK BIKE HQ & LOGISTICS', color: 0x0284c7 },
+      { id: 'pylonDK1', name: 'Cổng chính DK1', pos: { x: 74, y: 0, z: -15 }, text: 'DK BIKE FACTORY 1', color: 0x184995 },
+      { id: 'pylonDK2', name: 'Cổng chính DK2', pos: { x: -22, y: 0, z: 4 }, text: 'DK BIKE HQ & LOGISTICS', color: 0x0284c7 },
     ],
 
     // Cửa cuốn công nghiệp (Roller Shutter Doors) xưởng B
     shutterDoors: [
       { id: 'doorB1', name: 'Cửa cuốn chính Xưởng B', pos: { x: 58.0, y: 0, z: -33.2 }, width: 5.5, height: 4.2, isOpen: false },
       { id: 'doorB2', name: 'Cửa xuất nhập hàng Xưởng B', pos: { x: 72.0, y: 0, z: -33.2 }, width: 5.0, height: 4.2, isOpen: false },
-      { id: 'doorD21', name: 'Cửa Kho Linh kiện D2.1', pos: { x: -70.0, y: 0, z: -62.4 }, width: 4.5, height: 3.8, isOpen: false },
+      { id: 'doorD21', name: 'Cửa Kho Linh kiện D2.1', pos: { x: -70.0, y: 0, z: -40.4 }, width: 4.5, height: 3.8, isOpen: false },
     ],
 
     // Trạm sạc xe máy điện siêu tốc (DK Fast EV Charging)
@@ -493,43 +503,43 @@ export const CONFIG = {
   // Danh mục thông tin nhân sự và hoạt động
   CHARACTERS: {
     kcs: {
-      name: 'Kỹ sư KCS: Lê Tuấn Anh',
+      name: 'Kỹ sư KCS: Liễu Tùng Lâm',
       role: 'Kiểm soát chất lượng xuất xưởng',
       activity: 'Đang kiểm tra thông số phanh và pin dòng xe DK Roma SX trên tablet chuyên dụng.',
       zone: 'Sân KCS / Đường thử Nhà B',
     },
     forkliftDriver: {
-      name: 'Tài xế xe nâng: Trần Văn Hùng',
+      name: 'Tài xế xe nâng: Hà Văn Sự',
       role: 'Vận hành logistics xuất nhập xưởng',
       activity: 'Đang vận chuyển pallet cụm động cơ điện và bộ điều khiển IC vào cửa xưởng B.',
       zone: 'Cửa bốc dỡ Xưởng B',
     },
     guardDK1: {
-      name: 'Bảo vệ: Hoàng Văn Minh',
+      name: 'Bảo vệ: Phạm Quốc Trưởng',
       role: 'Kiểm soát an ninh Cổng chính DK1',
       activity: 'Điều phối barrier tự động cho xe tải logistics và khách ra vào nhà máy.',
       zone: 'Bốt gác Cổng DK1',
     },
     guardDK2: {
-      name: 'Bảo vệ: Triệu Quốc Bảo',
+      name: 'Bảo vệ: Hoàng Minh Quân',
       role: 'Kiểm soát an ninh Cổng chính DK2',
       activity: 'Quản lý vé xe, kiểm tra thẻ từ nhân viên và đối tác vào khu nhà điều hành.',
       zone: 'Bốt gác Cổng DK2',
     },
     logisticsLead: {
-      name: 'Quản lý kho: Đỗ Thanh Nga',
+      name: 'Quản lý kho:  Đinh Văn Long',
       role: 'Trưởng ban điều phối Logistics & Xuất khẩu',
-      activity: 'Kiểm đếm lô hàng 60 xe máy điện DK Creer E chuẩn bị đóng container xuất đi các tỉnh.',
+      activity: 'Kiểm đếm lô hàng 60 xe máy điện DK Gogo chuẩn bị đóng container xuất đi các tỉnh.',
       zone: 'Sân thành phẩm DK2',
     },
     rndStaff: {
-      name: 'Kỹ thuật viên R&D: Nguyễn Đức Thành',
+      name: 'Kỹ thuật viên R&D: Nguyễn Xuân Thao',
       role: 'Nghiên cứu phát triển kiểu dáng & khí động học',
       activity: 'Di chuyển trên cầu vượt tầng 2 mang bản vẽ kỹ thuật từ Nhà A sang xưởng lắp ráp B.',
       zone: 'Cầu vượt nối Nhà A - B',
     },
     orchidGardener: {
-      name: 'Nghệ nhân cây cảnh: Bác Bùi Văn Thắng',
+      name: 'Nghệ nhân cây cảnh: Phùng Văn Xuân',
       role: 'Chăm sóc cảnh quan sinh thái Vườn Lan',
       activity: 'Tưới và chăm sóc giàn phong lan rừng Lạng Sơn trên đỉnh đồi cao +16m.',
       zone: 'Vườn Lan Đỉnh Đồi DK2',
@@ -537,7 +547,7 @@ export const CONFIG = {
   },
 
   // Cấu hình mạng lưới người và nhân sự (Khối 7: Người)
-    // Cấu hình hoạt cảnh Logistics, Xe nâng & Đội xe tải (Khối 9)
+  // Cấu hình hoạt cảnh Logistics, Xe nâng & Đội xe tải (Khối 9)
   LOGISTICS: {
     cycleDuration: 48.0, // Tổng thời gian 1 chu kỳ giao nhận & bốc xếp khép kín (giây)
     truckSpeed: 5.8,     // Tốc độ xe tải 5T di chuyển (m/s)
