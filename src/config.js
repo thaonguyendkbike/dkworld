@@ -459,7 +459,7 @@ export const CONFIG = {
     hoCaKoiDK2: {
       pos: { x: -12, y: 13, z: 12 },
       target: { x: -20, y: 1.2, z: -4 },
-      name: 'Hồ cá Koi cảnh quan DK2',
+      name: 'Bể cá hình chữ nhật & Vườn hoa DK2',
     },
     dkCoffeeBar: {
       pos: { x: -10, y: 14, z: 20 },
