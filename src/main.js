@@ -3177,6 +3177,252 @@ function buildDK2HeadquartersKoiPond(parentGroup, cfg) {
 }
 
 // ============================================================================
+// KHO LINH KIỆN & PHỤ TÙNG DK2 (D2.1)
+// ============================================================================
+function buildKhoLinhKienDK2() {
+  const cfg = CONFIG.BUILDINGS.khoLinhKienDK2;
+  const group = new THREE.Group();
+  group.position.set(cfg.position.x, 0, cfg.position.z);
+  group.userData = { id: 'khoLinhKienDK2', config: cfg };
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width, cfg.height, cfg.depth),
+    new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.7 })
+  );
+  body.position.y = cfg.height / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width + 1.0, 0.6, cfg.depth + 1.0),
+    new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.45, metalness: 0.3 })
+  );
+  roof.position.y = cfg.height + 0.3;
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Cửa cuốn tự động chính Kho Linh Kiện D2.1 (kết nối bãi bốc xếp phía Nam)
+  createShutterDoor(group, 0, 0, cfg.depth / 2 + 0.08, 4.8, 3.8, 'doorD21', 'Cửa Kho Linh kiện D2.1');
+
+  // Các cửa cuốn phân loại kho (Kho Hóa chất HC, Kho Ắc quy AQ)
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0xdde2e6, roughness: 0.4, metalness: 0.3 });
+  for (let x = -cfg.width / 2 + 6; x <= cfg.width / 2 - 6; x += 7.0) {
+    if (Math.abs(x) < 3.5) continue; // Chừa chỗ cho cửa cuốn chính ở giữa
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 3.8), doorMat);
+    door.position.set(x, 1.9, cfg.depth / 2 + 0.05);
+    group.add(door);
+
+    // Khung cửa viền
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(4.4, 0.15, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 })
+    );
+    frame.position.set(x, 3.85, cfg.depth / 2 + 0.08);
+    group.add(frame);
+  }
+
+  scene.add(group);
+  buildingMeshes.push(body);
+}
+
+// ============================================================================
+// SÂN KIỂM ĐỊNH & XE THÀNH PHẨM DK2 (CHUYỂN ĐỔI TỪ NHÀ XƯỞNG CŨ)
+// ============================================================================
+function buildXuongDK2() {
+  const cfg = CONFIG.BUILDINGS.xuongDK2;
+  const group = new THREE.Group();
+  group.position.set(cfg.position.x, 0, cfg.position.z);
+  group.userData = {
+    id: 'xuongDK2',
+    config: cfg,
+    title: 'Sân kiểm định & Xe thành phẩm DK2',
+    type: 'yard',
+    desc: 'Sân bê tông rộng 88m × 22m mở rộng từ việc chuyển đổi nhà xưởng cũ, phục vụ bãi kiểm định chất lượng KCS, chạy thử xe và tập kết các lô xe máy điện DK Bike trước khi xuất kho.',
+    zone: 'DK2',
+  };
+
+  // 1. Paved concrete surface slab with expansion joints
+  const yardGeo = new THREE.PlaneGeometry(cfg.width, cfg.depth);
+  const yardMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    roughness: 0.85,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -1.0,
+  });
+  const yard = new THREE.Mesh(yardGeo, yardMat);
+  yard.rotation.x = -Math.PI / 2;
+  yard.position.y = 0.05;
+  yard.receiveShadow = true;
+  group.add(yard);
+
+  // Concrete grid expansion joints
+  const lineMat = new THREE.MeshBasicMaterial({
+    color: 0x64748b,
+    polygonOffset: true,
+    polygonOffsetFactor: -2.0,
+    polygonOffsetUnits: -2.0,
+  });
+  for (let lx = -cfg.width / 2 + 8; lx < cfg.width / 2; lx += 11) {
+    const joint = new THREE.Mesh(new THREE.PlaneGeometry(0.08, cfg.depth), lineMat);
+    joint.rotation.x = -Math.PI / 2;
+    joint.position.set(lx, 0.075, 0);
+    group.add(joint);
+  }
+
+  // 2. Painted logistics markings: yellow borders, diagonal test tracks, parking bays
+  const yellowPaintMat = new THREE.MeshBasicMaterial({
+    color: 0xfacc15,
+    polygonOffset: true,
+    polygonOffsetFactor: -2.0,
+    polygonOffsetUnits: -2.0,
+  });
+  const whitePaintMat = new THREE.MeshBasicMaterial({
+    color: 0xf8fafc,
+    polygonOffset: true,
+    polygonOffsetFactor: -2.0,
+    polygonOffsetUnits: -2.0,
+  });
+
+  // Border lines
+  const borderTop = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 2, 0.2), yellowPaintMat);
+  borderTop.rotation.x = -Math.PI / 2;
+  borderTop.position.set(0, 0.08, -cfg.depth / 2 + 1);
+  group.add(borderTop);
+
+  const borderBot = new THREE.Mesh(new THREE.PlaneGeometry(cfg.width - 2, 0.2), yellowPaintMat);
+  borderBot.rotation.x = -Math.PI / 2;
+  borderBot.position.set(0, 0.08, cfg.depth / 2 - 1);
+  group.add(borderBot);
+
+  // Speed / brake testing lane (Làn kiểm định tốc độ & phanh)
+  const testTrackGreen = new THREE.Mesh(
+    new THREE.PlaneGeometry(cfg.width - 4, 3.2),
+    new THREE.MeshStandardMaterial({
+      color: 0x15803d,
+      roughness: 0.7,
+      polygonOffset: true,
+      polygonOffsetFactor: -2.0,
+      polygonOffsetUnits: -2.0,
+    })
+  );
+  testTrackGreen.rotation.x = -Math.PI / 2;
+  testTrackGreen.position.set(0, 0.075, -6.5);
+  group.add(testTrackGreen);
+
+  // Center dashed line for test lane
+  for (let dx = -cfg.width / 2 + 4; dx < cfg.width / 2 - 4; dx += 4) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.15), whitePaintMat);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(dx, 0.09, -6.5);
+    group.add(dash);
+  }
+
+  // Finished vehicle diagonal parking bays & parked DK Bikes
+  const bikeColors = [0x184995, 0xef4444, 0x06b6d4, 0x10b981, 0x6366f1, 0xf1f5f9, 0x1e293b, 0x2563eb];
+  for (let slot = 0; slot < 26; slot++) {
+    const sx = -cfg.width / 2 + 6 + slot * 3.0;
+    const sz = 2.0;
+
+    // White parking divider line
+    const slotLine = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 4.0), whitePaintMat);
+    slotLine.rotation.x = -Math.PI / 2;
+    slotLine.position.set(sx - 1.3, 0.08, sz);
+    group.add(slotLine);
+
+    // Park a DK Bike in each bay
+    const bColor = bikeColors[slot % bikeColors.length];
+    const parkedBike = createDetailedDKBike(bColor, `DK Bike Thành Phẩm Lô #${slot + 1}`);
+    parkedBike.position.set(sx, 0.08, sz);
+    parkedBike.rotation.y = Math.PI / 2;
+    group.add(parkedBike);
+  }
+
+  // Second row of parked bikes (DK Gogo & DK Nova)
+  for (let slot = 0; slot < 18; slot++) {
+    const sx = -cfg.width / 2 + 10 + slot * 4.0;
+    const sz = 7.5;
+    const bColor = bikeColors[(slot + 3) % bikeColors.length];
+    const isNova = slot % 2 === 1;
+    const modelTitle = isNova ? `DK Nova Xuất Xưởng #${slot + 1}` : `DK Gogo Xuất Xưởng #${slot + 1}`;
+    const parkedBike = createDKGogo(bColor, modelTitle);
+    parkedBike.position.set(sx, 0.08, sz);
+    parkedBike.rotation.y = Math.PI / 2;
+    group.add(parkedBike);
+  }
+
+  // 4 corner industrial LED floodlight poles
+  [
+    { x: -cfg.width / 2 + 2, z: -cfg.depth / 2 + 2 },
+    { x: cfg.width / 2 - 2, z: -cfg.depth / 2 + 2 },
+    { x: -cfg.width / 2 + 2, z: cfg.depth / 2 - 2 },
+    { x: cfg.width / 2 - 2, z: cfg.depth / 2 - 2 },
+  ].forEach((lp) => {
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.18, 6.0, 6),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6 })
+    );
+    pole.position.set(lp.x, 3.0, lp.z);
+    pole.castShadow = true;
+    group.add(pole);
+
+    const headLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 0.35, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfef08a, emissiveIntensity: 0.3 })
+    );
+    headLight.position.set(lp.x, 6.1, lp.z);
+    headLight.rotation.x = Math.PI / 6;
+    group.add(headLight);
+  });
+
+  scene.add(group);
+  interactiveObjects.push(group);
+}
+
+// ============================================================================
+// SÂN BÃI THÀNH PHẨM & THỂ THAO ĐA NĂNG DK2
+// ============================================================================
+function buildSanThanhPhamDK2() {
+  const cfg = CONFIG.BUILDINGS.sanThanhPhamDK2;
+  const yardMat = new THREE.MeshStandardMaterial({
+    color: cfg.yardColor,
+    roughness: 0.8,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -1.0,
+  });
+  const yard = new THREE.Mesh(
+    new THREE.PlaneGeometry(cfg.width, cfg.depth),
+    yardMat
+  );
+  yard.rotation.x = -Math.PI / 2;
+  yard.position.set(cfg.position.x, 0.05, cfg.position.z);
+  yard.receiveShadow = true;
+  scene.add(yard);
+
+  // Green court areas
+  const courtMat = new THREE.MeshStandardMaterial({
+    color: cfg.courtColor,
+    roughness: 0.7,
+    polygonOffset: true,
+    polygonOffsetFactor: -2.0,
+    polygonOffsetUnits: -2.0,
+  });
+  const court1 = new THREE.Mesh(new THREE.PlaneGeometry(24, 16), courtMat);
+  court1.rotation.x = -Math.PI / 2;
+  court1.position.set(cfg.position.x - 18, 0.08, cfg.position.z - 8);
+  court1.receiveShadow = true;
+  scene.add(court1);
+
+  const court2 = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), courtMat);
+  court2.rotation.x = -Math.PI / 2;
+  court2.position.set(cfg.position.x + 12, 0.08, cfg.position.z - 12);
+  court2.receiveShadow = true;
+  scene.add(court2);
+}
+
+// ============================================================================
 // QUÁN CÀ PHÊ & LOUNGE DK COFFEE & BAR (ĐỐI DIỆN NHÀ ĐIỀU HÀNH DK2)
 // ============================================================================
 function buildDKCoffeeBar() {
