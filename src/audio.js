@@ -350,29 +350,29 @@ class AudioManager {
     noise.buffer = buffer;
     noise.loop = true;
 
-    // Lọc Lowpass dịu nhẹ ở 720Hz (loại bỏ tiếng xè xè gắt tai)
+    // Lọc Lowpass tươi sáng, rõ ràng ở 1450Hz (mưa rơi rào rạt và tí tách giòn giã hơn)
     const filter1 = ctx.createBiquadFilter();
     filter1.type = 'lowpass';
-    filter1.frequency.setValueAtTime(720, ctx.currentTime);
+    filter1.frequency.setValueAtTime(1450, ctx.currentTime);
 
-    // Lọc Highpass ở 180Hz (loại bỏ tiếng ầm ù)
+    // Lọc Highpass ở 140Hz (giữ độ trầm tự nhiên của màn mưa)
     const filter2 = ctx.createBiquadFilter();
     filter2.type = 'highpass';
-    filter2.frequency.setValueAtTime(180, ctx.currentTime);
+    filter2.frequency.setValueAtTime(140, ctx.currentTime);
 
-    // LFO gió thoảng nhẹ nhàng (chu kỳ 8 giây)
+    // LFO gió thoảng nhẹ nhàng (chu kỳ 6 giây)
     const lfo = ctx.createOscillator();
     const lfoGain = ctx.createGain();
     lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(0.12, ctx.currentTime);
-    lfoGain.gain.setValueAtTime(80, ctx.currentTime);
+    lfo.frequency.setValueAtTime(0.16, ctx.currentTime);
+    lfoGain.gain.setValueAtTime(180, ctx.currentTime);
     lfo.connect(filter1.frequency);
     lfo.start();
 
-    // Âm lượng nền mưa êm dịu: 0.045
+    // Âm lượng nền mưa rõ rệt, sống động: 0.088 (tăng từ 0.045)
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.045, ctx.currentTime + 1.0);
+    gain.gain.linearRampToValueAtTime(0.088, ctx.currentTime + 1.0);
 
     noise.connect(filter1);
     filter1.connect(filter2);
@@ -380,7 +380,7 @@ class AudioManager {
     gain.connect(this.sfxGain);
     noise.start();
 
-    // Từng giọt mưa rơi tí tách rả rích ngẫu nhiên 350ms - 900ms
+    // Từng giọt mưa rơi tí tách rả rích ngẫu nhiên 160ms - 420ms (rõ ràng, sống động)
     let dropTimeout = null;
     const scheduleNextDrop = () => {
       if (!this.sfxStates.rain) return;
@@ -390,17 +390,18 @@ class AudioManager {
       const dropGain = ctx.createGain();
       const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
 
-      const dropFreq = 700 + Math.random() * 550;
+      const dropFreq = 650 + Math.random() * 850;
       dropOsc.type = 'sine';
       dropOsc.frequency.setValueAtTime(dropFreq, t);
-      dropOsc.frequency.exponentialRampToValueAtTime(dropFreq * 0.45, t + 0.035);
+      dropOsc.frequency.exponentialRampToValueAtTime(dropFreq * 0.42, t + 0.045);
 
       dropFilter.type = 'lowpass';
-      dropFilter.frequency.setValueAtTime(1200, t);
+      dropFilter.frequency.setValueAtTime(1800, t);
 
-      const dropVol = 0.015 + Math.random() * 0.009;
+      // Âm lượng giọt mưa rõ rệt hơn (0.038 - 0.062)
+      const dropVol = 0.038 + Math.random() * 0.024;
       dropGain.gain.setValueAtTime(dropVol, t);
-      dropGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      dropGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
 
       dropOsc.connect(dropFilter);
       dropFilter.connect(dropGain);
@@ -414,13 +415,13 @@ class AudioManager {
       }
 
       dropOsc.start(t);
-      dropOsc.stop(t + 0.045);
+      dropOsc.stop(t + 0.055);
 
-      const nextDelay = 350 + Math.random() * 650;
+      const nextDelay = 160 + Math.random() * 260;
       dropTimeout = setTimeout(scheduleNextDrop, nextDelay);
     };
 
-    dropTimeout = setTimeout(scheduleNextDrop, 400);
+    dropTimeout = setTimeout(scheduleNextDrop, 250);
 
     this.rainNodes = {
       noise,

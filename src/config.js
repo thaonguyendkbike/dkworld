@@ -237,6 +237,19 @@ export const CONFIG = {
       opacity: 0.65,
       frameColor: 0x1e293b,
     },
+
+    dkCoffeeBar: {
+      name: 'DK Coffee & Bar (Khuôn viên DK2)',
+      zone: 'DK2',
+      width: 10.0,
+      height: 3.8,
+      depth: 8.5,
+      position: { x: -24.0, y: 0.1, z: 8.5 }, // Đối diện Nhà điều hành DK2
+      woodColor: 0x78350f,
+      steelColor: 0x1e293b,
+      canvasColor: 0x0284c7,
+      area: '85 m²',
+    },
   },
 
   // Tuyến đường nội bộ & test track (rộng 3.0m)
@@ -439,9 +452,19 @@ export const CONFIG = {
       name: 'Khu tập kết xe máy điện DK Bike',
     },
     aoCaDK2: {
-      pos: { x: -108, y: 28, z: -60 },
-      target: { x: -126, y: 17.2, z: -78 },
-      name: 'Ao cá đồi sinh thái DK2',
+      pos: { x: -148, y: 28, z: -94 },
+      target: { x: -132, y: 17.5, z: -76 },
+      name: 'Ao cá đồi sinh thái DK2 (Cầu gỗ & Cá nhảy)',
+    },
+    hoCaKoiDK2: {
+      pos: { x: -12, y: 13, z: 12 },
+      target: { x: -20, y: 1.2, z: -4 },
+      name: 'Hồ cá Koi cảnh quan DK2',
+    },
+    dkCoffeeBar: {
+      pos: { x: -10, y: 14, z: 20 },
+      target: { x: -24, y: 1.5, z: 8.5 },
+      name: 'DK Coffee & Bar (Đối diện Nhà điều hành)',
     },
     doiGaDK2: {
       pos: { x: -126, y: 29, z: -16 },
