@@ -1,3 +1,5 @@
+<img width="1395" height="625" alt="image" src="https://github.com/user-attachments/assets/88645765-847c-4ffc-974e-a96604cd544c" />
+
 # DK Bike World
 
 DK Bike World là một dự án web 3D mô phỏng khuôn viên công ty DK Bike theo phong cách low-poly, được xây dựng bằng Three.js và Vite. Dự án nhằm mục đích tạo ra một trải nghiệm trực quan, hiện đại, giúp người xem hình dung không gian công ty, cảnh quan xung quanh và bố cục tổng thể của khu đất trong một môi trường tương tác 3D.
