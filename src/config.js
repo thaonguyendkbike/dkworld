@@ -99,16 +99,16 @@ export const CONFIG = {
   BUILDINGS: {
     // === PHÂN KHU DK1 ===
     nhaB: {
-      name: 'Nhà B - Xưởng sản xuất chính',
+      name: 'Nhà B - Xưởng sản xuất chính (Dài 44m)',
       zone: 'DK1',
       width: 22.5,
       height: 13.5,
-      depth: 33.5,
-      position: { x: 65.0, y: 13.5 / 2, z: -50.0 },
+      depth: 43.5,
+      position: { x: 65.0, y: 13.5 / 2, z: -55.0 },
       wallColor: 0x475569,
       baseWallColor: 0xe2e8f0,
       roofColor: 0x1e293b,
-      monitorRoof: { width: 7.0, height: 2.2, depth: 28.0, color: 0x0f172a },
+      monitorRoof: { width: 7.0, height: 2.2, depth: 38.0, color: 0x0f172a },
       logo: { text: 'DK Bike', color: 0x184995, size: 2.8 },
       stories: 3,
     },
@@ -284,7 +284,7 @@ export const CONFIG = {
   // Khối 4: Hệ thống Nước, Sông máng & Ao cá đồi sinh thái (Stylized Water System)
   WATER: {
     shallowColor: 0x38bdf8, // Xanh ngọc trong vắt sát bờ
-    deepColor: 0x0369a1,    // Xanh đậm sẫm có chiều sâu giữa dòng
+    deepColor: 0x0284c7,    // Xanh ngọc biếc trong trẻo có chiều sâu giữa dòng (chuẩn ảnh mẫu)
     foamColor: 0xffffff,    // Viền bọt trắng ở bờ
     waveSpeed: 0.85,        // Tốc độ sóng chuyển động chậm
     waveFrequency: 0.35,
@@ -381,6 +381,31 @@ export const CONFIG = {
       target: { x: 65, y: 8, z: -50 },
       name: 'Xưởng chính Nhà B (DK1)',
     },
+    insideNhaB: {
+      pos: { x: 58.5, y: 6.2, z: -35.0 },
+      target: { x: 64.5, y: 1.8, z: -51.0 },
+      name: 'Bên trong Xưởng B (Dây chuyền & Kho)',
+    },
+    insideAssemblyLine: {
+      pos: { x: 61.2, y: 3.2, z: -40.0 },
+      target: { x: 63.2, y: 1.8, z: -48.0 },
+      name: 'Dây chuyền lắp ráp DK Bike',
+    },
+    insideFreightLift: {
+      pos: { x: 58.5, y: 3.2, z: -33.5 },
+      target: { x: 55.8, y: 2.2, z: -36.0 },
+      name: 'Thang tời hàng 2.5T',
+    },
+    insidePartsRacks: {
+      pos: { x: 66.5, y: 3.8, z: -45.0 },
+      target: { x: 71.0, y: 2.5, z: -50.0 },
+      name: 'Giá kệ kho linh kiện',
+    },
+    insideStagingArea: {
+      pos: { x: 62.5, y: 3.2, z: -42.0 },
+      target: { x: 58.5, y: 1.5, z: -47.0 },
+      name: 'Khu tập kết xe thành phẩm',
+    },
     nhaDieuHanh: {
       pos: { x: -16, y: 35, z: 12 },
       target: { x: -36, y: 6, z: -10 },
@@ -411,19 +436,24 @@ export const CONFIG = {
       target: { x: 88, y: 3, z: -2 },
       name: 'Ga xe lửa DK Station',
     },
+    bridgeView: {
+      pos: { x: 99.0, y: 28.0, z: -48.0 },
+      target: { x: 93.5, y: 1.0, z: -48.0 },
+      name: 'Cầu đường sắt vượt sông (Ảnh mẫu)',
+    },
     sheepFlock: {
-      pos: { x: 122, y: 12, z: -32 },
-      target: { x: 108, y: 4.8, z: -45 },
-      name: 'Đàn cừu trên đồi cỏ',
+      pos: { x: 120, y: 7.5, z: -32 },
+      target: { x: 108, y: 1.2, z: -45 },
+      name: 'Đàn cừu trên bãi cỏ',
     },
     river: {
-      pos: { x: 105, y: 12, z: 8 },
-      target: { x: 89.5, y: 0, z: -8 },
+      pos: { x: 106, y: 8.5, z: -70 },
+      target: { x: 91.8, y: -0.3, z: -82 },
       name: 'Sông máng nước & Thuyền nan',
     },
     windmill: {
-      pos: { x: 75, y: 36, z: -85 },
-      target: { x: 55, y: 26, z: -108 },
+      pos: { x: 78, y: 36, z: -100 },
+      target: { x: 58, y: 22, z: -128 },
       name: 'Cối xay gió sinh thái',
     },
     logistics: {

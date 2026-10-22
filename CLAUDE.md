@@ -27,3 +27,5 @@ Tham khảo phong cách: `inputs/reference/` (Grand Valley). KHÔNG sao chép t�
 - Nhạc/âm thanh/mô hình: chỉ dùng nguồn miễn phí bản quyền (CC0/CC-BY), ghi nguồn vào `docs/credits.md`.
 - Không đưa biển số xe, khuôn mặt, thông tin nội bộ nhạy cảm vào sản phẩm.
 - Ảnh trong `inputs/` chỉ để tham chiếu, không deploy lên web trừ khi tôi cho phép.
+- Đừng tự mở localhost để test nếu tôi không cho phép.
+

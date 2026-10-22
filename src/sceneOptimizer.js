@@ -73,10 +73,21 @@ export function batchStaticMeshes(scene, { simulate, clickables = [] }) {
 
   const clickableSet = new Set(clickables);
 
-  // Thu thập ứng viên
+  function isDoNotBatch(o) {
+    let cur = o;
+    while (cur && cur !== scene) {
+      if (cur.userData && (cur.userData.noBatch || cur.userData.dynamic)) return true;
+      if (cur.name === 'nhaBRoofGroup' || cur.userData?.id === 'nhaBRoofGroup') return true;
+      cur = cur.parent;
+    }
+    return false;
+  }
+
+  // Thu thập ứng viên (loại trừ các mesh thuộc nhóm mái/nội thất động)
   const candidates = [];
   scene.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+    if (isDoNotBatch(o)) return;
     candidates.push(o);
   });
 

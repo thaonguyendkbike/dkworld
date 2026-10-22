@@ -44,7 +44,7 @@ let animatedTruck, truckProgress = 0;
 // Khối 9: Logistics, Forklifts & Truck Fleet
 let activeLogisticsTruck = null;
 let activeForklift = null;
-let activeForkliftInitialPos = { x: 58.0, y: 0, z: -35.6, rotY: -Math.PI / 2 };
+let activeForkliftInitialPos = { x: 58.0, y: 0, z: -36.5, rotY: -Math.PI / 2 };
 let logisticsCycleTime = 0;
 let guardGate1 = null;
 let guardSaluteAngle = 0;
@@ -95,7 +95,7 @@ const CAMPUS_WAYPOINTS = [
   { id: 5, x: 37, y: 0, z: -6.5, neighbors: [2, 4, 6] },         // Lối đi trước đài phun nước DK & sân bóng chuyền
   { id: 6, x: 60, y: 0, z: -28, neighbors: [1, 5, 8] },         // Khu bốc dỡ Nhà B
   { id: 7, x: 28, y: 0, z: -4, neighbors: [3, 9] },            // Đầu vạch đi bộ qua đường DK1 (Zebra)
-  { id: 8, x: 70, y: 0, z: -42, neighbors: [1, 6] },            // Sân kiểm định sau Xưởng B
+  { id: 8, x: 78, y: 0, z: -26, neighbors: [1, 6, 25] },         // Vỉa hè ngoài trời cạnh đường thử xe DK1
 
   // Tuyến băng qua ĐT234 sang DK2
   { id: 9, x: 28, y: 0, z: 4, neighbors: [7, 10] },            // Giữa đường ĐT234
@@ -114,6 +114,16 @@ const CAMPUS_WAYPOINTS = [
   // Đồi sinh thái DK2
   { id: 19, x: -108, y: 15.8, z: -82, neighbors: [18] },        // Đỉnh đồi Vườn Lan & Ao cá
   { id: 20, x: -142, y: 15.5, z: -38, neighbors: [18] },        // Đỉnh Đồi Gà & Tháp bồ câu
+
+  // Tuyến đường & Cổng kết nối mới đối diện Cổng DK2 (Gate 1B <-> Nhà A)
+  { id: 21, x: -10.0, y: 0, z: -25.5, neighbors: [11, 22] },    // Vạch đi bộ ĐT234 nối thẳng 2 cổng
+  { id: 22, x: -6.0, y: 0, z: -25.5, neighbors: [21, 23] },     // Cổng kết nối 1B
+  { id: 23, x: 4.0, y: 0, z: -25.5, neighbors: [22, 24] },      // Giữa đường kết nối mới
+  { id: 24, x: 14.0, y: 0, z: -25.5, neighbors: [23, 3] },      // Đầu đường trước Nhà A (nối vào WP 3)
+
+  // Tuyến vỉa hè ngoài trời đi vòng qua Xưởng B (không xuyên qua tường)
+  { id: 25, x: 78.0, y: 0, z: -52.0, neighbors: [8, 26] },      // Vỉa hè cạnh Mái che xe điện
+  { id: 26, x: 78.0, y: 0, z: -80.0, neighbors: [25] },         // Vỉa hè ngoài trời sau Xưởng B (Z = -80.0, ngoài xưởng)
 ];
 
 // Volleyball match & court
@@ -149,6 +159,11 @@ let shutterDoors = [];
 let areDoorsOpen = true; // Cửa xưởng auto mở sẵn liên tục
 let doorProgress = 1; // 1 = fully open
 let interiorFactoryLights = [];
+let nhaBRoofGroupGlobal = null;
+let insideHVLSFans = [];
+let insideAssemblyBikes = [];
+let insideConveyorSlats = [];
+let insideAssemblyWorkers = [];
 let animatedForklifts = [];
 let animatedBarriers = [];
 let chargingStationsList = [];
@@ -541,15 +556,7 @@ function buildGroundsAndRoadDT234() {
   // Pylon Cổng DK2 (Dịch chuyển 22m theo hướng mũi tên)
   buildPylonSign(-22, 0, 4, 'DK BIKE', 'TRỤ SỞ & KHO DK2', 0x184995, 'pylonDK2');
 
-  // Hill DK1 (North)
-  const hill1Cfg = CONFIG.HILLS.dk1;
-  const hill1 = new THREE.Mesh(
-    new THREE.ConeGeometry(hill1Cfg.radius, hill1Cfg.height, 9),
-    new THREE.MeshStandardMaterial({ color: hill1Cfg.color, roughness: 0.9, flatShading: true })
-  );
-  hill1.position.set(hill1Cfg.position.x, hill1Cfg.height / 2 - 2, hill1Cfg.position.z);
-  hill1.receiveShadow = true;
-  scene.add(hill1);
+  // Hill DK1 (North) - Toàn bộ đồi núi được quản lý thống nhất bởi interiorHills trong dioramaGroup, tránh chèn lấn vào Nhà B
 }
 
 // Xây dựng Cột tháp Pylon thương hiệu tại Cổng nhà máy
@@ -678,6 +685,48 @@ function getDK2HillSurfaceY(x, z) {
   return maxY;
 }
 
+// ============================================================================
+// KHỞI TẠO TUYẾN TIM DÒNG SÔNG MÁNG NƯỚC UỐN LƯỢN (CANAL SPLINE & DEPTH FIELD)
+// ============================================================================
+const CANAL_WAYPOINTS = [
+  new THREE.Vector3(88.0, -0.32, -198),
+  new THREE.Vector3(88.0, -0.32, -140),
+  new THREE.Vector3(88.0, -0.32, -80),
+  new THREE.Vector3(86.0, -0.32, -62),
+  new THREE.Vector3(86.5, -0.32, -52),
+  new THREE.Vector3(93.5, -0.32, -48), // Cắt ngang uốn lượn dưới Cầu đường sắt đỏ như ảnh mẫu
+  new THREE.Vector3(101.5, -0.32, -45),
+  new THREE.Vector3(105.0, -0.32, -35),
+  new THREE.Vector3(98.0, -0.32, -22),
+  new THREE.Vector3(88.5, -0.32, -8),  // Ga DK Station
+  new THREE.Vector3(88.5, -0.32, 12),
+  new THREE.Vector3(89.5, -0.32, 70),
+  new THREE.Vector3(89.5, -0.32, 98),
+];
+const canalCurve = new THREE.CatmullRomCurve3(CANAL_WAYPOINTS);
+
+function getRiverBedDepth(x, z) {
+  // Khoảng cách tới đường tim dòng sông máng nước (tính chính xác theo spline uốn lượn)
+  const tEst = Math.max(0, Math.min(1, (z - (-198)) / 296));
+  let minDist = 9999;
+  for (let dt = -0.05; dt <= 0.05; dt += 0.01) {
+    const t = Math.max(0, Math.min(1, tEst + dt));
+    const pt = canalCurve.getPointAt(t);
+    const d = Math.hypot(x - pt.x, z - pt.z);
+    if (d < minDist) minDist = d;
+  }
+  const halfW = 4.8;  // Nửa bề rộng mặt nước ~ 4.8m (mặt nước rộng 9.6m)
+  const bankW = 3.6;  // Mái taluy bờ dốc thoai thoải 3.6m
+  if (minDist < halfW) {
+    return -1.15;
+  } else if (minDist < halfW + bankW) {
+    const s = (minDist - halfW) / bankW;
+    const smoothS = s * s * (3 - 2 * s);
+    return -1.15 * (1.0 - smoothS);
+  }
+  return 0.0;
+}
+
 function buildVastTerrainAndClouds() {
   // ==========================================================================
   // KHỐI ĐẢO 3D HÌNH VUÔNG LÁT CẮT ĐỊA TẦNG (SQUARE FLOATING DIORAMA BASE)
@@ -691,10 +740,42 @@ function buildVastTerrainAndClouds() {
   const cz = -50;  // Tâm Z
   const cliffDepth = 24.0; // Độ dày vách cắt địa chất
 
-  // 1. Mặt sàn cỏ xanh chính hình vuông (Top Grass Surface)
-  const topGrassGeo = new THREE.BoxGeometry(W, 1.2, D);
+  // 1. Mặt sàn địa hình cỏ xanh & Lòng sông máng nước lõm tự nhiên (Top Grass Surface with Recessed River Trench)
+  const segX = 150;
+  const segZ = 150;
+  const topGrassGeo = new THREE.PlaneGeometry(W, D, segX, segZ);
+  topGrassGeo.rotateX(-Math.PI / 2);
+  topGrassGeo.translate(cx, 0, cz);
+
+  const posAttr = topGrassGeo.attributes.position;
+  const colors = [];
+  const cGrass = new THREE.Color(CONFIG.GROUND.grassColor);
+  const cBank = new THREE.Color(0x854d0e);  // Tầng đất bờ sông nâu ấm
+  const cBed = new THREE.Color(0xb45309);   // Cát vàng đáy mương
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const vx = posAttr.getX(i);
+    const vz = posAttr.getZ(i);
+
+    const bedDepth = getRiverBedDepth(vx, vz);
+    posAttr.setY(i, bedDepth);
+
+    if (bedDepth < -0.85) {
+      colors.push(cBed.r, cBed.g, cBed.b);
+    } else if (bedDepth < -0.05) {
+      const t = (bedDepth - (-0.85)) / (0.0 - (-0.85));
+      const col = cBed.clone().lerp(cGrass, t);
+      colors.push(col.r, col.g, col.b);
+    } else {
+      colors.push(cGrass.r, cGrass.g, cGrass.b);
+    }
+  }
+
+  topGrassGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  topGrassGeo.computeVertexNormals();
+
   const topGrassMat = new THREE.MeshStandardMaterial({
-    color: CONFIG.GROUND.grassColor,
+    vertexColors: true,
     roughness: 0.88,
     metalness: 0.05,
     flatShading: true,
@@ -703,7 +784,6 @@ function buildVastTerrainAndClouds() {
     polygonOffsetUnits: 1.0,
   });
   const topGrass = new THREE.Mesh(topGrassGeo, topGrassMat);
-  topGrass.position.set(cx, -0.6, cz);
   topGrass.receiveShadow = true;
   dioramaGroup.add(topGrass);
 
@@ -810,10 +890,9 @@ function buildVastTerrainAndClouds() {
   // 5. Các ngọn đồi uốn lượn NẰM TRỌN VẸN BÊN TRONG HÌNH VUÔNG (Interior Hills Only)
   // Bỏ toàn bộ các dãy núi chân trời xa ngoài hình vuông, chỉ giữ các ngọn đồi nội vi diorama
   const interiorHills = [
-    { x: 55, y: 14, z: -108, radius: 54, height: 28, color: 0x22c55e, segs: 10 },  // Đồi cối xay gió
-    { x: 115, y: 11, z: -75, radius: 25, height: 22, color: 0x16a34a, segs: 9 },   // Đồi Đông xa (sau sông và đường ray, không lấn ray)
-    { x: 116, y: 9, z: -20, radius: 22, height: 18, color: 0x15803d, segs: 9 },    // Đồi Đông Nam xa (không chèn ray hay Nhà B)
-    { x: 50, y: 11, z: -108, radius: 32, height: 22, color: 0x22c55e, segs: 9 },   // Đồi sau Nhà B (lùi hẳn về Bắc)
+    { x: 58, y: 13, z: -128, radius: 36, height: 26, color: 0x22c55e, segs: 10 },  // Đồi cối xay gió lùi xa về phía Bắc (Z = -128, chân đồi kết thúc tại Z = -92, cách Nhà B > 24m)
+    { x: 115, y: 11, z: -80, radius: 24, height: 22, color: 0x16a34a, segs: 9 },   // Đồi Đông xa (sau sông và đường ray, không lấn ray)
+    { x: 116, y: 9, z: -25, radius: 20, height: 18, color: 0x15803d, segs: 9 },    // Đồi Đông Nam xa (không chèn ray hay Nhà B)
     { x: -145, y: 15, z: -155, radius: 48, height: 30, color: 0x15803d, segs: 10 }, // Đồi góc Tây Bắc bên trong hình vuông
     { x: 75, y: 15, z: -160, radius: 46, height: 30, color: 0x166534, segs: 10 },  // Đồi góc Đông Bắc bên trong hình vuông
     { x: -60, y: 16, z: -160, radius: 52, height: 32, color: 0x15803d, segs: 10 }, // Đồi sườn Bắc bên trong hình vuông
@@ -834,7 +913,7 @@ function buildVastTerrainAndClouds() {
 
   // 6. Cối xay gió phong cách Hà Lan trên đỉnh đồi sinh thái Bắc (Giữ nguyên)
   const windmillGroup = new THREE.Group();
-  windmillGroup.position.set(55, 25.5, -108);
+  windmillGroup.position.set(58, 24.5, -128);
 
   const millTower = new THREE.Mesh(
     new THREE.CylinderGeometry(2.2, 3.8, 9.5, 8),
@@ -1066,16 +1145,15 @@ function createStylizedWaterMaterial(isCurvedCanal = false) {
         // Chuyển sắc độ màu theo độ sâu nước (Xanh ngọc ở bờ -> Xanh đậm ở giữa)
         vec3 waterCol = mix(uShallowColor, uDeepColor, smoothstep(0.08, 0.72, depth));
 
-        // Họa tiết vệt sáng khúc xạ đáy nước chuyển động chậm (Animated Caustics)
-        float c1 = sin(vWorldPosition.x * 0.55 + uTime * 0.85) * cos(vWorldPosition.z * 0.55 - uTime * 0.65);
-        float c2 = cos(vWorldPosition.x * 0.9 - uTime * 0.5) * sin(vWorldPosition.z * 0.9 + uTime * 0.75);
-        float caustic = pow(clamp(c1 + c2, 0.0, 1.0), 3.0) * 0.36;
-        waterCol += caustic * vec3(1.0);
+        // 1. Họa tiết sóng gợn đáy nước êm dịu, nhẹ nhàng (mặt nước tĩnh tại, êm đềm, triệt tiêu toàn bộ hạt kim cương li ti)
+        float c1 = sin(vWorldPosition.x * 1.2 + uTime * 0.7) * cos(vWorldPosition.z * 1.2 - uTime * 0.6);
+        float c2 = cos(vWorldPosition.x * 1.8 - uTime * 0.8) * sin(vWorldPosition.z * 1.8 + uTime * 0.7);
+        float caustic = pow(clamp((c1 + c2) * 0.5 + 0.5, 0.0, 1.0), 2.2) * 0.08;
+        waterCol += caustic * vec3(0.55, 0.85, 1.0);
 
-        // Viền bọt trắng uốn lượn sát mép bờ cát
+        // 2. Dải viền bọt cát trắng mịn ôm bờ nhẹ nhàng
         float shoreEdge = (uIsCurvedCanal > 0.5) ? abs(vUv.x - 0.5) * 2.0 : length(vUv - vec2(0.5)) * 2.0;
-        float foamNoise = sin(vWorldPosition.z * 2.0 + uTime * 2.2) * 0.04;
-        float foam = smoothstep(0.85 + foamNoise, 0.98, shoreEdge) * 0.88;
+        float foam = smoothstep(0.92, 0.99, shoreEdge) * 0.65;
         waterCol = mix(waterCol, uFoamColor, foam);
 
         // Hiệu ứng hạt mưa tạo vòng sóng tròn lan tỏa khi trời mưa
@@ -1089,10 +1167,11 @@ function createStylizedWaterMaterial(isCurvedCanal = false) {
         // Vệt phản chiếu ánh nắng lấp lánh (Specular Highlights)
         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
         vec3 halfDir = normalize(uSunDir + viewDir);
-        float spec = pow(max(dot(vNormal, halfDir), 0.0), 36.0);
-        waterCol += spec * uSunColor * 0.45;
+        float spec = pow(max(dot(vNormal, halfDir), 0.0), 32.0);
+        waterCol += spec * uSunColor * 0.55;
 
-        gl_FragColor = vec4(waterCol, 0.74);
+        // Nước trong xanh tươi tắn, có độ trong suốt nhìn thấu đáy cát và đàn cá bơi lội
+        gl_FragColor = vec4(waterCol, 0.82);
       }
     `,
     transparent: true,
@@ -1105,6 +1184,114 @@ function createStylizedWaterMaterial(isCurvedCanal = false) {
 }
 
 // Tuyến đường sắt cong, Cầu vòm đỏ, Ga xe lửa DK Station & Mương nước uốn cong song song
+
+// Cụm rừng cây búp mây bồng bềnh & thảm hoa dại bao bọc 2 đầu cầu đường sắt (Chuẩn 100% như ảnh mẫu bên trái)
+function buildBridgeLushForest() {
+  const groveGroup = new THREE.Group();
+  groveGroup.name = 'bridgeLushForestGroup';
+
+  const trunkGeo = new THREE.CylinderGeometry(0.24, 0.42, 2.4, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9, flatShading: true });
+
+  const treePalettes = [
+    { name: 'lime', color: 0x4ade80, rough: 0.75 },
+    { name: 'vibrantGreen', color: 0x22c55e, rough: 0.72 },
+    { name: 'emerald', color: 0x16a34a, rough: 0.74 },
+    { name: 'deepForest', color: 0x15803d, rough: 0.76 },
+    { name: 'olive', color: 0x65a30d, rough: 0.78 },
+    { name: 'autumnGold', color: 0xf59e0b, rough: 0.70 },
+    { name: 'autumnOrange', color: 0xd97706, rough: 0.72 },
+  ];
+
+  const treeMaterials = treePalettes.map(p =>
+    new THREE.MeshStandardMaterial({ color: p.color, roughness: p.rough, flatShading: false })
+  );
+
+  // Danh sách vị trí cây rừng dày dặc bao bọc 2 bên bờ sông và 2 đầu cầu
+  const bridgeTrees = [
+    // Bờ Bắc (North Bank, Z = -58 đến -78)
+    // Phía Tây đường sắt
+    { x: 84.0, z: -58.5, r: 1.85, matIdx: 1 },
+    { x: 81.5, z: -63.0, r: 2.10, matIdx: 2 },
+    { x: 86.0, z: -66.5, r: 1.70, matIdx: 0 },
+    { x: 83.0, z: -71.0, r: 2.25, matIdx: 3 },
+    { x: 87.5, z: -74.0, r: 1.95, matIdx: 5 }, // Cây thu vàng
+    { x: 79.5, z: -68.0, r: 2.30, matIdx: 1 },
+    // Phía Đông đường sắt
+    { x: 104.0, z: -57.0, r: 2.05, matIdx: 2 },
+    { x: 107.5, z: -62.0, r: 2.40, matIdx: 5 }, // Cây thu vàng cam
+    { x: 102.5, z: -67.0, r: 1.85, matIdx: 0 },
+    { x: 106.0, z: -72.0, r: 2.20, matIdx: 3 },
+    { x: 110.5, z: -66.0, r: 2.00, matIdx: 6 }, // Cây thu cam
+    { x: 112.0, z: -74.0, r: 2.50, matIdx: 2 },
+    { x: 101.0, z: -75.0, r: 1.90, matIdx: 4 },
+
+    // Bờ Nam (South Bank, Z = -36 đến -20)
+    // Phía Tây đường sắt
+    { x: 84.5, z: -36.0, r: 1.90, matIdx: 0 },
+    { x: 81.0, z: -31.5, r: 2.20, matIdx: 2 },
+    { x: 85.5, z: -27.0, r: 1.80, matIdx: 5 }, // Cây vàng
+    { x: 82.5, z: -22.0, r: 2.10, matIdx: 1 },
+    { x: 86.8, z: -18.0, r: 1.75, matIdx: 3 },
+    { x: 78.5, z: -28.0, r: 2.40, matIdx: 2 },
+    // Phía Đông đường sắt
+    { x: 102.0, z: -36.0, r: 2.15, matIdx: 1 },
+    { x: 106.0, z: -31.0, r: 2.35, matIdx: 6 }, // Cây thu cam rực rỡ
+    { x: 100.5, z: -26.0, r: 1.85, matIdx: 0 },
+    { x: 105.0, z: -21.0, r: 2.20, matIdx: 2 },
+    { x: 109.0, z: -25.0, r: 2.00, matIdx: 5 }, // Cây vàng
+    { x: 108.5, z: -17.0, r: 2.40, matIdx: 3 },
+  ];
+
+  bridgeTrees.forEach((bt) => {
+    const treeGroup = new THREE.Group();
+    const groundY = getTerrainElevation ? getTerrainElevation(bt.x, bt.z) : 0.2;
+    treeGroup.position.set(bt.x, Math.max(0.1, groundY), bt.z);
+
+    // Thân cây
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 1.2;
+    trunk.scale.setScalar(bt.r / 1.8);
+    trunk.castShadow = true;
+    treeGroup.add(trunk);
+
+    // Tán cây búp mây bồng bềnh
+    const canopyGeo = createPuffyCloudCanopyGeometry(bt.r);
+    const canopyMat = treeMaterials[bt.matIdx % treeMaterials.length];
+    const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+    canopy.position.y = 2.4 * (bt.r / 1.8);
+    canopy.rotation.y = Math.random() * Math.PI * 2;
+    canopy.castShadow = true;
+    canopy.receiveShadow = true;
+    treeGroup.add(canopy);
+
+    groveGroup.add(treeGroup);
+  });
+
+  // Thảm hoa dại li ti (Daisies & Pink Wildflowers) nở rộ trên thảm cỏ ven 2 đầu cầu
+  const flowerGeo = new THREE.SphereGeometry(0.18, 6, 5);
+  const flwWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const flwPinkMat = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
+  const flwYellowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+  for (let f = 0; f < 65; f++) {
+    const fx = 80 + Math.random() * 32;
+    const fz = -75 + Math.random() * 58;
+    // Tránh giữa sông và đường ray
+    if (Math.hypot(fx - 93.5, fz - (-48)) < 6.5) continue;
+    if (Math.abs(fx - 92) < 2.5 && fz > -55 && fz < -40) continue;
+
+    const fy = getTerrainElevation ? getTerrainElevation(fx, fz) : 0.2;
+    const fMat = f % 3 === 0 ? flwWhiteMat : (f % 3 === 1 ? flwPinkMat : flwYellowMat);
+    const flw = new THREE.Mesh(flowerGeo, fMat);
+    flw.position.set(fx, Math.max(0.08, fy + 0.08), fz);
+    flw.scale.set(1.0, 0.45, 1.0);
+    groveGroup.add(flw);
+  }
+
+  scene.add(groveGroup);
+}
+
 function buildCanalAndRailway() {
   // --------------------------------------------------------------------------
   // B. Khởi tạo tuyến đường sắt cong uốn lượn (Curved Railway) trước tiên
@@ -1123,23 +1310,20 @@ function buildCanalAndRailway() {
   railwayCurve = new THREE.CatmullRomCurve3(railCurvePoints);
 
   // --------------------------------------------------------------------------
-  // A. Mương nước thủy lợi uốn lượn 100% song song với đường tàu (Theo yêu cầu)
+  // A. Sông máng nước uốn lượn trong vắt, bãi cát ven bờ, thuyền nan & hoa súng
+  // Tuyến sông uốn lượn song song với đường sắt, chảy dưới Cầu vòm đỏ và bên cạnh Ga DK Station
   // --------------------------------------------------------------------------
   const canalWidth = CONFIG.CANAL.width; // 9.5m
-  const canalOffset = CONFIG.CANAL.offsetFromRail; // 8.5m chạy song song
-  const segments = 120;
+  const segments = 140;
 
-  // Mảng dữ liệu hình học mặt nước mương cong
   const waterPositions = [];
   const waterUvs = [];
   const waterIndices = [];
 
-  // Mảng dữ liệu đáy mương cát vàng
   const bedPositions = [];
   const bedUvs = [];
   const bedIndices = [];
 
-  // Mảng dữ liệu bờ cát thoai thoải 2 bên (Bờ Tây và Bờ Đông)
   const sandLPositions = [];
   const sandLUvs = [];
   const sandLIndices = [];
@@ -1150,48 +1334,44 @@ function buildCanalAndRailway() {
 
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const pt = railwayCurve.getPointAt(t);
-    const tan = railwayCurve.getTangentAt(t);
+    const pt = canalCurve.getPointAt(t);
+    const tan = canalCurve.getTangentAt(t);
     const norm = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
 
-    // Tim mương nước uốn cong song song cách tim đường sắt 8.5m
-    const cCenter = pt.clone().sub(norm.clone().multiplyScalar(canalOffset));
+    const waterY = -0.32;
+    const bedY = -1.15;
+    const bankY = 0.02;
 
-    const waterY = -1.35;
-    const bedY = -2.35;
-    const bankY = -1.15;
+    const wHalf = canalWidth / 2 - 0.15; // 4.6m
+    const wLeft = pt.clone().sub(norm.clone().multiplyScalar(wHalf));
+    const wRight = pt.clone().add(norm.clone().multiplyScalar(wHalf));
 
-    const wHalf = canalWidth / 2;
-    const wLeft = cCenter.clone().sub(norm.clone().multiplyScalar(wHalf));
-    const wRight = cCenter.clone().add(norm.clone().multiplyScalar(wHalf));
-
-    // Bờ cát mở rộng 2.6m mỗi bên
-    const sLeftOuter = cCenter.clone().sub(norm.clone().multiplyScalar(wHalf + 2.6));
-    const sRightOuter = cCenter.clone().add(norm.clone().multiplyScalar(wHalf + 2.6));
+    const sLeftOuter = pt.clone().sub(norm.clone().multiplyScalar(wHalf + 3.6));
+    const sRightOuter = pt.clone().add(norm.clone().multiplyScalar(wHalf + 3.6));
 
     // 1. Mặt nước (Water ribbon)
     waterPositions.push(wLeft.x, waterY, wLeft.z);
     waterPositions.push(wRight.x, waterY, wRight.z);
-    waterUvs.push(0, t);
-    waterUvs.push(1, t);
+    waterUvs.push(0, t * 8.0);
+    waterUvs.push(1, t * 8.0);
 
     // 2. Đáy mương (Canal bed)
     bedPositions.push(wLeft.x, bedY, wLeft.z);
     bedPositions.push(wRight.x, bedY, wRight.z);
-    bedUvs.push(0, t);
-    bedUvs.push(1, t);
+    bedUvs.push(0, t * 8.0);
+    bedUvs.push(1, t * 8.0);
 
-    // 3. Bờ cát trái (Bờ Tây giáp nhà máy)
+    // 3. Bờ cát trái (Bờ Tây)
     sandLPositions.push(sLeftOuter.x, bankY, sLeftOuter.z);
-    sandLPositions.push(wLeft.x, waterY + 0.05, wLeft.z);
-    sandLUvs.push(0, t);
-    sandLUvs.push(1, t);
+    sandLPositions.push(wLeft.x, waterY + 0.04, wLeft.z);
+    sandLUvs.push(0, t * 8.0);
+    sandLUvs.push(1, t * 8.0);
 
-    // 4. Bờ cát phải (Bờ Đông giáp đường ray)
-    sandRPositions.push(wRight.x, waterY + 0.05, wRight.z);
+    // 4. Bờ cát phải (Bờ Đông)
+    sandRPositions.push(wRight.x, waterY + 0.04, wRight.z);
     sandRPositions.push(sRightOuter.x, bankY, sRightOuter.z);
-    sandRUvs.push(0, t);
-    sandRUvs.push(1, t);
+    sandRUvs.push(0, t * 8.0);
+    sandRUvs.push(1, t * 8.0);
 
     if (i < segments) {
       const idx = i * 2;
@@ -1253,25 +1433,21 @@ function buildCanalAndRailway() {
   sandRight.receiveShadow = true;
   scene.add(sandRight);
 
-  // Thuyền nan & người chèo đò đứng giữa dòng mương cong (t = 0.52)
-  const bPt = railwayCurve.getPointAt(0.52);
-  const bTan = railwayCurve.getTangentAt(0.52);
-  const bNorm = new THREE.Vector3(-bTan.z, 0, bTan.x).normalize();
-  const boatPos = bPt.clone().sub(bNorm.clone().multiplyScalar(canalOffset));
-
+  // Thuyền nan & người chèo đò nổi bồng bềnh trên sông máng (Dời về Z = -82, X = 91.8, cách xa đường sắt > 15m)
   const boatGroup = new THREE.Group();
-  boatGroup.position.set(boatPos.x, -1.32, boatPos.z);
-  boatGroup.rotation.y = Math.atan2(bTan.x, bTan.z);
+  boatGroup.position.set(91.8, -0.30, -82.0);
+  boatGroup.rotation.y = 0.05;
 
   const boatHull = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.6, 4.2),
+    new THREE.BoxGeometry(1.6, 0.55, 4.2),
     new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
   );
+  boatHull.position.y = 0.22;
   boatHull.castShadow = true;
   boatGroup.add(boatHull);
 
   const boatman = createCharacter({ shirtColor: 0xef4444, pantsColor: 0x1e293b, hatColor: 0xfef08a, isDriver: true });
-  boatman.position.set(0, 0.25, 0.4);
+  boatman.position.set(0, 0.48, 0.4);
   boatGroup.add(boatman);
 
   const oar = new THREE.Mesh(
@@ -1279,75 +1455,192 @@ function buildCanalAndRailway() {
     new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.7 })
   );
   oar.rotation.z = Math.PI / 4;
-  oar.position.set(0.6, 0.7, 0.2);
+  oar.position.set(0.6, 0.95, 0.2);
   boatGroup.add(oar);
 
   boatGroup.userData = {
     id: 'rowingBoat',
     title: 'Thuyền nan du ngoạn sinh thái trên sông máng',
     type: 'boat',
-    desc: 'Hoạt động chèo thuyền thư giãn trên dòng sông máng nước trong vắt uốn lượn song song với tuyến đường sắt DK Bike.',
+    desc: 'Hoạt động chèo thuyền thư giãn trên dòng sông máng nước trong vắt, cách xa đường ray xe lửa.',
     zone: 'Sông Máng Nước',
+    oar: oar,
   };
   boatHull.userData = boatGroup.userData;
   scene.add(boatGroup);
   interactiveObjects.push(boatHull);
   rowingBoat = boatGroup;
 
-  // Lá sen tròn to khuyết chữ V (Lily Pads) & hoa súng nổi trên mương cong
+  // Lá sen tròn to (Lily Pads) & hoa súng nổi trên mặt sông máng
   const lilyMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.6, side: THREE.DoubleSide });
   const lilyFlowerMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 });
   lotusLeaves = [];
 
-  const lilyCurveT = [0.44, 0.47, 0.50, 0.55, 0.58, 0.62];
-  lilyCurveT.forEach((lt, lIdx) => {
-    const lPt = railwayCurve.getPointAt(lt);
-    const lTan = railwayCurve.getTangentAt(lt);
-    const lNorm = new THREE.Vector3(-lTan.z, 0, lTan.x).normalize();
-    const lPos = lPt.clone().sub(lNorm.clone().multiplyScalar(canalOffset + (lIdx % 2 === 0 ? 1.5 : -1.5)));
-
+  const lilyOffsets = [
+    { t: 0.36, offX: -1.6, offZ: -2.0 },
+    { t: 0.40, offX: 1.4, offZ: 1.5 },
+    { t: 0.48, offX: -1.8, offZ: -3.0 },
+    { t: 0.52, offX: 1.6, offZ: 2.0 },
+    { t: 0.60, offX: -1.2, offZ: 3.0 },
+  ];
+  lilyOffsets.forEach((lo, lIdx) => {
+    const lPt = canalCurve.getPointAt(lo.t);
     const pad = new THREE.Mesh(new THREE.CircleGeometry(0.85, 12, 0.4, Math.PI * 1.85), lilyMat);
     pad.rotation.x = -Math.PI / 2;
-    pad.position.set(lPos.x, -1.33, lPos.z);
+    pad.position.set(lPt.x + lo.offX, -0.28, lPt.z + lo.offZ);
     scene.add(pad);
     lotusLeaves.push(pad);
 
     if (lIdx % 2 === 0) {
-      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25), lilyFlowerMat);
-      flower.position.set(lPos.x + 0.1, -1.23, lPos.z - 0.1);
+      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24), lilyFlowerMat);
+      flower.position.set(lPt.x + lo.offX + 0.1, -0.20, lPt.z + lo.offZ - 0.1);
       scene.add(flower);
     }
   });
 
-  // Đàn cá xanh bơi lội dưới sông máng
-  riverFishGroup = new THREE.Group();
-  riverFishGroup.position.set(boatPos.x, -1.45, boatPos.z);
-  const fishMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 });
+  buildBridgeLushForest();
 
-  for (let f = 0; f < 8; f++) {
-    const fMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 5), fishMat);
-    fMesh.rotation.x = Math.PI / 2;
-    const fAngle = (f / 8) * Math.PI * 2;
-    fMesh.position.set(Math.cos(fAngle) * 1.6, 0, Math.sin(fAngle) * 1.6);
-    fMesh.rotation.y = -fAngle + Math.PI / 2;
-    riverFishGroup.add(fMesh);
-  }
-  scene.add(riverFishGroup);
+  // Đàn cá Koi & cá sông bơi lội, nhảy lên khỏi mặt nước dọc theo dòng sông cạnh đường tàu (Khối 4 & 5)
+  buildRiverJumpingFish();
 
-  // Cầu gỗ mộc bắc qua khúc mương cong ở mạn Nam (t = 0.72)
-  const brPt = railwayCurve.getPointAt(0.72);
-  const brTan = railwayCurve.getTangentAt(0.72);
-  const brNorm = new THREE.Vector3(-brTan.z, 0, brTan.x).normalize();
-  const bridgePos = brPt.clone().sub(brNorm.clone().multiplyScalar(canalOffset));
+  // Bổ sung sỏi đá cuội ven bờ & Cụm hoa súng nở rộ rực rỡ quanh chân cầu đường sắt (chuẩn 100% như ảnh mẫu bên trái)
+  const riverPebbleMat = new THREE.MeshStandardMaterial({
+    color: 0x78716c,
+    roughness: 0.85,
+    flatShading: true,
+  });
+  const pebbleMatDark = new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const pebbleMatWarm = new THREE.MeshStandardMaterial({
+    color: 0x854d0e,
+    roughness: 0.88,
+    flatShading: true,
+  });
 
-  const woodBridge = new THREE.Mesh(
-    new THREE.BoxGeometry(canalWidth + 3.0, 0.35, 3.2),
-    new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 })
-  );
-  woodBridge.position.set(bridgePos.x, -0.9, bridgePos.z);
-  woodBridge.rotation.y = Math.atan2(brTan.x, brTan.z) + Math.PI / 2;
-  woodBridge.castShadow = true;
-  scene.add(woodBridge);
+  // Đá cuội rải rác tự nhiên 2 bên bờ mép cát
+  const pebbleCoords = [
+    // Bờ Tây (Mạn trái sông)
+    { x: 88.5, z: -58, s: 0.42, mat: riverPebbleMat },
+    { x: 88.2, z: -54, s: 0.65, mat: pebbleMatDark },
+    { x: 88.8, z: -50, s: 0.35, mat: pebbleMatWarm },
+    { x: 88.4, z: -45, s: 0.55, mat: riverPebbleMat },
+    { x: 88.6, z: -40, s: 0.38, mat: pebbleMatDark },
+    { x: 88.2, z: -35, s: 0.72, mat: pebbleMatWarm },
+    { x: 87.8, z: -25, s: 0.48, mat: riverPebbleMat },
+    { x: 87.5, z: -15, s: 0.58, mat: pebbleMatDark },
+    { x: 87.8, z: -6, s: 0.38, mat: riverPebbleMat },
+    { x: 88.0, z: 8, s: 0.52, mat: pebbleMatWarm },
+    { x: 88.2, z: 22, s: 0.62, mat: riverPebbleMat },
+    // Bờ Đông (Mạn phải sông)
+    { x: 95.8, z: -60, s: 0.45, mat: pebbleMatDark },
+    { x: 96.2, z: -55, s: 0.68, mat: riverPebbleMat },
+    { x: 95.5, z: -48, s: 0.38, mat: pebbleMatWarm },
+    { x: 95.8, z: -42, s: 0.58, mat: riverPebbleMat },
+    { x: 94.5, z: -35, s: 0.48, mat: pebbleMatDark },
+    { x: 93.8, z: -22, s: 0.62, mat: pebbleMatWarm },
+    { x: 93.2, z: -10, s: 0.42, mat: riverPebbleMat },
+    { x: 93.5, z: 5, s: 0.55, mat: pebbleMatDark },
+    { x: 94.0, z: 18, s: 0.68, mat: pebbleMatWarm },
+  ];
+
+  pebbleCoords.forEach((pb) => {
+    const pebble = new THREE.Mesh(new THREE.DodecahedronGeometry(pb.s, 0), pb.mat);
+    pebble.scale.set(1.2, 0.65, 0.95);
+    pebble.position.set(pb.x, -0.15, pb.z);
+    pebble.rotation.set(Math.random() * 2, Math.random() * 2, Math.random() * 2);
+    pebble.castShadow = true;
+    pebble.receiveShadow = true;
+    scene.add(pebble);
+  });
+
+  // Cụm lá sen & Hoa súng nở hồng phấn nhụy vàng rực rỡ dưới chân cầu (như ảnh mẫu)
+  const padMatVibrant = new THREE.MeshStandardMaterial({
+    color: 0x22c55e,
+    roughness: 0.55,
+    side: THREE.DoubleSide,
+  });
+  const lotusPinkMat = new THREE.MeshStandardMaterial({
+    color: 0xf472b6,
+    roughness: 0.3,
+  });
+  const lotusCenterMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15,
+    roughness: 0.2,
+  });
+
+  // Hàm tạo bông hoa súng 8 cánh nở rực rỡ
+  const createWaterLilyFlower = () => {
+    const flwGroup = new THREE.Group();
+    // 8 cánh hoa hồng xòe
+    for (let p = 0; p < 8; p++) {
+      const ang = (p / 8) * Math.PI * 2;
+      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.38, 4), lotusPinkMat);
+      petal.rotation.x = Math.PI / 3.2;
+      petal.rotation.z = Math.PI / 2;
+      petal.position.set(Math.cos(ang) * 0.18, 0.08, Math.sin(ang) * 0.18);
+      petal.rotation.y = -ang;
+      flwGroup.add(petal);
+    }
+    // Nhụy vàng rực rỡ ở giữa
+    const center = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), lotusCenterMat);
+    center.position.y = 0.08;
+    flwGroup.add(center);
+    return flwGroup;
+  };
+
+  // Cụm lá sen mạn Tây cầu (Z = -44 đến -55)
+  const lilyClusterWest = [
+    { x: 91.2, z: -55, r: 0.95, rot: 0.2, hasFlower: true },
+    { x: 90.4, z: -53, r: 0.75, rot: 1.4, hasFlower: false },
+    { x: 91.8, z: -52, r: 0.85, rot: 2.1, hasFlower: false },
+    { x: 90.8, z: -49, r: 1.15, rot: -0.6, hasFlower: true }, // Hoa súng lớn nở cạnh bóng cầu
+    { x: 92.2, z: -46, r: 0.80, rot: 0.8, hasFlower: false },
+    { x: 90.2, z: -44, r: 0.90, rot: 1.9, hasFlower: false },
+    { x: 89.8, z: -40, r: 0.70, rot: -1.2, hasFlower: false },
+  ];
+
+  lilyClusterWest.forEach((lc) => {
+    const lPad = new THREE.Mesh(new THREE.CircleGeometry(lc.r, 16, 0.35, Math.PI * 1.88), padMatVibrant);
+    lPad.rotation.x = -Math.PI / 2;
+    lPad.rotation.z = lc.rot;
+    lPad.position.set(lc.x, -0.28, lc.z);
+    lPad.receiveShadow = true;
+    scene.add(lPad);
+
+    if (lc.hasFlower) {
+      const lilyFlw = createWaterLilyFlower();
+      lilyFlw.position.set(lc.x + 0.1, -0.22, lc.z - 0.1);
+      scene.add(lilyFlw);
+    }
+  });
+
+  // Cụm lá sen mạn Đông cầu (Z = -50 đến -38)
+  const lilyClusterEast = [
+    { x: 95.2, z: -49, r: 0.85, rot: 0.4, hasFlower: false },
+    { x: 94.6, z: -45, r: 1.05, rot: 1.8, hasFlower: true },
+    { x: 95.8, z: -42, r: 0.75, rot: -0.5, hasFlower: false },
+    { x: 94.8, z: -38, r: 0.90, rot: 2.4, hasFlower: false },
+  ];
+
+  lilyClusterEast.forEach((lc) => {
+    const lPad = new THREE.Mesh(new THREE.CircleGeometry(lc.r, 16, 0.35, Math.PI * 1.88), padMatVibrant);
+    lPad.rotation.x = -Math.PI / 2;
+    lPad.rotation.z = lc.rot;
+    lPad.position.set(lc.x, -0.28, lc.z);
+    lPad.receiveShadow = true;
+    scene.add(lPad);
+
+    if (lc.hasFlower) {
+      const lilyFlw = createWaterLilyFlower();
+      lilyFlw.position.set(lc.x - 0.1, -0.22, lc.z + 0.1);
+      scene.add(lilyFlw);
+    }
+  });
+
+  // (Đã loại bỏ khối hộp cầu gỗ mộc thô kệch Z = 20 để dòng sông thông suốt, nguyên bản như ảnh mẫu)
 
   // Nền đá cát ballast uốn cong theo tim ray (như ảnh 1 & 3)
   const ballastTube = new THREE.Mesh(
@@ -1416,110 +1709,214 @@ function buildCanalAndRailway() {
   scene.add(sleeperInstanced);
 
   // --------------------------------------------------------------------------
-  // C. Cây Cầu vòm đường sắt màu đỏ tươi rực rỡ (Red Arch Railway Bridge - Khớp ray & Không va chạm)
+  // C. Cây Cầu đường sắt màu đỏ uốn cong vượt sông (Curved Red Steel Railway Bridge - Chuẩn 100% Ảnh Mẫu)
+  // Thiết kế dạng cầu dầm thép đỏ uốn cong theo đúng tim ray railwayCurve, không có khung vòm che tầm nhìn
+  // Nhìn từ trên cao xuống thấy rõ ray thép, tà vẹt gỗ, thành cầu đỏ, bóng cầu in trên làn nước biếc và hoa sen
   // --------------------------------------------------------------------------
   const bridgeGroup = new THREE.Group();
 
-  // Khớp chính xác tim vị trí và góc tiếp tuyến của đường ray tại khúc vượt sông máng (z ~ -48)
-  let archBridgeT = 0.34;
-  for (let step = 0.25; step <= 0.45; step += 0.005) {
-    const p = railwayCurve.getPointAt(step);
-    if (Math.abs(p.z - (-48.0)) < 0.25) {
-      archBridgeT = step;
-      break;
-    }
-  }
-  const archBridgePos = railwayCurve.getPointAt(archBridgeT);
-  const archBridgeTangent = railwayCurve.getTangentAt(archBridgeT);
-  const archBridgeRotY = Math.atan2(archBridgeTangent.x, archBridgeTangent.z);
-
-  bridgeGroup.position.set(archBridgePos.x, 0, archBridgePos.z);
-  bridgeGroup.rotation.y = archBridgeRotY;
-
   const redSteelMat = new THREE.MeshStandardMaterial({
-    color: CONFIG.RAILWAY.bridgeArchColor,
-    roughness: 0.35,
-    metalness: 0.5,
+    color: 0xdc2626, // Màu đỏ son rực rỡ tươi tắn như ảnh mẫu (Vermilion Red)
+    roughness: 0.32,
+    metalness: 0.52,
   });
 
-  // Bản mặt cầu dầm thép đỏ đặt ngay dưới chân tà vẹt (dày 0.4m, đỉnh mặt cầu ở 1.62m, tà vẹt ở 1.86m, ray ở 1.98m)
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.4, 30), redSteelMat);
-  deck.position.y = 1.42;
-  deck.castShadow = true;
-  bridgeGroup.add(deck);
-
-  // Hai vòm thép đỏ uốn cong hình parabol vút cao 9.5m hai bên ray (Khổ rộng 6.0m: archX = ±3.0m)
-  // Tàu rộng 2.5m, cao 4.8m -> Hành lang lưu không rộng rãi 1.75m mỗi bên, tuyệt đối không va chạm
-  [-3.0, 3.0].forEach((archX) => {
-    // Vòm cong thép đỏ
-    const archSegment = new THREE.Mesh(
-      new THREE.CylinderGeometry(15.0, 15.0, 0.52, 28, 1, true, 0, Math.PI),
-      redSteelMat
-    );
-    archSegment.rotation.z = Math.PI / 2;
-    archSegment.rotation.y = Math.PI / 2;
-    archSegment.position.set(archX, 1.42, 0);
-    archSegment.scale.set(0.55, 1.0, 1.0); // Vòm vút cao 8.25m
-    archSegment.castShadow = true;
-    bridgeGroup.add(archSegment);
-
-    // Dầm giằng thép dọc chân vòm
-    const baseChord = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 29), redSteelMat);
-    baseChord.position.set(archX, 1.62, 0);
-    bridgeGroup.add(baseChord);
-
-    // Các thanh cáp treo thẳng đứng (Hanger Cables) kết nối vòm và mặt cầu
-    for (let rz = -12; rz <= 12; rz += 2.0) {
-      const distFromCenter = Math.abs(rz);
-      const cableH = Math.max(0.8, (1 - Math.pow(distFromCenter / 15.0, 2)) * 8.25);
-      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, cableH, 8), redSteelMat);
-      cable.position.set(archX, 1.62 + cableH / 2, rz);
-      bridgeGroup.add(cable);
-    }
-
-    // Lan can an toàn màu đỏ dọc mép cầu (x = ±3.05, không bao giờ vướng vào tàu)
-    const railTop = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 29), redSteelMat);
-    railTop.position.set(archX, 2.55, 0);
-    bridgeGroup.add(railTop);
-
-    for (let rz = -14; rz <= 14; rz += 2.0) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.95, 0.08), redSteelMat);
-      post.position.set(archX, 2.1, rz);
-      bridgeGroup.add(post);
-    }
+  const redSteelDarkMat = new THREE.MeshStandardMaterial({
+    color: 0xb91c1c, // Đỏ đậm tạo chiều sâu mặt dưới & dầm giằng
+    roughness: 0.45,
+    metalness: 0.45,
   });
 
-  // Giằng ngang trên cao (Chỉ lắp ở độ cao > 8.0m, tàu cao 4.8m chạy bên dưới hoàn toàn thông thoáng)
-  for (let rz = -6; rz <= 6; rz += 3.0) {
-    const distFromCenter = Math.abs(rz);
-    const beamY = 1.62 + (1 - Math.pow(distFromCenter / 15.0, 2)) * 8.25;
-    if (beamY > 7.5) {
-      const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.22, 0.22), redSteelMat);
-      crossBeam.position.set(0, beamY, rz);
-      bridgeGroup.add(crossBeam);
+  const pierMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b, // Mố cầu đá xám xanh tự nhiên
+    roughness: 0.92,
+    flatShading: true,
+  });
+
+  // Tham số khoảng lấy mẫu cầu trên tuyến đường sắt (Z từ ~ -61 đến ~ -33)
+  const bridgeTStart = 0.315;
+  const bridgeTEnd = 0.465;
+  const bridgeSlices = 36;
+  const bridgeWidth = 4.5; // Khổ rộng mặt cầu 4.5m (hành lang thông thoáng cho tàu 2.5m)
+  const girderHeight = 0.95; // Chiều cao thành cầu dầm thép đỏ 0.95m (không che khuất top-down view)
+
+  const deckPositions = [];
+  const deckNormals = [];
+  const deckIndices = [];
+
+  const shadowPositions = [];
+  const shadowIndices = [];
+
+  for (let s = 0; s <= bridgeSlices; s++) {
+    const t = bridgeTStart + (s / bridgeSlices) * (bridgeTEnd - bridgeTStart);
+    const pt = railwayCurve.getPointAt(t);
+    const tan = railwayCurve.getTangentAt(t);
+    const norm = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+
+    const halfW = bridgeWidth / 2;
+    const pLeft = pt.clone().add(norm.clone().multiplyScalar(-halfW));
+    const pRight = pt.clone().add(norm.clone().multiplyScalar(halfW));
+
+    // Mặt sàn dầm cầu đặt ngay dưới tà vẹt (pt.y - 0.08)
+    const deckY = pt.y - 0.08;
+    pLeft.y = deckY;
+    pRight.y = deckY;
+
+    deckPositions.push(pLeft.x, deckY, pLeft.z);
+    deckPositions.push(pRight.x, deckY, pRight.z);
+    deckNormals.push(0, 1, 0);
+    deckNormals.push(0, 1, 0);
+
+    // Vệt bóng đổ uốn cong nhẹ nhàng trên mặt nước (-0.30m)
+    const shadowW = halfW + 0.5;
+    const sLeft = pt.clone().add(norm.clone().multiplyScalar(-shadowW));
+    const sRight = pt.clone().add(norm.clone().multiplyScalar(shadowW));
+    shadowPositions.push(sLeft.x, -0.30, sLeft.z);
+    shadowPositions.push(sRight.x, -0.30, sRight.z);
+
+    if (s < bridgeSlices) {
+      const idx = s * 2;
+      deckIndices.push(idx, idx + 1, idx + 2);
+      deckIndices.push(idx + 1, idx + 3, idx + 2);
+
+      shadowIndices.push(idx, idx + 1, idx + 2);
+      shadowIndices.push(idx + 1, idx + 3, idx + 2);
     }
   }
 
-  // Mố cầu đá kiên cố cắm xuống đáy sông
-  const pierMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 });
-  [-13.5, 13.5].forEach((pz) => {
-    const pier = new THREE.Mesh(new THREE.BoxGeometry(6.6, 4.0, 3.2), pierMat);
-    pier.position.set(0, -0.6, pz);
-    pier.castShadow = true;
-    pier.receiveShadow = true;
-    bridgeGroup.add(pier);
+  // 1. Bản mặt sàn dầm cầu đỏ uốn cong
+  const curvedDeckGeo = new THREE.BufferGeometry();
+  curvedDeckGeo.setAttribute('position', new THREE.Float32BufferAttribute(deckPositions, 3));
+  curvedDeckGeo.setAttribute('normal', new THREE.Float32BufferAttribute(deckNormals, 3));
+  curvedDeckGeo.setIndex(deckIndices);
+  curvedDeckGeo.computeVertexNormals();
+
+  const curvedDeckMesh = new THREE.Mesh(curvedDeckGeo, redSteelMat);
+  curvedDeckMesh.castShadow = true;
+  curvedDeckMesh.receiveShadow = true;
+  bridgeGroup.add(curvedDeckMesh);
+
+  // Mặt dưới dầm cầu dày 0.35m tạo khối hộp kiên cố
+  const bottomDeckMesh = curvedDeckMesh.clone();
+  bottomDeckMesh.position.y -= 0.35;
+  bottomDeckMesh.material = redSteelDarkMat;
+  bridgeGroup.add(bottomDeckMesh);
+
+  // 2. Hai thành dầm thép đỏ uốn cong (Left & Right Girder Walls) + Lan can an toàn
+  for (let s = 0; s < bridgeSlices; s++) {
+    const tA = bridgeTStart + (s / bridgeSlices) * (bridgeTEnd - bridgeTStart);
+    const tB = bridgeTStart + ((s + 1) / bridgeSlices) * (bridgeTEnd - bridgeTStart);
+    const ptA = railwayCurve.getPointAt(tA);
+    const ptB = railwayCurve.getPointAt(tB);
+    const tanA = railwayCurve.getTangentAt(tA);
+    const tanB = railwayCurve.getTangentAt(tB);
+    const normA = new THREE.Vector3(-tanA.z, 0, tanA.x).normalize();
+    const normB = new THREE.Vector3(-tanB.z, 0, tanB.x).normalize();
+
+    const halfW = bridgeWidth / 2;
+
+    [-1, 1].forEach((side) => {
+      const p1 = ptA.clone().add(normA.clone().multiplyScalar(side * halfW));
+      const p2 = ptB.clone().add(normB.clone().multiplyScalar(side * halfW));
+      p1.y = ptA.y - 0.25;
+      p2.y = ptB.y - 0.25;
+
+      const midPt = p1.clone().add(p2).multiplyScalar(0.5);
+      const segLen = p1.distanceTo(p2);
+      const segAngY = Math.atan2(p2.x - p1.x, p2.z - p1.z);
+
+      // Tấm thành dầm thép đỏ dọc
+      const girderPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, girderHeight, segLen + 0.04),
+        redSteelMat
+      );
+      girderPlate.position.set(midPt.x, midPt.y + girderHeight / 2, midPt.z);
+      girderPlate.rotation.y = segAngY;
+      girderPlate.castShadow = true;
+      girderPlate.receiveShadow = true;
+      bridgeGroup.add(girderPlate);
+
+      // Tay vịn lan can bo tròn trên đỉnh dầm
+      const handRail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.065, 0.065, segLen + 0.04, 6),
+        redSteelMat
+      );
+      handRail.position.set(midPt.x, midPt.y + girderHeight + 0.04, midPt.z);
+      handRail.rotation.x = Math.PI / 2;
+      handRail.rotation.y = segAngY;
+      handRail.castShadow = true;
+      bridgeGroup.add(handRail);
+
+      // Trụ sườn tăng cứng dầm thép đứng (Stiffener Ribs)
+      if (s % 2 === 0) {
+        const stiffener = new THREE.Mesh(
+          new THREE.BoxGeometry(0.36, girderHeight + 0.08, 0.16),
+          redSteelMat
+        );
+        stiffener.position.set(p1.x, p1.y + girderHeight / 2, p1.z);
+        stiffener.rotation.y = segAngY;
+        stiffener.castShadow = true;
+        bridgeGroup.add(stiffener);
+      }
+    });
+  }
+
+  // 3. Mố cầu đá kiên cố 2 đầu cầu cắm vào bờ sông
+  [bridgeTStart, bridgeTEnd].forEach((endT) => {
+    const endPt = railwayCurve.getPointAt(endT);
+    const endTan = railwayCurve.getTangentAt(endT);
+    const endAngY = Math.atan2(endTan.x, endTan.z);
+
+    const abutment = new THREE.Mesh(
+      new THREE.BoxGeometry(bridgeWidth + 1.2, 3.8, 3.2),
+      pierMat
+    );
+    abutment.position.set(endPt.x, endPt.y - 1.8, endPt.z);
+    abutment.rotation.y = endAngY;
+    abutment.castShadow = true;
+    abutment.receiveShadow = true;
+    bridgeGroup.add(abutment);
   });
+
+  // 4. Trụ cầu giữa lòng sông nâng đỡ nhịp cầu chính (Z = -48)
+  const midBridgeT = 0.385;
+  const midBridgePt = railwayCurve.getPointAt(midBridgeT);
+  const midBridgeTan = railwayCurve.getTangentAt(midBridgeT);
+  const midPier = new THREE.Mesh(
+    new THREE.BoxGeometry(bridgeWidth + 0.6, 3.2, 2.2),
+    pierMat
+  );
+  midPier.position.set(midBridgePt.x, -0.6, midBridgePt.z);
+  midPier.rotation.y = Math.atan2(midBridgeTan.x, midBridgeTan.z);
+  midPier.castShadow = true;
+  midPier.receiveShadow = true;
+  bridgeGroup.add(midPier);
+
+  // 5. Mặt phẳng bóng mờ uốn cong in trên mặt nước (Translucent Bridge Shadow Decal)
+  const shadowGeo = new THREE.BufferGeometry();
+  shadowGeo.setAttribute('position', new THREE.Float32BufferAttribute(shadowPositions, 3));
+  shadowGeo.setIndex(shadowIndices);
+  shadowGeo.computeVertexNormals();
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x032541,
+    transparent: true,
+    opacity: 0.36,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  bridgeGroup.add(shadowMesh);
 
   bridgeGroup.userData = {
     id: 'redArchBridge',
-    title: 'Cầu vòm đường sắt màu đỏ (Red Arch Railway Bridge)',
+    title: 'Cầu đường sắt đỏ vượt sông (Red Steel Curved Railway Bridge)',
     type: 'bridge',
-    desc: 'Cầu vòm đường sắt kết cấu thép sơn đỏ rực rỡ bắc qua thung lũng sông máng nước, thiết kế tĩnh không rộng rãi cho đoàn tàu hơi nước cổ điển lướt qua an toàn.',
+    desc: 'Cầu đường sắt dầm thép đỏ uốn lượn mềm mại vượt qua dòng sông máng nước trong veo, in bóng mờ lãng mạn xuống thảm hoa súng và đàn cá bơi lội.',
     zone: 'Đường sắt Bắc - Nam',
   };
-  deck.userData = bridgeGroup.userData;
+  curvedDeckMesh.userData = bridgeGroup.userData;
   scene.add(bridgeGroup);
-  interactiveObjects.push(deck);
+  interactiveObjects.push(curvedDeckMesh);
 
   // --------------------------------------------------------------------------
   // D. Ga xe lửa DK Station (như ảnh 3: Mái ngói đỏ, ke ga trắng, barie, biển ga)
@@ -1756,13 +2153,32 @@ function buildCanalAndRailway() {
   scene.add(villagePath);
 
   // --------------------------------------------------------------------------
-  // F. Đàn cừu trắng muốt đầu đen trên sườn đồi xanh & Bóng thoại (như ảnh 2)
+  // F. Đàn cừu trắng muốt đầu đen trên bãi cỏ xanh & Bóng thoại (Đứng vững chãi trên mặt cỏ Y = 0.0, không lơ lửng)
   // --------------------------------------------------------------------------
   const sheepBaseX = 108;
   const sheepBaseZ = -45;
-  const sheepBaseY = getEastHillSurfaceY(sheepBaseX, sheepBaseZ) + 0.1; // ~ 4.6m
+  const sheepBaseY = 0.02; // Chân cừu đặt chuẩn xác trên thảm cỏ xanh mướt
   const sheepGroup = new THREE.Group();
   sheepGroup.position.set(sheepBaseX, sheepBaseY, sheepBaseZ);
+
+  // Thảm cỏ gặm cỏ riêng biệt cho đàn cừu có điểm xuyết hoa dại trắng & vàng
+  const pasturePatch = new THREE.Mesh(
+    new THREE.CylinderGeometry(8.2, 8.8, 0.08, 16),
+    new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.9, flatShading: true })
+  );
+  pasturePatch.position.set(0, 0.04, 0);
+  pasturePatch.receiveShadow = true;
+  sheepGroup.add(pasturePatch);
+
+  const flwWMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const flwYMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  for (let fi = 0; fi < 14; fi++) {
+    const ang = Math.random() * Math.PI * 2;
+    const rad = 1.8 + Math.random() * 5.2;
+    const flw = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.18), fi % 2 === 0 ? flwWMat : flwYMat);
+    flw.position.set(Math.cos(ang) * rad, 0.10, Math.sin(ang) * rad);
+    sheepGroup.add(flw);
+  }
 
   const woolMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
   const sheepBlackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
@@ -1779,8 +2195,8 @@ function buildCanalAndRailway() {
 
   sheepCoords.forEach((sc, sIdx) => {
     const oneSheep = new THREE.Group();
-    const wy = getEastHillSurfaceY(sc.x + sheepBaseX, sc.z + sheepBaseZ) - sheepBaseY;
-    oneSheep.position.set(sc.x, wy, sc.z);
+    // Chân cừu chạm đất vững chãi tại Y = 0 (cylinder chân cao 0.55m, tâm ở Y = 0.28)
+    oneSheep.position.set(sc.x, 0, sc.z);
     oneSheep.rotation.y = sc.rot;
 
     // Thân lông xù trắng lớn, bồng bềnh
@@ -1809,7 +2225,7 @@ function buildCanalAndRailway() {
       oneSheep.add(ear);
     });
 
-    // 4 chân đen vững chãi
+    // 4 chân đen vững chãi tiếp đất
     [-0.32, 0.32].forEach((lx) => {
       [-0.45, 0.45].forEach((lz) => {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.55, 6), sheepBlackMat);
@@ -1823,12 +2239,12 @@ function buildCanalAndRailway() {
     fluffySheeps.push(oneSheep);
   });
 
-  // Bóng thoại hoạt hình đáng yêu (như ảnh 2: "I could dance all afternoon!")
+  // Bóng thoại hoạt hình đáng yêu đặt ở độ cao vừa tầm (Y = 2.4m trên đàn cừu)
   const speechBubble = new THREE.Mesh(
     new THREE.BoxGeometry(4.2, 1.4, 0.12),
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
   );
-  speechBubble.position.set(2.5, 4.2, 0.5);
+  speechBubble.position.set(2.5, 2.5, 0.5);
   speechBubble.rotation.y = -Math.PI / 4;
   sheepGroup.add(speechBubble);
 
@@ -1837,7 +2253,7 @@ function buildCanalAndRailway() {
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
   );
   bubbleTail.rotation.z = Math.PI;
-  bubbleTail.position.set(1.6, 3.2, 0.5);
+  bubbleTail.position.set(1.6, 1.6, 0.5);
   sheepGroup.add(bubbleTail);
 
   sheepGroup.userData = {
@@ -1871,17 +2287,17 @@ function buildRoadsAndTestTrack() {
   road1.receiveShadow = true;
   scene.add(road1);
 
-  // Test track phía Bắc Nhà B
+  // Test track phía Bắc Nhà B (dời theo xưởng dài thêm 10m về Z = -79.5)
   const trackNorth = new THREE.Mesh(new THREE.PlaneGeometry(35, 3.2), roadMat);
   trackNorth.rotation.x = -Math.PI / 2;
-  trackNorth.position.set(65, 0.05, -69.5);
+  trackNorth.position.set(65, 0.05, -79.5);
   trackNorth.receiveShadow = true;
   scene.add(trackNorth);
 
-  // Test track phía Đông Nhà B
-  const trackEast = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 45), roadMat);
+  // Test track phía Đông Nhà B (kéo dài theo chiều dài xưởng 55m)
+  const trackEast = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 55), roadMat);
   trackEast.rotation.x = -Math.PI / 2;
-  trackEast.position.set(79, 0.051, -49);
+  trackEast.position.set(79, 0.051, -54);
   trackEast.receiveShadow = true;
   scene.add(trackEast);
 
@@ -2124,35 +2540,125 @@ function buildNhaB() {
   group.position.set(cfg.position.x, 0, cfg.position.z);
   group.userData = { id: 'nhaB', config: cfg };
 
-  // 1. Thân xưởng chính - Tường xám công nghiệp (Wall: Slate Gray 0x475569)
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width, cfg.height - 1.5, cfg.depth),
-    new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.65, metalness: 0.2 })
-  );
-  body.position.y = (cfg.height + 1.5) / 2;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  group.add(body);
+  // Nhóm toàn bộ Mái và Mặt tiền trên Nhà B (sẽ tự động ẩn khi xem Bên trong Xưởng B)
+  const nhaBRoofGroup = new THREE.Group();
+  nhaBRoofGroup.name = 'nhaBRoofGroup';
+  nhaBRoofGroup.userData = { noBatch: true, dynamic: true };
+  nhaBRoofGroupGlobal = nhaBRoofGroup;
 
-  // 2. Chân tường bệ bê tông trắng kem chống bám bẩn (Base Wall: 0xf1f5f9)
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(cfg.width + 0.15, 1.5, cfg.depth + 0.15),
-    new THREE.MeshStandardMaterial({ color: cfg.baseWallColor, roughness: 0.7 })
-  );
-  base.position.y = 0.75;
-  base.castShadow = true;
-  group.add(base);
+  const wallMat = new THREE.MeshStandardMaterial({ color: cfg.wallColor, roughness: 0.65, metalness: 0.2 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: cfg.baseWallColor, roughness: 0.7 });
 
-  // 3. Mái xưởng chính màu xám đậm (Roof Deck: Dark Slate 0x1e293b)
+  // 1. Tường Bắc (Phía sau), Tường Tây (Mạn Nhà C), Tường Đông (Mạn đường thử)
+  // Tường Bắc (North Wall: z = -cfg.depth / 2)
+  const baseNorth = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, 1.5, 0.4), baseMat);
+  baseNorth.position.set(0, 0.75, -cfg.depth / 2);
+  baseNorth.castShadow = true;
+  group.add(baseNorth);
+
+  const wallNorth = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, cfg.height - 1.5, 0.4), wallMat);
+  wallNorth.position.set(0, 1.5 + (cfg.height - 1.5) / 2, -cfg.depth / 2);
+  wallNorth.castShadow = true;
+  wallNorth.receiveShadow = true;
+  group.add(wallNorth);
+
+  // Tường Tây (West Wall: x = -cfg.width / 2)
+  const baseWest = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.5, cfg.depth), baseMat);
+  baseWest.position.set(-cfg.width / 2, 0.75, 0);
+  baseWest.castShadow = true;
+  group.add(baseWest);
+
+  const wallWest = new THREE.Mesh(new THREE.BoxGeometry(0.4, cfg.height - 1.5, cfg.depth), wallMat);
+  wallWest.position.set(-cfg.width / 2, 1.5 + (cfg.height - 1.5) / 2, 0);
+  wallWest.castShadow = true;
+  wallWest.receiveShadow = true;
+  group.add(wallWest);
+
+  // Tường Đông (East Wall: x = cfg.width / 2)
+  const baseEast = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.5, cfg.depth), baseMat);
+  baseEast.position.set(cfg.width / 2, 0.75, 0);
+  baseEast.castShadow = true;
+  group.add(baseEast);
+
+  const wallEast = new THREE.Mesh(new THREE.BoxGeometry(0.4, cfg.height - 1.5, cfg.depth), wallMat);
+  wallEast.position.set(cfg.width / 2, 1.5 + (cfg.height - 1.5) / 2, 0);
+  wallEast.castShadow = true;
+  wallEast.receiveShadow = true;
+  group.add(wallEast);
+
+  // 2. MẶT NAM QUAY RA SÂN BỐC DỠ: CẮT MỞ 2 CỬA THÔNG THOÁNG (Door B1 & Door B2)
+  // Door B1: x = -7.0, rộng 5.6m, cao 4.2m (Tâm world X = 58.0)
+  // Door B2: x = +7.0, rộng 5.0m, cao 4.2m
+  const frontZ = cfg.depth / 2;
+
+  const upperFrontH = cfg.height - 4.2;
+  const upperFront = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, upperFrontH, 0.4), wallMat);
+  upperFront.position.set(0, 4.2 + upperFrontH / 2, frontZ);
+  upperFront.castShadow = true;
+  upperFront.receiveShadow = true;
+  nhaBRoofGroup.add(upperFront);
+
+  const bFrontL = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.5, 0.4), baseMat);
+  bFrontL.position.set(-10.525, 0.75, frontZ);
+  bFrontL.castShadow = true;
+  group.add(bFrontL);
+
+  const wFrontL = new THREE.Mesh(new THREE.BoxGeometry(1.45, 2.7, 0.4), wallMat);
+  wFrontL.position.set(-10.525, 1.5 + 1.35, frontZ);
+  wFrontL.castShadow = true;
+  group.add(wFrontL);
+
+  const bFrontMid = new THREE.Mesh(new THREE.BoxGeometry(8.7, 1.5, 0.4), baseMat);
+  bFrontMid.position.set(0.15, 0.75, frontZ);
+  bFrontMid.castShadow = true;
+  group.add(bFrontMid);
+
+  const wFrontMid = new THREE.Mesh(new THREE.BoxGeometry(8.7, 2.7, 0.4), wallMat);
+  wFrontMid.position.set(0.15, 1.5 + 1.35, frontZ);
+  wFrontMid.castShadow = true;
+  group.add(wFrontMid);
+
+  const bFrontR = new THREE.Mesh(new THREE.BoxGeometry(1.75, 1.5, 0.4), baseMat);
+  bFrontR.position.set(10.375, 0.75, frontZ);
+  bFrontR.castShadow = true;
+  group.add(bFrontR);
+
+  const wFrontR = new THREE.Mesh(new THREE.BoxGeometry(1.75, 2.7, 0.4), wallMat);
+  wFrontR.position.set(10.375, 1.5 + 1.35, frontZ);
+  wFrontR.castShadow = true;
+  group.add(wFrontR);
+
+  // Sàn bê tông công nghiệp phẳng mịn đánh bóng bên trong xưởng
+  const factoryFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(cfg.width - 0.2, 0.1, cfg.depth - 0.2),
+    new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.35, metalness: 0.15 })
+  );
+  factoryFloor.position.set(0, 0.05, 0);
+  factoryFloor.receiveShadow = true;
+  group.add(factoryFloor);
+
+  // Vạch kẻ sơn vàng an toàn dẫn lối xe nâng từ trong xưởng thẳng ra Cửa B1
+  const laneMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  const laneL = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 10.0), laneMat);
+  laneL.rotation.x = -Math.PI / 2;
+  laneL.position.set(-8.8, 0.11, 11.5);
+  group.add(laneL);
+
+  const laneR = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 10.0), laneMat);
+  laneR.rotation.x = -Math.PI / 2;
+  laneR.position.set(-5.2, 0.11, 11.5);
+  group.add(laneR);
+
+  // 3. TOÀN BỘ HỆ THỐNG MÁI NGOẠI THẤT (ĐƯỢC GOM VÀO nhaBRoofGroup)
+
   const roof = new THREE.Mesh(
     new THREE.BoxGeometry(cfg.width + 0.6, 0.6, cfg.depth + 0.6),
     new THREE.MeshStandardMaterial({ color: cfg.roofColor, roughness: 0.5 })
   );
-  roof.position.y = cfg.height + 0.3; // Mặt sàn mái tại cfg.height + 0.6
+  roof.position.y = cfg.height + 0.3;
   roof.castShadow = true;
-  group.add(roof);
+  nhaBRoofGroup.add(roof);
 
-  // 4. Gờ mái viền xung quanh (Roof Fascia / Parapet Coping - 4 mép viền không đè lên mặt sàn)
   const corniceMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
   const cThick = 0.45;
   const cHeight = 0.35;
@@ -2160,21 +2666,23 @@ function buildNhaB() {
   const cNorth = new THREE.Mesh(new THREE.BoxGeometry(cfg.width + 0.8, cHeight, cThick), corniceMat);
   cNorth.position.set(0, cY, -(cfg.depth + 0.6) / 2 + cThick / 2);
   cNorth.castShadow = true;
-  group.add(cNorth);
+  nhaBRoofGroup.add(cNorth);
+
   const cSouth = new THREE.Mesh(new THREE.BoxGeometry(cfg.width + 0.8, cHeight, cThick), corniceMat);
   cSouth.position.set(0, cY, (cfg.depth + 0.6) / 2 - cThick / 2);
   cSouth.castShadow = true;
-  group.add(cSouth);
+  nhaBRoofGroup.add(cSouth);
+
   const cEast = new THREE.Mesh(new THREE.BoxGeometry(cThick, cHeight, cfg.depth + 0.6 - cThick * 2), corniceMat);
   cEast.position.set((cfg.width + 0.8) / 2 - cThick / 2, cY, 0);
   cEast.castShadow = true;
-  group.add(cEast);
+  nhaBRoofGroup.add(cEast);
+
   const cWest = new THREE.Mesh(new THREE.BoxGeometry(cThick, cHeight, cfg.depth + 0.6 - cThick * 2), corniceMat);
   cWest.position.set(-(cfg.width + 0.8) / 2 + cThick / 2, cY, 0);
   cWest.castShadow = true;
-  group.add(cWest);
+  nhaBRoofGroup.add(cWest);
 
-  // 5. Nóc thông gió & lấy sáng (Monitor Roof)
   const monCfg = cfg.monitorRoof;
   const monitor = new THREE.Mesh(
     new THREE.BoxGeometry(monCfg.width, monCfg.height, monCfg.depth),
@@ -2182,20 +2690,18 @@ function buildNhaB() {
   );
   monitor.position.y = cfg.height + 0.6 + monCfg.height / 2;
   monitor.castShadow = true;
-  group.add(monitor);
+  nhaBRoofGroup.add(monitor);
 
-  // Quạt hút thông gió xoay tròn trên nóc (Roof Ventilators)
   for (let vz = -10; vz <= 10; vz += 5.0) {
     const vent = new THREE.Mesh(
       new THREE.CylinderGeometry(0.55, 0.65, 0.6, 8),
       new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.35, metalness: 0.6 })
     );
     vent.position.set(0, cfg.height + 0.6 + monCfg.height + 0.3, vz);
-    group.add(vent);
+    nhaBRoofGroup.add(vent);
     roofVentilators.push(vent);
   }
 
-  // 6. Tấm lấy sáng mái (Polycarbonate Skylights)
   const skylightMat = new THREE.MeshStandardMaterial({
     color: 0xdbeafe,
     roughness: 0.2,
@@ -2205,14 +2711,21 @@ function buildNhaB() {
   [-4.8, 4.8].forEach((sx) => {
     const skylight = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, monCfg.depth - 2), skylightMat);
     skylight.position.set(sx, cfg.height + 0.66, 0);
-    group.add(skylight);
+    nhaBRoofGroup.add(skylight);
   });
 
-  // 7. Hệ thống Pin mặt trời trên mái xưởng B (Photovoltaic Solar Arrays)
-  createSolarPanelGrid(group, -7.5, cfg.height + 0.62, 0, 5.5, 24, 0.15);
-  createSolarPanelGrid(group, 7.5, cfg.height + 0.62, 0, 5.5, 24, 0.15);
+  createSolarPanelGrid(nhaBRoofGroup, -7.5, cfg.height + 0.62, 0, 5.5, 24, 0.15);
+  createSolarPanelGrid(nhaBRoofGroup, 7.5, cfg.height + 0.62, 0, 5.5, 24, 0.15);
 
-  // 8. Nhiều dãy cửa sổ công nghiệp có đố kính (Multi-pane window strips with mullions)
+  const chillerMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4 });
+  const chiller = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.2, 1.8), chillerMat);
+  chiller.position.set(-6.5, cfg.height + 1.4, -12);
+  chiller.castShadow = true;
+  nhaBRoofGroup.add(chiller);
+
+  group.add(nhaBRoofGroup);
+
+  // 4. Dãy cửa sổ công nghiệp (vẫn giữ nguyên trên tường biên)
   const windowMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.1, metalness: 0.8 });
   windowLights.push(windowMat);
 
@@ -2220,41 +2733,631 @@ function buildNhaB() {
     const winHeight = 1.1;
     const winY = 1.6 + (story - 0.5) * 3.8;
 
-    // Mặt Nam (Front quay ra sân giao nhận)
-    createWindowStripWithMullions(group, 0, winY, cfg.depth / 2 + 0.05, cfg.width - 4, winHeight, 0, 2.2, windowMat);
-
-    // Mặt Đông (East - hướng đường chạy thử)
+    if (story > 1) {
+      createWindowStripWithMullions(nhaBRoofGroup, 0, winY, cfg.depth / 2 + 0.05, cfg.width - 4, winHeight, 0, 2.2, windowMat);
+    }
     createWindowStripWithMullions(group, cfg.width / 2 + 0.05, winY, 0, cfg.depth - 4, winHeight, Math.PI / 2, 2.4, windowMat);
-
-    // Mặt Bắc (North - phía sau)
     createWindowStripWithMullions(group, 0, winY, -cfg.depth / 2 - 0.05, cfg.width - 6, winHeight, Math.PI, 2.2, windowMat);
-
-    // Mặt Tây (West - phía Nhà C)
     createWindowStripWithMullions(group, -cfg.width / 2 - 0.05, winY, 0, cfg.depth - 6, winHeight, -Math.PI / 2, 2.4, windowMat);
   }
 
-  // 9. 2 Cửa cuốn công nghiệp Xưởng B (Door B1, B2)
-  createShutterDoor(group, -5.5, 0, cfg.depth / 2 + 0.08, 5.4, 4.0, 'doorB1', 'Cửa cuốn chính Xưởng B');
-  createShutterDoor(group, 5.5, 0, cfg.depth / 2 + 0.08, 5.0, 4.0, 'doorB2', 'Cửa xuất nhập hàng Xưởng B');
+  // 5. Cửa cuốn công nghiệp (Door B1, B2)
+  createShutterDoor(group, -7.0, 0, cfg.depth / 2 + 0.08, 5.6, 4.2, 'doorB1', 'Cửa cuốn chính Xưởng B');
+  createShutterDoor(group, 7.0, 0, cfg.depth / 2 + 0.08, 5.0, 4.2, 'doorB2', 'Cửa xuất nhập hàng Xưởng B');
 
-  // 10. Ống thoát nước mưa 4 góc tường (Rainwater Downspouts)
+  // 6. Tiện ích ngoại thất
   createRainwaterDownspouts(group, cfg.width, cfg.height, cfg.depth, 0x64748b);
-
-  // 11. Thang thoát hiểm ngoài trời bằng thép (External Steel Fire Escape) ở mặt Bắc
   createFireEscapeStairs(group, -cfg.width / 2 + 4.5, -cfg.depth / 2 - 1.0, cfg.height, 3, 0x334155);
-
-  // 12. Cụm điều hòa công nghiệp HVAC / Chiller trên mái
-  const chillerMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4 });
-  const chiller = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.2, 1.8), chillerMat);
-  chiller.position.set(-6.5, cfg.height + 1.4, -12);
-  chiller.castShadow = true;
-  group.add(chiller);
-
-  // 13. Logo Badge "DK Bike" vàng cam nổi bật
   createBuildingLogo(group, cfg);
 
+  // ========================================================================
+  // 7. KIẾN TẠO TOÀN BỘ NỘI THẤT XƯỞNG B CHUẨN THỰC TẾ & BẢN VẼ PDF LAYOUT
+  // Dây chuyền lắp ráp, giá kệ selective, xe thành phẩm, thang tời hàng
+  // ========================================================================
+  buildNhaBInterior(group, cfg);
+
   scene.add(group);
-  buildingMeshes.push(body);
+  buildingMeshes.push(upperFront);
+}
+
+// Hàm khởi tạo toàn bộ nội thất chi tiết Xưởng B: Dài hơn 10m, dây chuyền 30m, KHÔNG CỘT TRỤ RẦM (Không gian mở thông thoáng 100%)
+function buildNhaBInterior(group, cfg) {
+  const interiorGroup = new THREE.Group();
+  interiorGroup.name = 'nhaBInterior';
+
+  // Reset các mảng hoạt cảnh dây chuyền
+  insideAssemblyBikes = [];
+  insideConveyorSlats = [];
+  insideAssemblyWorkers = [];
+
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.6 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+  const blueFrameMat = new THREE.MeshStandardMaterial({ color: 0x184995, roughness: 0.35, metalness: 0.25 }); // Xanh DK Bike
+  const orangeRackMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.35 }); // Cam selective rack
+  const blueRackMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.4 });   // Xanh chân kệ
+  const yellowHazardMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 }); // Vàng an toàn thang tời
+  const crateBlueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
+  const crateRedMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
+  const cartonMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.9 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.1, metalness: 0.85 });
+
+  // ==========================================================================
+  // A. KHÔNG GIAN TRẦN & CHIẾU SÁNG CAO CẤP (ĐÃ BỎ HOÀN TOÀN CỘT TRỤ & DẦM NGANG/DỌC CHO ĐỠ VƯỚNG)
+  // Không gian thông thủy 100% không vướng cột, nhìn xuyên suốt từ đầu xưởng đến cuối xưởng
+  // ==========================================================================
+
+  // Đường ống cứu hỏa PCCC sơn đỏ chạy sát mép trần trên cao
+  const pipeMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.3 });
+  const firePipe = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, cfg.depth - 2, 8), pipeMat);
+  firePipe.rotation.x = Math.PI / 2;
+  firePipe.position.set(-cfg.width / 2 + 1.2, cfg.height - 0.4, 0);
+  interiorGroup.add(firePipe);
+
+  // Quạt trần công nghiệp HVLS cánh lớn sải rộng treo sát mái (không vướng tầm mắt dưới sàn)
+  [-3.5, 3.5].forEach((fx, fIdx) => {
+    const fz = fIdx === 0 ? -6.0 : 6.0;
+    const fanGroup = new THREE.Group();
+    fanGroup.position.set(fx, cfg.height - 1.2, fz);
+
+    const fMotor = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.4, 12), darkMat);
+    fanGroup.add(fMotor);
+
+    const fRotor = new THREE.Group();
+    for (let b = 0; b < 6; b++) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.035, 0.2), blueFrameMat);
+      blade.position.x = 1.4;
+      const bWrapper = new THREE.Group();
+      bWrapper.rotation.y = (b / 6) * Math.PI * 2;
+      bWrapper.add(blade);
+      fRotor.add(bWrapper);
+    }
+    fanGroup.add(fRotor);
+    insideHVLSFans.push(fRotor);
+    interiorGroup.add(fanGroup);
+  });
+
+  // Hệ thống đèn LED High-Bay UFO treo trần bố trí dọc theo xưởng dài 44m
+  const lampZs = [-16, -9, -2, 5, 12];
+  [-3.2, 3.2].forEach((lx) => {
+    lampZs.forEach((lz) => {
+      // Dây cáp treo thanh mảnh
+      const dropWire = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.01, 1.2, 6),
+        steelMat
+      );
+      dropWire.position.set(lx, cfg.height - 0.6, lz);
+      interiorGroup.add(dropWire);
+
+      const lamp = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.4, 0.14, 12),
+        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 })
+      );
+      lamp.position.set(lx, cfg.height - 1.25, lz);
+      interiorGroup.add(lamp);
+
+      const bulb = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.34, 0.34, 0.03, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      bulb.position.set(lx, cfg.height - 1.32, lz);
+      interiorGroup.add(bulb);
+
+      const pLight = new THREE.PointLight(0xfffbeb, 0.82, 16);
+      pLight.position.set(lx, cfg.height - 1.45, lz);
+      interiorGroup.add(pLight);
+      interiorFactoryLights.push(pLight);
+    });
+  });
+
+  // ==========================================================================
+  // B. THANG TỜI HÀNG CÔNG NGHIỆP 2.5 TẤN (Góc Tây Nam: ô vuông 4555mm)
+  // ==========================================================================
+  const liftGroup = new THREE.Group();
+  liftGroup.position.set(-8.8, 0, cfg.depth / 2 - 2.8);
+
+  const lW = 3.4, lD = 2.8, lH = 8.5;
+  [[-lW / 2, -lD / 2], [lW / 2, -lD / 2], [-lW / 2, lD / 2], [lW / 2, lD / 2]].forEach(([px, pz]) => {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, lH, 0.16), yellowHazardMat);
+    post.position.set(px, lH / 2, pz);
+    post.castShadow = true;
+    liftGroup.add(post);
+  });
+
+  for (let ty = 2.0; ty <= lH; ty += 1.8) {
+    const ring = new THREE.Mesh(new THREE.BoxGeometry(lW + 0.08, 0.08, lD + 0.08), darkMat);
+    ring.position.y = ty;
+    liftGroup.add(ring);
+  }
+
+  const meshMat = new THREE.MeshStandardMaterial({ color: 0x64748b, wireframe: true, roughness: 0.5 });
+  const backMesh = new THREE.Mesh(new THREE.PlaneGeometry(lW, lH), meshMat);
+  backMesh.position.set(0, lH / 2, -lD / 2);
+  liftGroup.add(backMesh);
+
+  const leftMesh = new THREE.Mesh(new THREE.PlaneGeometry(lD, lH), meshMat);
+  leftMesh.rotation.y = Math.PI / 2;
+  leftMesh.position.set(-lW / 2, lH / 2, 0);
+  liftGroup.add(leftMesh);
+
+  const gate = new THREE.Mesh(new THREE.BoxGeometry(lW - 0.3, 2.2, 0.06), yellowHazardMat);
+  gate.position.set(0, 1.1, lD / 2);
+  liftGroup.add(gate);
+
+  for (let hz = 0; hz < 6; hz++) {
+    const hStripe = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.42, 0.14),
+      new THREE.MeshBasicMaterial({ color: hz % 2 === 0 ? 0xfacc15 : 0x0f172a })
+    );
+    hStripe.rotation.x = -Math.PI / 2;
+    hStripe.position.set(-1.05 + hz * 0.42, 0.08, lD / 2 + 0.45);
+    liftGroup.add(hStripe);
+  }
+
+  const winchMotor = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.1, 12), steelMat);
+  winchMotor.rotation.z = Math.PI / 2;
+  winchMotor.position.set(0, lH + 0.3, 0);
+  liftGroup.add(winchMotor);
+
+  const liftPlatform = new THREE.Mesh(new THREE.BoxGeometry(lW - 0.4, 0.15, lD - 0.4), steelMat);
+  liftPlatform.position.set(0, 0.55, 0);
+  liftGroup.add(liftPlatform);
+
+  const ctrlBox = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.4, 0.1), yellowHazardMat);
+  ctrlBox.position.set(lW / 2 + 0.12, 1.35, lD / 2);
+  liftGroup.add(ctrlBox);
+
+  const liftData = {
+    id: 'insideFreightLift',
+    title: 'Thang tời hàng công nghiệp 2.5 Tấn (Vị trí góc Tây Nam Xưởng B)',
+    type: 'lift',
+    desc: 'Hệ thống thang tời hàng thủy lực/cáp kéo tải trọng 2.500 kg, phục vụ chuyển linh kiện động cơ, ắc quy và khung xe giữa các tầng của Xưởng B.',
+    zone: 'DK1',
+  };
+  liftGroup.userData = liftData;
+  gate.userData = liftData;
+  interactiveObjects.push(gate);
+  interiorGroup.add(liftGroup);
+
+  // ==========================================================================
+  // C. DÂY CHUYỀN LẮP RÁP XE MÁY ĐIỆN DK BIKE KÉO DÀI 30 MÉT (Không vướng cột, hoạt cảnh chạy chậm)
+  // ==========================================================================
+  const lineGroup = new THREE.Group();
+  const lineX = -1.2;
+  lineGroup.position.set(lineX, 0, 0);
+
+  const lineLen = 27.0; // Băng chuyền chính dài 27 mét
+  const lineW = 1.05;
+  const lineH = 0.62;
+
+  // Băng chuyền chính sơn xanh DK Bike
+  const lineBed = new THREE.Mesh(
+    new THREE.BoxGeometry(lineW, lineH, lineLen),
+    blueFrameMat
+  );
+  lineBed.position.set(0, lineH / 2, -2.5);
+  lineBed.castShadow = true;
+  lineGroup.add(lineBed);
+
+  const slatBelt = new THREE.Mesh(
+    new THREE.BoxGeometry(lineW - 0.16, 0.04, lineLen - 0.3),
+    steelMat
+  );
+  slatBelt.position.set(0, lineH + 0.02, -2.5);
+  lineGroup.add(slatBelt);
+
+  // 36 Tấm nan kim loại của băng chuyền trượt tịnh tiến liên tục
+  for (let sIdx = 0; sIdx < 36; sIdx++) {
+    const slatZ = -15.5 + sIdx * 0.72;
+    const slat = new THREE.Mesh(
+      new THREE.BoxGeometry(lineW - 0.22, 0.015, 0.18),
+      new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.3, metalness: 0.7 })
+    );
+    slat.position.set(0, lineH + 0.045, slatZ);
+    lineGroup.add(slat);
+    insideConveyorSlats.push(slat);
+  }
+
+  // Chân đế chữ U đỡ băng tải
+  for (let bz = -15.0; bz <= 9.0; bz += 3.0) {
+    const legL = new THREE.Mesh(new THREE.BoxGeometry(0.08, lineH, 0.08), steelMat);
+    legL.position.set(-lineW / 2 + 0.05, lineH / 2, bz);
+    lineGroup.add(legL);
+    const legR = legL.clone();
+    legR.position.x = lineW / 2 - 0.05;
+    lineGroup.add(legR);
+  }
+
+  // CẦU TRƯỢT DỐC XUỐNG XE THÀNH PHẨM (Dài 3.5m)
+  const rampLen = 3.5;
+  const rampGeo = new THREE.BoxGeometry(lineW + 0.1, 0.06, rampLen);
+  const ramp = new THREE.Mesh(rampGeo, blueFrameMat);
+  ramp.position.set(0, lineH / 2 + 0.02, 11.5);
+  ramp.rotation.x = Math.atan2(lineH, rampLen);
+  ramp.castShadow = true;
+  lineGroup.add(ramp);
+
+  // Vạch kẻ an toàn quanh chân cầu trượt
+  const rampSafetyMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+  const rampLine1 = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 4.2), rampSafetyMat);
+  rampLine1.rotation.x = -Math.PI / 2;
+  rampLine1.position.set(-lineW / 2 - 0.35, 0.08, 11.8);
+  lineGroup.add(rampLine1);
+
+  const rampLine2 = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 4.2), rampSafetyMat);
+  rampLine2.rotation.x = -Math.PI / 2;
+  rampLine2.position.set(lineW / 2 + 0.35, 0.08, 11.8);
+  lineGroup.add(rampLine2);
+
+  // TỦ ĐIỆN ĐIỀU KHIỂN HMI & ĐÈN BÁO
+  const ctrlCabinet = new THREE.Group();
+  ctrlCabinet.position.set(-lineW / 2 - 0.75, 0, 9.5);
+
+  const cabBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.65, 1.45, 0.48),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 })
+  );
+  cabBody.position.y = 1.45 / 2;
+  cabBody.castShadow = true;
+  ctrlCabinet.add(cabBody);
+
+  const screenHMI = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.22), new THREE.MeshBasicMaterial({ color: 0x0284c7 }));
+  screenHMI.position.set(0, 1.05, 0.25);
+  ctrlCabinet.add(screenHMI);
+
+  const stackPole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8), steelMat);
+  stackPole.position.set(0.2, 1.45 + 0.17, 0);
+  ctrlCabinet.add(stackPole);
+
+  const greenBeacon = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+  greenBeacon.position.set(0.2, 1.45 + 0.38, 0);
+  ctrlCabinet.add(greenBeacon);
+
+  lineGroup.add(ctrlCabinet);
+
+  // KHUNG GIÀN TREO DÂY CHUYỀN SPAN 30 MÉT & ĐÈN SOI
+  const gantryMat = new THREE.MeshStandardMaterial({ color: 0x184995, roughness: 0.4 });
+  const gantryZs = [-15.0, -9.0, -3.0, 3.0, 9.0];
+
+  gantryZs.forEach((gz) => {
+    const gPostL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.4, 0.07), gantryMat);
+    gPostL.position.set(-lineW / 2 - 0.08, 1.2, gz);
+    lineGroup.add(gPostL);
+
+    const gPostR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.4, 0.07), gantryMat);
+    gPostR.position.set(lineW / 2 + 0.08, 1.2, gz);
+    lineGroup.add(gPostR);
+
+    const gBeam = new THREE.Mesh(new THREE.BoxGeometry(lineW + 0.25, 0.07, 0.07), gantryMat);
+    gBeam.position.set(0, 2.38, gz);
+    lineGroup.add(gBeam);
+  });
+
+  const signBanner = new THREE.Mesh(new THREE.BoxGeometry(lineW + 0.35, 0.32, 0.05), blueFrameMat);
+  signBanner.position.set(0, 2.48, 9.0);
+  lineGroup.add(signBanner);
+
+  const taskLight = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.04, lineLen - 1),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  taskLight.position.set(0, 2.32, -2.5);
+  lineGroup.add(taskLight);
+
+  // 8 CÔNG ĐOẠN XE TRÊN DÂY CHUYỀN (Xe hướng thẳng theo chiều chuyền: rotation.y = -Math.PI / 2)
+  const bikeScale = 0.78;
+
+  // Stage 0: Khung sườn kim loại trần trên đồ gá jig
+  const stage0 = new THREE.Group();
+  const jig0 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.5), steelMat);
+  jig0.position.y = 0.06;
+  stage0.add(jig0);
+  const rawFrameMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.65, 1.2),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.6 })
+  );
+  rawFrameMesh.position.y = 0.45;
+  stage0.add(rawFrameMesh);
+  stage0.position.set(0, lineH + 0.02, -15.0);
+  lineGroup.add(stage0);
+  insideAssemblyBikes.push({ mesh: stage0, startZ: -15.0, baseY: lineH + 0.02 });
+
+  // Stage 1: Lắp càng sau & giảm xóc đôi
+  const stage1 = createDetailedDKBike(0x0284c7, 'Xe lắp càng & giảm xóc');
+  stage1.scale.set(bikeScale, bikeScale, bikeScale);
+  stage1.rotation.y = -Math.PI / 2;
+  stage1.position.set(0, lineH + 0.05, -11.5);
+  lineGroup.add(stage1);
+  insideAssemblyBikes.push({ mesh: stage1, startZ: -11.5, baseY: lineH + 0.05 });
+
+  // Stage 2: Lắp động cơ điện BLDC & vành đúc
+  const stage2 = createDetailedDKBike(0x0284c7, 'Xe lắp động cơ BLDC');
+  stage2.scale.set(bikeScale, bikeScale, bikeScale);
+  stage2.rotation.y = -Math.PI / 2;
+  stage2.position.set(0, lineH + 0.05, -8.0);
+  lineGroup.add(stage2);
+  insideAssemblyBikes.push({ mesh: stage2, startZ: -8.0, baseY: lineH + 0.05 });
+
+  // Stage 3: Lắp hộc ắc quy & bó dây điện sườn
+  const stage3 = createDetailedDKBike(0xdc2626, 'Xe lắp ắc quy & hệ điện');
+  stage3.scale.set(bikeScale, bikeScale, bikeScale);
+  stage3.rotation.y = -Math.PI / 2;
+  stage3.position.set(0, lineH + 0.05, -4.5);
+  lineGroup.add(stage3);
+  insideAssemblyBikes.push({ mesh: stage3, startZ: -4.5, baseY: lineH + 0.05 });
+
+  // Stage 4: Lắp giảm xóc trước telescopic & ghi đông phanh đĩa
+  const stage4 = createDetailedDKBike(0xdc2626, 'Xe lắp ghi đông & phanh ABS');
+  stage4.scale.set(bikeScale, bikeScale, bikeScale);
+  stage4.rotation.y = -Math.PI / 2;
+  stage4.position.set(0, lineH + 0.05, -1.0);
+  lineGroup.add(stage4);
+  insideAssemblyBikes.push({ mesh: stage4, startZ: -1.0, baseY: lineH + 0.05 });
+
+  // Stage 5: Lắp đồng hồ LED kỹ thuật số & tay ga
+  const stage5 = createDetailedDKBike(0x64748b, 'Xe kết nối đồng hồ LED');
+  stage5.scale.set(bikeScale, bikeScale, bikeScale);
+  stage5.rotation.y = -Math.PI / 2;
+  stage5.position.set(0, lineH + 0.05, 2.5);
+  lineGroup.add(stage5);
+  insideAssemblyBikes.push({ mesh: stage5, startZ: 2.5, baseY: lineH + 0.05 });
+
+  // Stage 6: Lắp dàn áo yếm nhựa & yên da caramel
+  const stage6 = createDetailedDKBike(0x64748b, 'DK Roma SX Gần Hoàn Thiện');
+  stage6.scale.set(bikeScale, bikeScale, bikeScale);
+  stage6.rotation.y = -Math.PI / 2;
+  stage6.position.set(0, lineH + 0.05, 6.0);
+  lineGroup.add(stage6);
+  insideAssemblyBikes.push({ mesh: stage6, startZ: 6.0, baseY: lineH + 0.05 });
+
+  // Stage 7: Xe hoàn chỉnh lăn bánh xuống dốc
+  const stage7 = createDetailedDKBike(0xf8fafc, 'DK Roma SX Trắng Ngọc Trai');
+  stage7.scale.set(bikeScale, bikeScale, bikeScale);
+  stage7.rotation.y = -Math.PI / 2;
+  stage7.position.set(0, lineH + 0.05, 9.5);
+  lineGroup.add(stage7);
+  insideAssemblyBikes.push({ mesh: stage7, startZ: 9.5, baseY: lineH + 0.05 });
+
+  // Công nhân thao tác dọc dây chuyền
+  const workerConfigs = [
+    { z: -13.0, side: -1, phase: 0 },
+    { z: -9.5,  side: 1,  phase: 1.2 },
+    { z: -6.0,  side: -1, phase: 2.4 },
+    { z: -2.5,  side: 1,  phase: 3.6 },
+    { z: 1.0,   side: -1, phase: 4.8 },
+    { z: 4.5,   side: 1,  phase: 6.0 },
+  ];
+
+  workerConfigs.forEach((wc) => {
+    const w = createCharacter({ shirtColor: 0x0284c7, pantsColor: 0x1e293b, hatColor: 0x0284c7, role: 'worker', heightScale: 0.95 });
+    w.scale.set(0.95, 0.95, 0.95);
+    w.position.set(wc.side * (lineW / 2 + 0.42), 0, wc.z);
+    w.rotation.y = wc.side < 0 ? Math.PI / 2 : -Math.PI / 2;
+    lineGroup.add(w);
+    insideAssemblyWorkers.push({ mesh: w, phase: wc.phase });
+  });
+
+  const lineData = {
+    id: 'insideAssemblyLine',
+    title: 'Dây chuyền lắp ráp xe máy điện tự động DK Bike (Dài 30m)',
+    type: 'assemblyLine',
+    desc: 'Dây chuyền lắp ráp kéo dài 30 mét với 8 trạm công đoạn đồng bộ, vận hành êm đềm liên tục, xuất xe thành phẩm qua cầu dốc xanh.',
+    zone: 'DK1',
+  };
+  lineGroup.userData = lineData;
+  lineBed.userData = lineData;
+  ramp.userData = lineData;
+  interactiveObjects.push(lineBed);
+  interactiveObjects.push(ramp);
+  interiorGroup.add(lineGroup);
+
+  // ==========================================================================
+  // D. KHU TẬP KẾT XE THÀNH PHẨM (Mở rộng theo chiều dài xưởng: 33 xe thành phẩm, 3 hàng thẳng tắp)
+  // ==========================================================================
+  const stagingGroup = new THREE.Group();
+  stagingGroup.position.set(-6.8, 0, -3.5);
+
+  const lotW = 4.2, lotD = 23.5;
+  const lotMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  const lotBorder = new THREE.Mesh(new THREE.PlaneGeometry(lotW, lotD), lotMat);
+  lotBorder.rotation.x = -Math.PI / 2;
+  lotBorder.position.set(0, 0.07, 0);
+  stagingGroup.add(lotBorder);
+
+  const lotInner = new THREE.Mesh(
+    new THREE.PlaneGeometry(lotW - 0.15, lotD - 0.15),
+    new THREE.MeshStandardMaterial({ color: 0x3b4a5d, roughness: 0.35, metalness: 0.15 })
+  );
+  lotInner.rotation.x = -Math.PI / 2;
+  lotInner.position.set(0, 0.075, 0);
+  stagingGroup.add(lotInner);
+
+  // Vạch kẻ chia từng ô đỗ xe ngay ngắn
+  const stallLineMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+  for (let sz = -10.5; sz <= 10.5; sz += 2.0) {
+    const sLine = new THREE.Mesh(new THREE.PlaneGeometry(lotW - 0.25, 0.05), stallLineMat);
+    sLine.rotation.x = -Math.PI / 2;
+    sLine.position.set(0, 0.08, sz);
+    stagingGroup.add(sLine);
+  }
+
+  // 33 Xe máy điện DK Roma SX xếp thành 3 hàng x 11 xe thẳng tắp, tất cả quay mũi ra cửa Nam
+  const bikeColors = [
+    0x64748b, // Xám xi măng đặc trưng
+    0x64748b,
+    0xf8fafc, // Trắng ngọc trai
+    0x64748b,
+    0xdc2626, // Đỏ đô
+    0x0f172a, // Đen bóng
+    0x0284c7, // Xanh cyan
+    0x64748b,
+  ];
+
+  const colOffsets = [-1.3, 0.0, 1.3];
+  colOffsets.forEach((colX, cIdx) => {
+    for (let row = 0; row < 11; row++) {
+      const rowZ = -10.0 + row * 2.0;
+      const colHex = bikeColors[(cIdx * 11 + row) % bikeColors.length];
+      const bike = createDetailedDKBike(colHex, `DK Roma SX Lô #${cIdx + 1}-${row + 1}`);
+      bike.scale.set(bikeScale, bikeScale, bikeScale);
+      bike.rotation.y = -Math.PI / 2; // Hướng thẳng ra cửa xuất hàng Nam!
+      bike.position.set(colX, 0, rowZ);
+      stagingGroup.add(bike);
+    }
+  });
+
+  const stagingData = {
+    id: 'insideStagingArea',
+    title: 'Khu tập kết 33 xe máy điện thành phẩm sau kiểm định KCS (Xưởng B)',
+    type: 'staging',
+    desc: 'Khu vực tập kết 33 xe máy điện DK Roma SX hoàn thiện (xám xi măng, trắng ngọc trai, đỏ đô, đen bóng) xếp hàng ngay ngắn trên sàn bê tông phẳng mịn.',
+    zone: 'DK1',
+  };
+  stagingGroup.userData = stagingData;
+  lotInner.userData = stagingData;
+  interactiveObjects.push(lotInner);
+  interiorGroup.add(stagingGroup);
+
+  // ==========================================================================
+  // E. HỆ THỐNG GIÁ KỆ KHO LINH KIỆN & PALLET ĐỘNG CƠ (6 Dãy Selective Racking 4 tầng phía Đông)
+  // ==========================================================================
+  const rackBlocks = [
+    { z: -15.5, name: 'Kệ selective K01: Pallet động cơ điện BLDC & IC điều tốc' },
+    { z: -10.0, name: 'Kệ selective K02: Thùng phụ tùng nhựa dàn áo & yếm xe' },
+    { z: -4.5,  name: 'Kệ selective K03: Cụm giảm xóc thủy lực, vành đúc & lốp không săm' },
+    { z: 1.0,   name: 'Kệ selective K04: Phụ kiện ốc vít, chốt định vị & bó dây điện' },
+    { z: 6.5,   name: 'Kệ selective K05: Khay linh kiện lắp ráp nhanh & phụ kiện đèn còi' },
+    { z: 12.0,  name: 'Kệ selective K06: Bộ sạc thông minh & bình ắc quy dự trữ' },
+  ];
+
+  rackBlocks.forEach((rb, rbIdx) => {
+    const rackGroup = new THREE.Group();
+    rackGroup.position.set(6.4, 0, rb.z);
+
+    const rW = 4.2;
+    const rD = 1.1;
+    const rH = 4.4;
+
+    [[-rW / 2, -rD / 2], [rW / 2, -rD / 2], [-rW / 2, rD / 2], [rW / 2, rD / 2], [0, -rD / 2], [0, rD / 2]].forEach(([px, pz]) => {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.09, rH, 0.09), blueRackMat);
+      col.position.set(px, rH / 2, pz);
+      col.castShadow = true;
+      rackGroup.add(col);
+    });
+
+    for (let tier = 1; tier <= 4; tier++) {
+      const beamY = tier * 1.0;
+
+      [-rD / 2, rD / 2].forEach((bz) => {
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(rW, 0.07, 0.05), orangeRackMat);
+        beam.position.set(0, beamY, bz);
+        rackGroup.add(beam);
+      });
+
+      const shelfDeck = new THREE.Mesh(new THREE.BoxGeometry(rW - 0.1, 0.025, rD - 0.1), steelMat);
+      shelfDeck.position.set(0, beamY + 0.02, 0);
+      rackGroup.add(shelfDeck);
+
+      [-rW / 4, rW / 4].forEach((px, pIdx) => {
+        if ((tier + rbIdx + pIdx) % 2 === 0) {
+          const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.09, 0.9), cartonMat);
+          pallet.position.set(px, beamY + 0.07, 0);
+          rackGroup.add(pallet);
+
+          const cBox = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.52, 0.82), cartonMat);
+          cBox.position.set(px, beamY + 0.38, 0);
+          cBox.castShadow = true;
+          rackGroup.add(cBox);
+        } else {
+          for (let kx = -0.32; kx <= 0.32; kx += 0.42) {
+            const cMat = (kx > 0) ? crateRedMat : crateBlueMat;
+            const crate = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.25, 0.6), cMat);
+            crate.position.set(px + kx, beamY + 0.15, 0);
+            rackGroup.add(crate);
+          }
+        }
+      });
+    }
+
+    const rackData = {
+      id: 'insidePartsRacks',
+      title: rb.name,
+      type: 'rack',
+      desc: 'Hệ thống giá kệ Selective Racking chịu tải 1.000 kg/tầng, lưu trữ linh kiện động cơ điện BLDC, ắc quy khô, bộ điều khiển IC và phụ tùng cơ khí chính hãng DK Bike.',
+      zone: 'DK1',
+    };
+    rackGroup.userData = rackData;
+    interiorGroup.add(rackGroup);
+  });
+
+  // Xe đẩy khay nhựa cơ động
+  [-4.0, 3.5].forEach((tz) => {
+    const cartGroup = new THREE.Group();
+    cartGroup.position.set(2.4, 0, tz);
+
+    const cartFrame = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 1.0), blueRackMat);
+    cartFrame.position.y = 0.68;
+    cartGroup.add(cartFrame);
+
+    for (let cy = 0.28; cy <= 1.1; cy += 0.32) {
+      const bCrate = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.18, 0.92), crateBlueMat);
+      bCrate.position.y = cy;
+      cartGroup.add(bCrate);
+    }
+    interiorGroup.add(cartGroup);
+  });
+
+  // Xe nâng tay màu vàng (Manual Pallet Jack theo ghi chú trên bản vẽ PDF: "Dùng xe nâng tay")
+  const palletJack = new THREE.Group();
+  palletJack.position.set(2.4, 0, 8.5);
+
+  const forkL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 1.1), yellowHazardMat);
+  forkL.position.set(-0.2, 0.05, 0);
+  palletJack.add(forkL);
+  const forkR = forkL.clone();
+  forkR.position.x = 0.2;
+  palletJack.add(forkR);
+
+  const jackHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.85, 8), darkMat);
+  jackHandle.rotation.x = -0.3;
+  jackHandle.position.set(0, 0.45, 0.65);
+  palletJack.add(jackHandle);
+
+  const jackPallet = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.8), cartonMat);
+  jackPallet.position.set(0, 0.12, 0);
+  palletJack.add(jackPallet);
+
+  const jackBox = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.45, 0.7), cartonMat);
+  jackBox.position.set(0, 0.38, 0);
+  palletJack.add(jackBox);
+
+  interiorGroup.add(palletJack);
+
+  // Pallet động cơ dự phòng sát vách Bắc (45 pallet theo PDF layout)
+  for (let mx = -4.5; mx <= 4.5; mx += 1.8) {
+    const mPallet = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.09, 0.95), cartonMat);
+    mPallet.position.set(mx, 0.05, -cfg.depth / 2 + 1.2);
+    interiorGroup.add(mPallet);
+
+    const mStack = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.58, 0.85), cartonMat);
+    mStack.position.set(mx, 0.38, -cfg.depth / 2 + 1.2);
+    interiorGroup.add(mStack);
+  }
+
+  // ==========================================================================
+  // F. SÀN BÊ TÔNG ĐÁNH BÓNG & HÀNH LANG RỘNG MÊNH MÔNG (3.5M - 6.0M THÔNG THOÁNG)
+  // ==========================================================================
+  const safetyLineMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  const cLineL = new THREE.Mesh(new THREE.PlaneGeometry(0.08, cfg.depth - 4), safetyLineMat);
+  cLineL.rotation.x = -Math.PI / 2;
+  cLineL.position.set(-2.2, 0.065, 0);
+  interiorGroup.add(cLineL);
+
+  const cLineR = new THREE.Mesh(new THREE.PlaneGeometry(0.08, cfg.depth - 4), safetyLineMat);
+  cLineR.rotation.x = -Math.PI / 2;
+  cLineR.position.set(3.8, 0.065, 0);
+  interiorGroup.add(cLineR);
+
+  group.add(interiorGroup);
 }
 
 // Hàm khởi tạo Cửa cuốn công nghiệp có thể mở/đóng và lộ dây chuyền bên trong
@@ -2305,20 +3408,30 @@ function createShutterDoor(parentGroup, x, y, z, width, height, id, name) {
   doorGroup.add(interiorLight);
   interiorFactoryLights.push(interiorLight);
 
-  // Băng chuyền và khung xe máy điện bên trong xưởng
-  const conveyor = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.8, 0.6, 3.8),
-    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 })
-  );
-  conveyor.position.set(0, 0.3, -2.5);
-  doorGroup.add(conveyor);
+  // Băng chuyền và khung xe máy điện bên trong xưởng (Chỉ đặt ở cửa phụ, không đặt ở Cửa B1 để xe nâng di chuyển tự do)
+  if (id !== 'doorB1') {
+    const conveyor = new THREE.Mesh(
+      new THREE.BoxGeometry(width * 0.8, 0.6, 3.8),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 })
+    );
+    conveyor.position.set(0, 0.3, -2.5);
+    doorGroup.add(conveyor);
 
-  const chassis = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.7, 0.5),
-    new THREE.MeshStandardMaterial({ color: 0x184995, roughness: 0.3 })
-  );
-  chassis.position.set(0, 0.95, -2.5);
-  doorGroup.add(chassis);
+    const chassis = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.7, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x184995, roughness: 0.3 })
+    );
+    chassis.position.set(0, 0.95, -2.5);
+    doorGroup.add(chassis);
+  } else {
+    // Giá kệ phụ tùng đặt sát 2 bên mép cửa xưởng B, giữ thông thoáng 100% làn đường xe nâng
+    const rackMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 });
+    [-width / 2 + 0.3, width / 2 - 0.3].forEach((rx) => {
+      const rack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.4, 2.5), rackMat);
+      rack.position.set(rx, 1.2, -2.2);
+      doorGroup.add(rack);
+    });
+  }
 
   // Metadata tương tác
   const doorData = {
@@ -2382,7 +3495,11 @@ function createBuildingLogo(group, cfg) {
   faceSouth.position.z = 0.035;
   signSouth.add(faceSouth);
 
-  group.add(signSouth);
+  if (nhaBRoofGroupGlobal) {
+    nhaBRoofGroupGlobal.add(signSouth);
+  } else {
+    group.add(signSouth);
+  }
 
   // 2. Mặt Đông (Quay ra đường chạy thử & đường sắt)
   const signEast = new THREE.Group();
@@ -4537,6 +5654,33 @@ function createJitteredIcosahedron(radius, detail = 1, jitterAmount = 0.28) {
   return geo;
 }
 
+// Tạo tán cây tròn bồng bềnh nhiều múi búp mây (Stylized Puffy Cloud-Canopy như ảnh mẫu bên trái)
+function createPuffyCloudCanopyGeometry(baseRadius = 1.6) {
+  const geos = [];
+
+  // Múi trung tâm tròn lớn
+  const centerSphere = new THREE.DodecahedronGeometry(baseRadius, 1);
+  geos.push(centerSphere);
+
+  // 4 múi búp mây vệ tinh nở tròn xung quanh tạo tán cây bồng bềnh hữu cơ
+  const lobes = [
+    { x: 0.85 * baseRadius, y: -0.15 * baseRadius, z: 0.35 * baseRadius, r: 0.72 * baseRadius },
+    { x: -0.75 * baseRadius, y: 0.12 * baseRadius, z: -0.45 * baseRadius, r: 0.75 * baseRadius },
+    { x: -0.35 * baseRadius, y: -0.22 * baseRadius, z: 0.75 * baseRadius, r: 0.68 * baseRadius },
+    { x: 0.45 * baseRadius, y: 0.28 * baseRadius, z: -0.65 * baseRadius, r: 0.65 * baseRadius },
+  ];
+
+  lobes.forEach((l) => {
+    const lobeGeo = new THREE.DodecahedronGeometry(l.r, 1);
+    lobeGeo.translate(l.x, l.y, l.z);
+    geos.push(lobeGeo);
+  });
+
+  const merged = BufferGeometryUtils.mergeGeometries(geos, false);
+  merged.computeVertexNormals();
+  return merged;
+}
+
 // Tạo hình cây thông 3 tầng nón xếp chồng + thân gỗ gộp chung (Compound Tiered Pine)
 function createTieredPineGeometry() {
   const geos = [];
@@ -4684,7 +5828,7 @@ function buildLandscaping() {
   const roundTrunkInst = new THREE.InstancedMesh(roundTrunkGeo, roundTrunkMat, roundCount);
   roundTrunkInst.castShadow = true;
 
-  const roundFoliageGeo = createJitteredIcosahedron(1.7, 1, 0.28);
+  const roundFoliageGeo = createPuffyCloudCanopyGeometry(1.55);
   const roundFoliageMat = createWindFoliageMaterial(0x22c55e, 0.8);
   const roundFoliageInst = new THREE.InstancedMesh(roundFoliageGeo, roundFoliageMat, roundCount);
   roundFoliageInst.castShadow = true;
@@ -4705,7 +5849,7 @@ function buildLandscaping() {
   const autumnTrunkInst = new THREE.InstancedMesh(roundTrunkGeo, roundTrunkMat, autumnCount);
   autumnTrunkInst.castShadow = true;
 
-  const autumnFoliageGeo = createJitteredIcosahedron(1.55, 1, 0.3);
+  const autumnFoliageGeo = createPuffyCloudCanopyGeometry(1.45);
   const autumnFoliageMat = createWindFoliageMaterial(0xf59e0b, 0.78);
   const autumnFoliageInst = new THREE.InstancedMesh(autumnFoliageGeo, autumnFoliageMat, autumnCount);
   autumnFoliageInst.castShadow = true;
@@ -6207,7 +7351,7 @@ function createUnassembledFrameRack(x, y, z, rotY, id, name) {
 function buildLogisticsAndEquipment() {
   // 1. Xe nâng điện Komatsu hiện đại (Khối 9: Mast thủy lực, càng nâng, cabin & đèn xoay amber)
   // Xe nâng 1 tham gia chu kỳ bốc dỡ tại Xưởng B
-  createDetailedForklift(58.0, 0, -35.6, -Math.PI / 2, 'forklift1', 'Xe nâng điện Komatsu FB25 #01 (Xưởng B)', { isActiveCycle: true });
+  createDetailedForklift(58.0, 0, -36.5, -Math.PI / 2, 'forklift1', 'Xe nâng điện Komatsu FB25 #01 (Xưởng B)', { isActiveCycle: true });
 
   // Xe nâng 2 túc trực bốc dỡ tại Cửa Kho Linh Kiện D2.1
   createDetailedForklift(-48.0, 0, -60.0, Math.PI / 2, 'forklift2', 'Xe nâng điện Komatsu FB25 #02 (Kho D2.1)', { isActiveCycle: false });
@@ -6219,7 +7363,7 @@ function buildLogisticsAndEquipment() {
   create1Point5TonDeliveryTruck(-32.0, 0, -40.0, Math.PI / 2, 'deliveryTruck1', 'Xe tải giao hàng nhanh 1.5T DK Express');
 
   // 4. Xe đẩy pallet thủy lực thủ công & nhân viên bốc hàng
-  createHandPalletJack(62.0, 0, -29.0, -Math.PI / 3, 'palletJack1', 'Xe đẩy pallet thủy lực & Nhân viên kho');
+  createHandPalletJack(63.2, 0, -30.0, -Math.PI / 3, 'palletJack1', 'Xe đẩy pallet thủy lực & Nhân viên kho');
 
   // 5. Đoàn xe kéo nhỏ chở linh kiện nội bộ phân khu DK2
   createTuggerCartTrain(-42.0, 0, -56.0, 0, 'tuggerTrain1', 'Đoàn xe kéo nhỏ nội bộ DK2');
@@ -8272,7 +9416,7 @@ function buildPeopleAndCharacters() {
 
   // 3. Kỹ sư KCS (Lê Tuấn Anh): Đứng tại sân thử xe DK1 cầm tablet kiểm tra
   const kcs = createCharacter({ shirtColor: 0xea580c, pantsColor: 0x1e293b, hatColor: 0xffffff, holdingTablet: true });
-  kcs.position.set(63.5, 0, -28);
+  kcs.position.set(66.5, 0, -27.5); // Khu vực kiểm định KCS ngoài luồng xe lùi
   kcs.rotation.y = Math.PI / 4;
   kcs.userData = {
     id: 'kcsInspector',
@@ -8286,7 +9430,7 @@ function buildPeopleAndCharacters() {
 
   // Xe máy điện DK Roma SX đặt trên bệ kiểm định cạnh KCS
   const testBike = createDetailedDKBike(0x184995, 'DK Roma SX Đang Kiểm Định');
-  testBike.position.set(65.0, 0, -27.2);
+  testBike.position.set(68.0, 0, -27.0);
   testBike.rotation.y = -Math.PI / 4;
   scene.add(testBike);
 
@@ -8519,7 +9663,7 @@ function buildPeopleAndCharacters() {
     role: 'worker',
     hasVest: true,
   });
-  loader1.position.set(56, 0, -31);
+  loader1.position.set(54.2, 0, -30.5); // Đứng ngoài hành lang an toàn, không chắn lối đi xe nâng
   loader1.rotation.y = -Math.PI / 4;
   scene.add(loader1);
 
@@ -10939,18 +12083,303 @@ function buildFreeRangeChickens() {
   interactiveObjects.push(flockGroup);
 }
 
+
+// ============================================================================
+// HỆ THỐNG ĐÀN CÁ BƠI & NHẢY TRÊN SÔNG MÁNG GẦN ĐƯỜNG TÀU (JUMPING FISH & RIPPLES)
+// ============================================================================
+let activeRiverFish = [];
+let riverWaterRipples = [];
+
+function buildRiverJumpingFish() {
+  const fishGroup = new THREE.Group();
+  fishGroup.name = 'riverJumpingFishGroup';
+
+  const fishConfigs = [
+    { x: 93.2, z: -42, color: 0xf97316, name: 'Cá Koi Kohaku Cam' },     // Cạnh Cầu vòm đỏ & đường tàu
+    { x: 93.6, z: -54, color: 0xfbbf24, name: 'Cá Chép Vàng Ogon' },      // Dưới chân Cầu vòm đỏ
+    { x: 90.6, z: -22, color: 0xdc2626, name: 'Cá Koi Sanke Đỏ' },       // Bờ sông cạnh tuyến ray
+    { x: 89.8, z: -2.0, color: 0xf8fafc, name: 'Cá Bạc Platinum' },      // Cạnh Ga xe lửa DK Station
+    { x: 91.5, z: -74, color: 0xf97316, name: 'Cá Koi Vàng Cam' },       // Khúc sông gần thuyền nan
+    { x: 92.2, z: -88, color: 0x0284c7, name: 'Cá Lam Sinh Thái' },      // Khúc sông sau thuyền nan
+    { x: 91.0, z: -105, color: 0xfbbf24, name: 'Cá Chép Hoàng Kim' },     // Thượng nguồn sông máng
+  ];
+
+  fishConfigs.forEach((cfg, idx) => {
+    const oneFish = new THREE.Group();
+    oneFish.position.set(cfg.x, -0.42, cfg.z);
+
+    const fishMat = new THREE.MeshStandardMaterial({
+      color: cfg.color,
+      roughness: 0.25,
+      metalness: 0.15,
+    });
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+
+    // Thân cá thon nhọn khí động học
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.72, 7), fishMat);
+    body.rotation.x = Math.PI / 2;
+    body.scale.set(0.75, 1.0, 1.25);
+    oneFish.add(body);
+
+    // Mũi đầu cá
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), fishMat);
+    head.position.set(0, 0, 0.38);
+    head.scale.set(0.72, 0.9, 1.2);
+    oneFish.add(head);
+
+    // Mắt cá tròn
+    [-0.11, 0.11].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+      eye.position.set(ex, 0.06, 0.46);
+      oneFish.add(eye);
+    });
+
+    // Vây lưng
+    const dorsalFin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.24), whiteMat);
+    dorsalFin.position.set(0, 0.16, -0.05);
+    dorsalFin.rotation.x = -Math.PI / 6;
+    oneFish.add(dorsalFin);
+
+    // 2 Vây bơi 2 bên
+    [-0.14, 0.14].forEach((fx) => {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.02, 0.14), whiteMat);
+      fin.position.set(fx, -0.05, 0.15);
+      fin.rotation.z = fx > 0 ? -Math.PI / 5 : Math.PI / 5;
+      oneFish.add(fin);
+    });
+
+    // Đuôi cá có khớp quẫy sóng
+    const tailPivot = new THREE.Group();
+    tailPivot.position.set(0, 0, -0.38);
+
+    const tailFin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.28, 0.28), whiteMat);
+    tailFin.position.set(0, 0, -0.14);
+    tailFin.rotation.x = Math.PI / 4;
+    tailPivot.add(tailFin);
+    oneFish.add(tailPivot);
+
+    scene.add(oneFish);
+
+    activeRiverFish.push({
+      mesh: oneFish,
+      tailPivot: tailPivot,
+      baseX: cfg.x,
+      baseZ: cfg.z,
+      baseY: -0.42,
+      id: idx,
+      isJumping: false,
+      jumpProgress: 0,
+      jumpDuration: 1.15,
+      jumpCooldown: 2.5 + Math.random() * 5.0, // Nhảy ngẫu nhiên cách nhau vài giây
+      jumpHeight: 0.65 + Math.random() * 0.45,  // Độ cao nhảy vút lên khỏi mặt nước
+    });
+  });
+}
+
+function spawnWaterRipple(x, z, maxScale = 2.0) {
+  const rippleGeo = new THREE.RingGeometry(0.1, 0.18, 16);
+  const rippleMat = new THREE.MeshBasicMaterial({
+    color: 0xbae6fd,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide,
+  });
+  const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+  ripple.rotation.x = -Math.PI / 2;
+  ripple.position.set(x, -0.31, z);
+  scene.add(ripple);
+
+  riverWaterRipples.push({
+    mesh: ripple,
+    scale: 0.3,
+    maxScale: maxScale,
+    opacity: 0.85,
+    life: 1.2,
+  });
+}
+
+function updateRiverFish(delta, time) {
+  // Cập nhật gợn sóng nước
+  for (let i = riverWaterRipples.length - 1; i >= 0; i--) {
+    const r = riverWaterRipples[i];
+    r.life -= delta;
+    r.scale += delta * 1.5;
+    r.opacity = (r.life / 1.2) * 0.85;
+    r.mesh.scale.set(r.scale, r.scale, 1);
+    r.mesh.material.opacity = Math.max(0, r.opacity);
+    if (r.life <= 0) {
+      scene.remove(r.mesh);
+      r.mesh.geometry.dispose();
+      r.mesh.material.dispose();
+      riverWaterRipples.splice(i, 1);
+    }
+  }
+
+  // Cập nhật cá bơi và nhảy
+  activeRiverFish.forEach((fish) => {
+    if (fish.isJumping) {
+      // Đang trong quỹ đạo nhảy parabol lên khỏi mặt nước
+      fish.jumpProgress += delta / fish.jumpDuration;
+      const t = fish.jumpProgress;
+
+      if (t >= 1.0) {
+        // Rơi trở lại xuống sông: tạo gợn sóng tõm
+        fish.isJumping = false;
+        fish.mesh.position.y = fish.baseY;
+        fish.mesh.rotation.x = 0;
+        spawnWaterRipple(fish.mesh.position.x, fish.mesh.position.z, 2.2);
+        fish.jumpCooldown = 4.0 + Math.random() * 6.0;
+      } else {
+        // Quỹ đạo nhảy hình vòng cung parabol
+        const arcY = 4 * fish.jumpHeight * t * (1 - t);
+        fish.mesh.position.y = fish.baseY + arcY;
+        // Chúc đầu lên khi bay lên, chúc đầu xuống khi rơi lặn
+        const pitch = t < 0.5 ? -0.85 * (1 - t * 2) : 0.85 * ((t - 0.5) * 2);
+        fish.mesh.rotation.x = pitch;
+        // Đuôi quẫy nhanh trong không trung
+        fish.tailPivot.rotation.y = Math.sin(time * 0.025 + fish.id) * 0.65;
+      }
+    } else {
+      // Bơi lội thư thái dưới nước
+      fish.mesh.rotation.x = 0;
+      fish.mesh.position.y = fish.baseY + Math.sin(time * 0.003 + fish.id) * 0.04;
+      fish.mesh.position.x = fish.baseX + Math.sin(time * 0.0012 + fish.id) * 0.65;
+      fish.mesh.position.z = fish.baseZ + Math.cos(time * 0.0012 + fish.id) * 0.55;
+
+      // Hướng mặt theo chuyển động
+      const dirX = Math.cos(time * 0.0012 + fish.id);
+      const dirZ = -Math.sin(time * 0.0012 + fish.id);
+      fish.mesh.rotation.y = Math.atan2(dirX, dirZ);
+
+      // Đuôi cá quẫy sóng nước nhịp nhàng
+      fish.tailPivot.rotation.y = Math.sin(time * 0.015 + fish.id) * 0.45;
+
+      // Đếm ngược nhảy lên khỏi mặt nước
+      fish.jumpCooldown -= delta;
+      if (fish.jumpCooldown <= 0) {
+        fish.isJumping = true;
+        fish.jumpProgress = 0;
+        // Tạo gợn sóng nước lúc vọt lên
+        spawnWaterRipple(fish.mesh.position.x, fish.mesh.position.z, 1.8);
+      }
+    }
+  });
+}
+
+// ============================================================================
+// HỆ THỐNG PHẢN ỨNG THỜI TIẾT (MƯA / TẠNH) & NGÀY ĐÊM CỦA NGƯỜI (HUMAN BEHAVIOR)
+// ============================================================================
+const CAMPUS_SHELTERS = [
+  { id: 'canteen_porch', x: 22.0, y: 0, z: -12.0, name: 'Hiên Nhà Ăn CBNV' },
+  { id: 'nhaA_canopy', x: 26.0, y: 0, z: -20.0, name: 'Sảnh mái hiên Nhà A' },
+  { id: 'nhaA_main', x: 35.0, y: 0, z: -28.0, name: 'Hiên sảnh chính Nhà A' },
+  { id: 'nhaB_dock', x: 58.0, y: 0, z: -32.5, name: 'Cửa cuốn Xưởng B' },
+  { id: 'nhaB_east', x: 74.0, y: 0, z: -30.0, name: 'Mái che lối vào Xưởng B' },
+  { id: 'ev_station', x: 26.0, y: 0, z: -24.0, name: 'Mái che Trạm sạc EV' },
+  { id: 'bike_shelter', x: 79.5, y: 0, z: -46.0, name: 'Mái che xe điện Đông' },
+  { id: 'guard_dk1', x: 74.0, y: 0, z: -18.0, name: 'Bốt bảo vệ Cổng 1' },
+  { id: 'dk2_hq', x: -36.0, y: 0, z: -24.0, name: 'Sảnh đón Nhà điều hành DK2' },
+  { id: 'dk2_warehouse', x: -72.0, y: 0, z: -55.0, name: 'Mái hiên Kho D2.1' },
+  { id: 'dk2_gazebo', x: -108.0, y: 15.8, z: -82.0, name: 'Nhà chòi Vườn Lan' },
+];
+
+let campusToastTimeout = null;
+function showCampusToast(message, type = 'info') {
+  let toast = document.getElementById('campus-event-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'campus-event-toast';
+    toast.className = 'campus-event-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = message;
+  toast.classList.add('show');
+
+  if (campusToastTimeout) clearTimeout(campusToastTimeout);
+  campusToastTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 4200);
+}
+
+function triggerEventSpeechBubbles(eventType) {
+  const quotesMap = {
+    rain: [
+      "Mưa rồi mưa rồi vào nhà thôi! 🌧️🏃‍♂️",
+      "Tuyệt vời, mưa cho cây lá xanh tốt! 🌱🌧️",
+      "Mau chạy vào hiên trú mưa thôi anh em ơi! ☔💨",
+      "Mát mẻ sảng khoái quá, cơn mưa rào tưới mát cả nhà máy! 🌦️✨",
+      "Cất đồ vào xưởng nhanh lên nào! 📦🏃",
+    ],
+    sun: [
+      "Tạnh mưa rồi, trời trong lành quá! ☀️✨",
+      "Cầu vồng rực rỡ kìa mọi người ơi! 🌈😍",
+      "Lại ra dạo mát và làm việc thôi nào! 🚶‍♂️💼",
+      "Không khí sau mưa thơm mùi đất cỏ thật dễ chịu! 🍃🌿",
+      "Trời hửng nắng rồi, tiếp tục một ngày năng suất nhé! 🛵💪",
+    ],
+    night: [
+      "Tối rồi, đi ăn rồi tăng ca tiếp thôi! 🍜",
+      "Đến giờ cơm tối rồi anh em ơi! 🍚🍗",
+      "Đói bụng quá, cơm nhà ăn hôm nay có món gì nhỉ? 🍲😋",
+      "Ăn no lấy sức lát chiến tiếp ca đêm nhé! 💪🌙",
+      "Mùi sườn xào chua ngọt từ nhà ăn thơm nức mũi! 🤤✨",
+    ],
+    day: [
+      "Bắt đầu ngày mới tràn đầy năng lượng nào! ☀️🛵",
+      "Ăn cơm xong rồi, quay lại ca làm việc thôi! 💼🛠️",
+      "Chiều mát mẻ, làm việc hiệu quả và an toàn nhé cả nhà! 🌇✨",
+    ],
+  };
+
+  const quotes = quotesMap[eventType] || quotesMap.day;
+  const typeClass = eventType === 'rain' ? 'type-weather-rain' : (eventType === 'sun' ? 'type-weather-sun' : 'type-night');
+  const icon = eventType === 'rain' ? '🌧️' : (eventType === 'sun' ? '☀️' : (eventType === 'night' ? '🌙' : '✨'));
+
+  // Chọn 2 - 3 người để hiện popup thoại
+  const candidates = [];
+  wanderingPedestrians.forEach(p => { if (p.mesh) candidates.push(p.mesh); });
+  if (candidates.length === 0) return;
+
+  // Xáo trộn ngẫu nhiên
+  const shuffled = candidates.slice().sort(() => 0.5 - Math.random());
+  const selectedCount = Math.min(3, shuffled.length);
+
+  for (let i = 0; i < selectedCount; i++) {
+    const mesh = shuffled[i];
+    const quote = quotes[(i + Math.floor(Math.random() * quotes.length)) % quotes.length];
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = `cute-speech-bubble ${typeClass}`;
+      el.innerHTML = `
+        <span class="speech-icon">${icon}</span>
+        <span class="speech-text">${quote}</span>
+        <div class="speech-tail"></div>
+      `;
+      document.body.appendChild(el);
+
+      activeSpeechBubbles.push({
+        el: el,
+        speakerMesh: mesh,
+        heightOffset: 2.1,
+        ttl: 4.5,
+        leaving: false,
+      });
+    }, i * 350);
+  }
+}
+
 // ============================================================================
 // 14. Animated Vehicles & Rail Transit
 // ============================================================================
 function setupAnimatedVehicles() {
-  // 1. Xe máy điện DK Roma SX Đỏ chạy thử nghiệm trên Test Track (KCS Tester)
+  // 1. Xe máy điện DK Roma SX Đỏ chạy thử nghiệm trên Test Track (KCS Tester chạy dọc đường thử riêng phía Đông & Bắc)
   animatedBike = createDKRomaSX(0xdc2626, 'DK Roma SX Chạy Thử KCS', {
     withRider: true,
     riderShirt: 0x0284c7,
     helmetColor: 0xfacc15,
   });
-  animatedBike.position.set(65, 0.05, -31);
-  animatedBike.rotation.y = 0;
+  animatedBike.position.set(79.5, 0.05, -28.0);
+  animatedBike.rotation.y = Math.PI / 2;
   scene.add(animatedBike);
 
   // 2. Xe máy điện DK Gogo Xanh Dương chạy tuần tra đại lộ nội bộ DK1
@@ -10969,23 +12398,48 @@ function setupAnimatedVehicles() {
   eBike.rotation.y = -Math.PI / 2;
   scene.add(eBike);
 
-  // 4. Xe điện 3 bánh chở hàng luân chuyển phụ tùng giữa Nhà C và Xưởng B
+  // 4. Xe điện 3 bánh chở hàng luân chuyển phụ tùng (chạy trên đường nhựa nội bộ Z = -26.5 phía trước Nhà A & Xưởng B)
   const cargoHauler = createDKThreeWheelerCargo(0x10b981, 'Xe 3 bánh Logistics DK1');
-  cargoHauler.position.set(48, 0.05, -50);
+  cargoHauler.position.set(35.0, 0.05, -26.5);
   cargoHauler.rotation.y = 0;
   scene.add(cargoHauler);
+
+  // Tuyến đường chạy thử khép kín dọc theo Test Track phía Đông & quay đầu ở sân Bắc / sân Nam (100% ngoài trời, cách tường xưởng B > 1.95m)
+  const testTrackPts = [
+    new THREE.Vector3(79.5, 0.05, -28.0),
+    new THREE.Vector3(79.5, 0.05, -45.0),
+    new THREE.Vector3(79.5, 0.05, -62.0),
+    new THREE.Vector3(79.5, 0.05, -75.0),
+    new THREE.Vector3(79.2, 0.05, -78.5),
+    new THREE.Vector3(78.5, 0.05, -80.0),
+    new THREE.Vector3(77.0, 0.05, -80.5),
+    new THREE.Vector3(74.0, 0.05, -80.5),
+    new THREE.Vector3(71.0, 0.05, -80.2),
+    new THREE.Vector3(69.0, 0.05, -79.5),
+    new THREE.Vector3(71.0, 0.05, -78.8),
+    new THREE.Vector3(74.0, 0.05, -78.8),
+    new THREE.Vector3(77.0, 0.05, -79.2),
+    new THREE.Vector3(78.2, 0.05, -78.2),
+    new THREE.Vector3(78.2, 0.05, -74.0),
+    new THREE.Vector3(78.2, 0.05, -62.0),
+    new THREE.Vector3(78.2, 0.05, -45.0),
+    new THREE.Vector3(78.2, 0.05, -30.0),
+    new THREE.Vector3(77.5, 0.05, -27.5),
+    new THREE.Vector3(76.5, 0.05, -26.0),
+    new THREE.Vector3(78.0, 0.05, -25.5),
+    new THREE.Vector3(79.5, 0.05, -26.5),
+  ];
+  const testTrackCurve = new THREE.CatmullRomCurve3(testTrackPts, true, 'centripetal', 0.2);
 
   // Lưu vào danh sách quản lý hoạt cảnh phương tiện Khối 8
   animatedVehicles = [
     {
       type: 'testTrackBike',
       mesh: animatedBike,
-      angle: 0,
-      speed: 0.42,
-      centerX: 65,
-      centerZ: -50,
-      radiusX: 13,
-      radiusZ: 19,
+      curve: testTrackCurve,
+      progress: 0,
+      speed: 12.0, // 12 m/s (~43 km/h tốc độ thử nghiệm KCS)
+      curveLen: testTrackCurve.getLength(),
     },
     {
       type: 'waypointCruiser',
@@ -11017,11 +12471,11 @@ function setupAnimatedVehicles() {
       type: 'cargoHauler',
       mesh: cargoHauler,
       progress: 0,
-      speed: 3.2,
-      minX: 46,
-      maxX: 59,
+      speed: 3.5,
+      minX: 28.0, // Trước sảnh & trạm sạc Nhà A
+      maxX: 53.0, // Đầu làn bốc hàng trước Xưởng B (không đâm vào tường Nhà B X=53.75 hay đuôi xe tải X=58)
       dir: 1,
-      z: -48,
+      z: -26.5,  // Chạy trên mặt đường nhựa nội bộ rộng rãi, cách xa tường xưởng B > 6.7 mét
     },
     {
       type: 'dk2BrakeTestBike',
@@ -11182,7 +12636,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     if (doorB1) doorB1.targetProgress = 1.0;
 
     // Xe nâng chờ sẵn bên trong Xưởng B, mang sẵn pallet xe máy điện thành phẩm
-    fl.position.set(58.0, 0, -35.6);
+    fl.position.set(58.0, 0, -36.5);
     fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
     ensureForkliftOutboundPalletLoaded();
@@ -11221,7 +12675,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     doorR.rotation.y = 0;
     if (doorB1) doorB1.targetProgress = 1.0;
 
-    fl.position.set(58.0, 0, -35.6);
+    fl.position.set(58.0, 0, -36.5);
     fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
     ensureForkliftOutboundPalletLoaded();
@@ -11243,7 +12697,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     doorR.rotation.y = doorAngle;
 
     // Càng nâng bắt đầu nâng pallet xe điện lên độ cao sàn thùng xe (1.22m)
-    fl.position.set(58.0, 0, -35.6);
+    fl.position.set(58.0, 0, -36.5);
     fl.rotation.y = -Math.PI / 2;
     flLift.position.y = lerp(activeForklift.initialY, 1.22, t);
     ensureForkliftOutboundPalletLoaded();
@@ -11263,7 +12717,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     // Pallet xe điện luồn vào đúng vị trí sàn thùng xe tải
     if (t < 0.35) {
       const subT = smooth(t / 0.35);
-      fl.position.set(58.0, 0, lerp(-35.6, -29.6, subT));
+      fl.position.set(58.0, 0, lerp(-36.5, -29.6, subT));
       fl.rotation.y = -Math.PI / 2;
       flLift.position.y = 1.22;
       ensureForkliftOutboundPalletLoaded();
@@ -11283,13 +12737,13 @@ function updateLogisticsCycle(delta, time, isNight) {
     // t: 0.55 -> 0.95: Xe nâng lùi thẳng trở lại bên trong Xưởng B (z = -35.6)
     else if (t < 0.95) {
       const subT = smooth((t - 0.55) / 0.40);
-      fl.position.set(58.0, 0, lerp(-29.6, -35.6, subT));
+      fl.position.set(58.0, 0, lerp(-29.6, -36.5, subT));
       fl.rotation.y = -Math.PI / 2;
       flLift.position.y = lerp(1.08, activeForklift.initialY, subT);
     }
     // t: 0.95 -> 1.0: Đã lùi an toàn bên trong xưởng, sẵn sàng ca tiếp
     else {
-      fl.position.set(58.0, 0, -35.6);
+      fl.position.set(58.0, 0, -36.5);
       fl.rotation.y = -Math.PI / 2;
       flLift.position.y = activeForklift.initialY;
     }
@@ -11309,7 +12763,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     // Cửa cuốn Xưởng B giữ mở liên tục
     if (doorB1) doorB1.targetProgress = 1.0;
 
-    fl.position.set(58.0, 0, -35.6);
+    fl.position.set(58.0, 0, -36.5);
     fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
   }
@@ -11322,7 +12776,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     doorR.rotation.y = 0;
     if (doorB1) doorB1.targetProgress = 1.0;
 
-    fl.position.set(58.0, 0, -35.6);
+    fl.position.set(58.0, 0, -36.5);
     fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
 
@@ -11356,7 +12810,7 @@ function updateLogisticsCycle(delta, time, isNight) {
     doorR.rotation.y = 0;
     if (doorB1) doorB1.targetProgress = 1.0;
 
-    fl.position.set(58.0, 0, -35.6);
+    fl.position.set(58.0, 0, -36.5);
     fl.rotation.y = -Math.PI / 2;
     flLift.position.y = activeForklift.initialY;
 
@@ -11885,25 +13339,28 @@ function updateAnimatedObjects(delta, time) {
   // 1. Đội xe máy điện & phương tiện lưu thông khuôn viên DK Bike (Khối 8)
   animatedVehicles.forEach((veh) => {
     if (veh.type === 'testTrackBike') {
-      veh.angle += delta * veh.speed;
-      const t = veh.angle;
-      const x = veh.centerX + Math.sin(t) * veh.radiusX;
-      const z = veh.centerZ + Math.cos(t) * veh.radiusZ;
-      veh.mesh.position.set(x, 0.05, z);
+      // Chạy dọc theo đường thử xe testTrackCurve bên ngoài Xưởng B (hoàn toàn ngoài trời, không đâm xuyên tường)
+      const dist = (veh.speed || 12.0) * delta;
+      veh.progress = (veh.progress + dist / (veh.curveLen || 129.5)) % 1.0;
 
-      const nextX = veh.centerX + Math.sin(t + 0.06) * veh.radiusX;
-      const nextZ = veh.centerZ + Math.cos(t + 0.06) * veh.radiusZ;
-      // Xe có trục tiến dọc theo +X trong toạ độ cục bộ, căn chỉnh đầu xe chuẩn theo vector vận tốc
-      const heading = Math.atan2(-(nextZ - z), nextX - x);
+      const pt = veh.curve.getPointAt(veh.progress);
+      veh.mesh.position.set(pt.x, 0.05, pt.z);
+
+      const tangent = veh.curve.getTangentAt(veh.progress);
+      // Đầu xe (+X) quay theo tiếp tuyến vector chuyển động
+      const heading = Math.atan2(-tangent.z, tangent.x);
       veh.mesh.rotation.y = heading;
 
-      // Nghiêng xe tự nhiên vào cua theo trục tiến của xe (Roll axis is local X)
-      veh.mesh.rotation.x = -0.14 - 0.04 * Math.sin(t) * Math.sin(t);
+      // Nghiêng xe tự nhiên khi vào các góc cua (Roll quanh trục X tiến của xe)
+      const nextTangent = veh.curve.getTangentAt((veh.progress + 0.01) % 1.0);
+      const lateralCurv = (tangent.x * nextTangent.z - tangent.z * nextTangent.x);
+      const targetRoll = THREE.MathUtils.clamp(-lateralCurv * 45, -0.22, 0.22);
+      veh.mesh.rotation.x = targetRoll;
       veh.mesh.rotation.z = 0;
 
-      // Quay bánh xe theo tốc độ di chuyển quanh trục Z của bánh xe
-      if (veh.mesh.userData.frontWheel) veh.mesh.userData.frontWheel.rotation.z -= delta * 14;
-      if (veh.mesh.userData.rearWheel) veh.mesh.userData.rearWheel.rotation.z -= delta * 14;
+      // Quay bánh xe theo tốc độ di chuyển
+      if (veh.mesh.userData.frontWheel) veh.mesh.userData.frontWheel.rotation.z -= delta * 18;
+      if (veh.mesh.userData.rearWheel) veh.mesh.userData.rearWheel.rotation.z -= delta * 18;
     } else if (veh.type === 'waypointCruiser') {
       // Chạy dọc tuyến đại lộ nội bộ qua các điểm
       const pLen = veh.path.length;
@@ -11951,12 +13408,15 @@ function updateAnimatedObjects(delta, time) {
         });
       }
     } else if (veh.type === 'cargoHauler') {
-      // Xe 3 bánh vận chuyển phụ tùng
+      // Xe 3 bánh vận chuyển phụ tùng chạy trên đường nhựa nội bộ phía trước (Z = -26.5), không đâm vào tường xưởng B
       veh.mesh.position.x += veh.dir * veh.speed * delta;
+      veh.mesh.position.z = veh.z || -26.5;
       if (veh.mesh.position.x > veh.maxX) {
+        veh.mesh.position.x = veh.maxX;
         veh.dir = -1;
         veh.mesh.rotation.y = Math.PI;
       } else if (veh.mesh.position.x < veh.minX) {
+        veh.mesh.position.x = veh.minX;
         veh.dir = 1;
         veh.mesh.rotation.y = 0;
       }
@@ -12089,20 +13549,25 @@ function updateAnimatedObjects(delta, time) {
     }
   });
 
-  // 6. Thuyền gỗ nhấp nhô nhẹ trên dòng sông máng nước xanh ngọc (như ảnh 2)
+  // 6. Thuyền nan du ngoạn bồng bềnh và bơi xuôi ngược trên dòng sông máng (Z = -82, cách xa đường tàu > 15m)
   if (rowingBoat) {
-    rowingBoat.position.y = -1.3 + Math.sin(time * 0.0025) * 0.04;
-    rowingBoat.rotation.z = Math.sin(time * 0.002) * 0.03;
+    const boatPhase = (time * 0.0006) % (Math.PI * 2);
+    const zOffset = Math.sin(boatPhase) * 6.5; // Bơi qua lại giữa Z = -75.5 và -88.5
+    rowingBoat.position.z = -82.0 + zOffset;
+    rowingBoat.position.x = 91.8 + Math.sin(boatPhase * 0.5) * 0.35;
+    rowingBoat.position.y = -0.30 + Math.sin(time * 0.003) * 0.025;
+    rowingBoat.rotation.z = Math.sin(time * 0.002) * 0.025;
+    const forwardDir = Math.cos(boatPhase) > 0 ? 0.05 : Math.PI - 0.05;
+    rowingBoat.rotation.y = forwardDir + Math.sin(time * 0.002) * 0.03;
+
+    // Bác lái đò khua mái chèo nhịp nhàng
+    if (rowingBoat.userData && rowingBoat.userData.oar) {
+      rowingBoat.userData.oar.rotation.x = Math.sin(time * 0.004) * 0.35;
+    }
   }
 
-  // 7. Đàn cá bơi lội dưới sông máng (Bơi lượn dọc theo lòng kênh nước)
-  if (riverFishGroup) {
-    riverFishGroup.children.forEach((fMesh, idx) => {
-      fMesh.position.z += Math.sin(time * 0.0015 + idx * 1.2) * delta * 0.6;
-      const dir = Math.cos(time * 0.0015 + idx * 1.2);
-      fMesh.rotation.y = (dir > 0 ? 0 : Math.PI) + Math.sin(time * 0.015 + idx) * 0.12;
-    });
-  }
+  // 7. Đàn cá Koi & cá sông bơi lội và nhảy vút lên khỏi mặt nước sông máng cạnh đường tàu
+  updateRiverFish(delta, time);
 
   // 8. Đàn cừu trên đồi cỏ lắc đầu thong thả (như ảnh 2)
   fluffySheeps.forEach((sheep, shIdx) => {
@@ -12262,6 +13727,124 @@ function updateAnimatedObjects(delta, time) {
   const isTruckNearCrossing = Math.abs(truckZPos - 0) < 18;
 
   wanderingPedestrians.forEach((p) => {
+    // 1. CHẾ ĐỘ TRÚ MƯA: Trời mưa -> chạy vào hiên trú mưa gần nhất
+    if (isRaining) {
+      if (!p.shelterTarget) {
+        // Tìm địa điểm trú mưa có mái che gần nhất
+        let bestDist = 99999;
+        let bestShelter = CAMPUS_SHELTERS[0];
+        const cx = p.mesh.position.x;
+        const cz = p.mesh.position.z;
+        for (let s of CAMPUS_SHELTERS) {
+          const d = Math.hypot(cx - s.x, cz - s.z);
+          if (d < bestDist) {
+            bestDist = d;
+            bestShelter = s;
+          }
+        }
+        // Thêm độ lệch nhẹ để không đứng đè lên nhau
+        const jitterX = ((p.id % 5) - 2) * 0.55;
+        const jitterZ = ((p.id % 3) - 1) * 0.55;
+        p.shelterTarget = { x: bestShelter.x + jitterX, y: bestShelter.y || 0, z: bestShelter.z + jitterZ };
+        p.shelterState = 'running_to_shelter';
+      }
+
+      const tx = p.shelterTarget.x;
+      const tz = p.shelterTarget.z;
+      const dx = tx - p.mesh.position.x;
+      const dz = tz - p.mesh.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      if (dist < 0.6) {
+        // Đã đến hiên trú mưa an toàn: Đứng ngắm mưa, nghỉ chân
+        p.shelterState = 'sheltered';
+        if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x *= 0.85;
+        if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x *= 0.85;
+        if (p.mesh.userData.headGroup) {
+          p.mesh.userData.headGroup.rotation.y = Math.sin(time * 0.002 + p.id) * 0.35;
+        }
+        return;
+      } else {
+        // Chạy nhanh vào nhà trú mưa (tốc độ chạy 3.4 m/s)
+        const runSpeed = 3.4;
+        const moveDist = Math.min(runSpeed * delta, dist);
+        p.mesh.position.x += (dx / dist) * moveDist;
+        p.mesh.position.z += (dz / dist) * moveDist;
+        p.mesh.position.y += ((p.shelterTarget.y || 0) - p.mesh.position.y) * delta * 5.0;
+
+        const targetAngle = Math.atan2(dx, dz);
+        p.mesh.rotation.y = targetAngle;
+
+        p.stepAngle += delta * 12.0; // Bước chân chạy nhanh gấp rút
+        const swing = Math.sin(p.stepAngle) * 0.72;
+        if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x = swing;
+        if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x = -swing;
+        if (p.mesh.userData.leftArm) p.mesh.userData.leftArm.rotation.x = -swing * 0.9;
+        if (p.mesh.userData.rightArm) p.mesh.userData.rightArm.rotation.x = swing * 0.9;
+        return;
+      }
+    } else {
+      p.shelterTarget = null;
+      p.shelterState = null;
+    }
+
+    // 2. CHẾ ĐỘ TRỜI TỐI (NIGHT): Đi bộ / chạy đến Nhà Ăn CBNV (hoặc sảnh HQ DK2) để dùng bữa tối
+    if (currentEnv === 'night') {
+      if (!p.dinnerTarget) {
+        if (p.mesh.position.x > -15) {
+          // Phân khu DK1: Đến Nhà Ăn CBNV (Z = -12, X = 22)
+          const jx = ((p.id % 5) - 2) * 0.7;
+          const jz = ((p.id % 4) - 1.5) * 0.7;
+          p.dinnerTarget = { x: 22.0 + jx, y: 0, z: -12.0 + jz };
+        } else {
+          // Phân khu DK2: Đến Sảnh đón & Nhà ăn HQ DK2 (X = -36, Z = -24)
+          const jx = ((p.id % 4) - 1.5) * 0.6;
+          const jz = ((p.id % 3) - 1) * 0.6;
+          p.dinnerTarget = { x: -36.0 + jx, y: 0, z: -24.0 + jz };
+        }
+      }
+
+      const tx = p.dinnerTarget.x;
+      const tz = p.dinnerTarget.z;
+      const dx = tx - p.mesh.position.x;
+      const dz = tz - p.mesh.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      if (dist < 0.75) {
+        // Đã đến nhà ăn: đứng/ngồi ăn tối, trò chuyện vui vẻ
+        if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x *= 0.85;
+        if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x *= 0.85;
+        if (p.mesh.userData.headGroup) {
+          p.mesh.userData.headGroup.rotation.y = Math.sin(time * 0.0025 + p.id) * 0.4;
+        }
+        if (p.mesh.userData.rightArm) {
+          p.mesh.userData.rightArm.rotation.x = -0.6 + Math.sin(time * 0.006 + p.id) * 0.25; // Động tác gắp thức ăn / cầm đũa
+        }
+        return;
+      } else {
+        // Đi bộ nhanh tới nhà ăn
+        const dinnerWalkSpeed = 2.4;
+        const moveDist = Math.min(dinnerWalkSpeed * delta, dist);
+        p.mesh.position.x += (dx / dist) * moveDist;
+        p.mesh.position.z += (dz / dist) * moveDist;
+        p.mesh.position.y += ((p.dinnerTarget.y || 0) - p.mesh.position.y) * delta * 5.0;
+
+        const targetAngle = Math.atan2(dx, dz);
+        p.mesh.rotation.y = targetAngle;
+
+        p.stepAngle += delta * 8.5;
+        const swing = Math.sin(p.stepAngle) * 0.55;
+        if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x = swing;
+        if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x = -swing;
+        if (p.mesh.userData.leftArm) p.mesh.userData.leftArm.rotation.x = -swing * 0.8;
+        if (p.mesh.userData.rightArm) p.mesh.userData.rightArm.rotation.x = swing * 0.8;
+        return;
+      }
+    } else {
+      p.dinnerTarget = null;
+    }
+
+    // 3. CHẾ ĐỘ BAN NGÀY BÌNH THƯỜNG: Đi dạo theo Waypoint Graph
     // Nếu đang tạm dừng (pause look-around)
     if (p.pauseTimer > 0) {
       p.pauseTimer -= delta;
@@ -12311,7 +13894,7 @@ function updateAnimatedObjects(delta, time) {
     } else {
       // Bước đi tiến tới mục tiêu
       const dist = Math.sqrt(distSq);
-      const moveDist = Math.min(p.speed * delta, dist);
+      const moveDist = Math.min((p.speed || 1.6) * delta, dist);
       currentPos.x += (dx / dist) * moveDist;
       currentPos.z += (dz / dist) * moveDist;
 
@@ -12327,7 +13910,7 @@ function updateAnimatedObjects(delta, time) {
       p.mesh.rotation.y += angleDiff * Math.min(delta * 7.5, 1.0);
 
       // Cử động nhịp nhàng chân tay theo bước chạy
-      p.stepAngle += delta * (p.speed * 3.5);
+      p.stepAngle += delta * ((p.speed || 1.6) * 3.5);
       const swing = Math.sin(p.stepAngle) * 0.46;
       if (p.mesh.userData.leftLeg) p.mesh.userData.leftLeg.rotation.x = swing;
       if (p.mesh.userData.rightLeg) p.mesh.userData.rightLeg.rotation.x = -swing;
@@ -12356,6 +13939,44 @@ function updateAnimatedObjects(delta, time) {
   // 12. Quạt thông gió trên nóc xưởng B
   roofVentilators.forEach((vent) => {
     vent.rotation.y += delta * 2.5;
+  });
+
+  // Quạt trần công nghiệp HVLS cánh lớn sải rộng bên trong xưởng B
+  insideHVLSFans.forEach((fan) => {
+    fan.rotation.y += delta * 1.8;
+  });
+
+  // DÂY CHUYỀN LẮP RÁP XƯỞNG B VẬN HÀNH CHẬM RÃI (Dài 30m, vận tốc 0.35 m/s)
+  const lineSpeed = 0.35;
+  insideAssemblyBikes.forEach((item) => {
+    item.mesh.position.z += lineSpeed * delta;
+    if (item.mesh.position.z >= 9.6 && item.mesh.position.z <= 13.2) {
+      // Đang trượt dốc xuống cầu trượt dài 3.5m: nghiêng nhẹ theo dốc
+      const rampProgress = (item.mesh.position.z - 9.6) / (13.2 - 9.6);
+      item.mesh.position.y = item.baseY - rampProgress * 0.55;
+      item.mesh.rotation.x = 0.18;
+    } else if (item.mesh.position.z > 13.2) {
+      // Chạm chân dốc -> tuần hoàn mượt mà lại điểm bắt đầu của dây chuyền phía Bắc
+      item.mesh.position.z = item.startZ;
+      item.mesh.position.y = item.baseY;
+      item.mesh.rotation.x = 0;
+    } else {
+      item.mesh.position.y = item.baseY;
+      item.mesh.rotation.x = 0;
+    }
+  });
+
+  // 36 Tấm nan kim loại của băng chuyền trượt tịnh tiến chậm rãi
+  insideConveyorSlats.forEach((slat) => {
+    slat.position.z += lineSpeed * delta;
+    if (slat.position.z > 9.8) {
+      slat.position.z -= 25.2;
+    }
+  });
+
+  // Công nhân lắp ráp cử động nhịp nhàng theo thao tác
+  insideAssemblyWorkers.forEach((w) => {
+    w.mesh.position.y = Math.sin(time * 0.0025 + w.phase) * 0.012;
   });
 
   // 13. Đàn chim chao lượn quanh đỉnh đồi Vườn Lan
@@ -13045,8 +14666,17 @@ function setEnvironment(time) {
     }
   });
   streetLightSpotLights.forEach((light) => {
-    light.intensity = isNight ? 1.5 : (isSunset ? 0.6 : 0);
+    light.intensity = isNight ? 1.8 : (isSunset ? 0.75 : 0);
   });
+
+  // Phản ứng sinh hoạt của CBNV khi chuyển đổi Ngày / Đêm
+  if (isNight) {
+    showCampusToast('🌙 Trời tối - Đèn đường bật sáng: Mọi người đi bộ & chạy vào Nhà Ăn CBNV dùng bữa tối!', 'night');
+    triggerEventSpeechBubbles('night');
+  } else if (time === 'day' || time === 'sunset') {
+    showCampusToast(time === 'day' ? '☀️ Bắt đầu ngày mới: Mọi người trở lại vị trí làm việc và tiếp tục các hoạt động!' : '🌇 Chiều hoàng hôn: Không khí mát mẻ, làm việc hăng say!', 'day');
+    triggerEventSpeechBubbles('day');
+  }
 
   logoLight.intensity = isNight ? 1.8 : (isSunset ? 0.8 : 0);
 
@@ -13081,7 +14711,7 @@ function createBuildingLabels() {
   const container = document.body;
   const labelsData = [
     // DK1
-    { text: 'Nhà B (Xưởng 3 tầng)', pos: new THREE.Vector3(65, 14.5, -50), id: 'nhaB' },
+    { text: 'Nhà B (Xưởng 3 tầng - Dài 44m)', pos: new THREE.Vector3(65, 14.5, -55), id: 'nhaB' },
     { text: 'Nhà A (Văn phòng)', pos: new THREE.Vector3(35, 12.0, -35), id: 'nhaA' },
     { text: 'Nhà C (Mái tôn xanh)', pos: new THREE.Vector3(45, 7.5, -58.5), id: 'nhaC' },
     { text: 'Nhà ăn CBNV', pos: new THREE.Vector3(23, 11.5, -12), id: 'nhaAn' },
@@ -13091,15 +14721,20 @@ function createBuildingLabels() {
     { text: '🏐 Sân bóng chuyền DK1', pos: new THREE.Vector3(51, 3.8, -12), id: 'volleyballCourt' },
     { text: '⛲ Đài phun nước DK (5m)', pos: new THREE.Vector3(36.6, 4.2, -12), id: 'fountainDK' },
     { text: '🌳 Cây bóng mát (Cách Nhà Ăn 10m)', pos: new THREE.Vector3(23, 4.6, 4), id: 'landscapeTree' },
-    { text: '🏍️ Khu tập kết xe sau chạy thử', pos: new THREE.Vector3(68, 2.5, -42), id: 'stagingBikes' },
+    { text: '🏍️ Khu tập kết xe sau chạy thử', pos: new THREE.Vector3(67, 2.5, -30), id: 'stagingBikes' },
+    // Nội thất Xưởng B
+    { text: '🔧 Dây chuyền lắp ráp DK Bike', pos: new THREE.Vector3(63.2, 3.2, -45), id: 'insideAssemblyLine' },
+    { text: '🛗 Thang tời hàng 2.5T', pos: new THREE.Vector3(56.2, 4.2, -36.5), id: 'insideFreightLift' },
+    { text: '📦 Giá kệ kho linh kiện', pos: new THREE.Vector3(70.5, 3.8, -48), id: 'insidePartsRacks' },
+    { text: '🛵 Khu tập kết xe thành phẩm', pos: new THREE.Vector3(57.8, 2.2, -50), id: 'insideStagingArea' },
 
     // Tuyến đường sắt, Cầu vòm đỏ & Cảnh quan sinh thái mới (Theo ảnh mẫu)
     { text: '🚂 Tàu hơi nước & Đường sắt', pos: new THREE.Vector3(92, 5.5, -20), id: 'steamLoco' },
     { text: '🌉 Cầu vòm đỏ (Red Arch)', pos: new THREE.Vector3(95, 5.5, -49), id: 'redArchBridge' },
     { text: '🚉 Ga xe lửa DK Station', pos: new THREE.Vector3(88, 5.0, -2), id: 'dkStation' },
-    { text: '⛵ Thuyền chèo đò trên sông', pos: new THREE.Vector3(89.5, 1.8, -8), id: 'rowingBoat' },
-    { text: '🐑 Đàn cừu trên đồi cỏ', pos: new THREE.Vector3(108, 6.8, -45), id: 'sheepFlock' },
-    { text: '🌾 Cối xay gió sinh thái', pos: new THREE.Vector3(55, 34.0, -108), id: 'windmill' },
+    { text: '⛵ Thuyền chèo đò trên sông', pos: new THREE.Vector3(91.8, 1.8, -82), id: 'rowingBoat' },
+    { text: '🐑 Đàn cừu trên bãi cỏ', pos: new THREE.Vector3(108, 2.6, -45), id: 'sheepFlock' },
+    { text: '🌾 Cối xay gió sinh thái', pos: new THREE.Vector3(58, 33.0, -128), id: 'windmill' },
 
     // DK2
     { text: 'Nhà điều hành DK2 (HQ)', pos: new THREE.Vector3(-36, 13.0, -10), id: 'nhaDieuHanhDK2' },
@@ -13155,6 +14790,10 @@ function handleLabelClick(item) {
       sheepFlock: { type: 'animals', title: 'Đàn cừu sinh thái trên đồi cỏ' },
       windmill: { type: 'landmark', title: 'Cối xay gió sinh thái trên đỉnh đồi' },
       volleyballCourt: { type: 'sports', title: 'Sân bóng chuyền ngoài trời DK1' },
+      insideAssemblyLine: { type: 'factory', title: 'Dây chuyền lắp ráp xe máy điện DK Bike' },
+      insideFreightLift: { type: 'lift', title: 'Thang tời hàng công nghiệp 2.5 Tấn' },
+      insidePartsRacks: { type: 'warehouse', title: 'Giá kệ kho linh kiện & Pallet động cơ' },
+      insideStagingArea: { type: 'staging', title: 'Khu tập kết xe máy điện thành phẩm' },
       fountainDK: { type: 'landscape', title: 'Đài phun nước biểu tượng DK (5m)' },
       landscapeTree: { type: 'landscape', title: 'Cây bóng mát cảnh quan (Cách Nhà Ăn 10m)' },
       stagingBikes: { type: 'vehicleYard', title: 'Khu vực tập kết xe sau chạy thử' },
@@ -13178,6 +14817,12 @@ function handleLabelClick(item) {
 }
 
 function smoothFocusOnPoint(targetPoint, offset = new THREE.Vector3(26, 22, 26)) {
+  // Nếu điểm cần focus nằm trong khuôn viên Xưởng B, tự động mở mái để quan sát
+  const isInsideNhaB = (targetPoint.x >= 53.0 && targetPoint.x <= 77.0 && targetPoint.z >= -78.0 && targetPoint.z <= -33.0 && targetPoint.y <= 14.0);
+  if (nhaBRoofGroupGlobal) {
+    nhaBRoofGroupGlobal.visible = !isInsideNhaB;
+  }
+
   const startPos = camera.position.clone();
   const startTarget = controls.target.clone();
   const endTarget = targetPoint.clone();
@@ -13474,6 +15119,12 @@ function setCameraPreset(key) {
   const startTarget = controls.target.clone();
   const endPos = new THREE.Vector3(preset.pos.x, preset.pos.y, preset.pos.z);
   const endTarget = new THREE.Vector3(preset.target.x, preset.target.y, preset.target.z);
+
+  // Tự động mở mái và mặt tiền xưởng B khi xem góc nhìn nội thất bên trong, khôi phục khi xem toàn cảnh
+  const isInside = (key === 'insideNhaB' || key.startsWith('inside'));
+  if (nhaBRoofGroupGlobal) {
+    nhaBRoofGroupGlobal.visible = !isInside;
+  }
 
   const duration = 1200;
   const startTime = performance.now();
@@ -13774,6 +15425,9 @@ function setupEventListeners() {
 
     if (enabled) {
       lightningCooldown = 0.8; // Ngay khi bật Mưa, xuất hiện tia sét sau 0.8 giây!
+      // Hiện toast và câu nói trú mưa sinh động
+      showCampusToast('🌧️ Trời đổ mưa rào: Mọi người nhanh chân chạy vào các hiên nhà để trú mưa!', 'rain');
+      triggerEventSpeechBubbles('rain');
     } else {
       if (activeLightningGroup) {
         scene.remove(activeLightningGroup);
@@ -13787,6 +15441,9 @@ function setupEventListeners() {
         dirLight.intensity = CONFIG.LIGHTING[currentEnv].sunIntensity;
       }
       lightningCooldown = 0.8;
+      // Hiện toast và câu nói tạnh mưa đáng yêu
+      showCampusToast('☀️ Tạnh mưa rồi: Cầu vồng rực rỡ, mọi người lại ra ngoài tiếp tục hoạt động!', 'sun');
+      triggerEventSpeechBubbles('sun');
     }
   };
 
@@ -14101,6 +15758,7 @@ function setupEventListeners() {
     else if (tag.includes('animal') || title.includes('cừu')) setCameraPreset('sheepFlock');
     else if (tag.includes('boat') || title.includes('thuyền') || title.includes('sông')) setCameraPreset('river');
     else if (tag.includes('landmark') || title.includes('cối xay')) setCameraPreset('windmill');
+    else if (tag.includes('factory') || tag.includes('lift') || tag.includes('warehouse') || tag.includes('staging') || title.includes('dây chuyền') || title.includes('thang tời') || title.includes('linh kiện') || title.includes('tập kết') || title.includes('bên trong')) setCameraPreset('insideNhaB');
     else if (tag.includes('dk1') || tag === 'nhab') setCameraPreset('nhaB');
     else if (tag.includes('dk2') || tag.includes('nha')) setCameraPreset('nhaDieuHanh');
     else if (tag.includes('lan')) setCameraPreset('vuonLan');
@@ -14225,6 +15883,12 @@ function optimizeScenePerformance() {
         toggleShutterDoors(); run(200);
         toggleShutterDoors(); run(200);
         if (areDoorsOpen !== doorsBefore) toggleShutterDoors();
+        if (nhaBRoofGroupGlobal) {
+          nhaBRoofGroupGlobal.visible = false;
+          checkpoint();
+          nhaBRoofGroupGlobal.visible = true;
+          checkpoint();
+        }
         setEnvironment(envBefore);
       },
     });
