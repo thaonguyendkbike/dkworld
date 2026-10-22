@@ -144,7 +144,7 @@ let vehicleHeadlights = [];
 
 // Cute Speech Bubbles (Người, Gà, Cừu)
 let activeSpeechBubbles = [];
-let nextSpeechTimer = 2.2;
+let nextSpeechTimer = 25.0; // Hoãn tối thiểu 25s sau khi mở trang mới xuất hiện bubble ngẫu nhiên
 
 // DK2 Hillside Eco-Pond, Chickens & Pigeons
 let hillPondKoiFishes = [];
@@ -12342,7 +12342,7 @@ function triggerEventSpeechBubbles(eventType) {
 
   // Xáo trộn ngẫu nhiên
   const shuffled = candidates.slice().sort(() => 0.5 - Math.random());
-  const selectedCount = Math.min(3, shuffled.length);
+  const selectedCount = 1; // Chỉ chọn đúng 1 người để nói, tránh làm rối màn hình
 
   for (let i = 0; i < selectedCount; i++) {
     const mesh = shuffled[i];
@@ -14611,7 +14611,7 @@ function updateRain(delta) {
 // ============================================================================
 // 16. Environment Toggle (Day / Sunset / Night)
 // ============================================================================
-function setEnvironment(time) {
+function setEnvironment(time, isUserAction = false) {
   renderer.shadowMap.needsUpdate = true;
   currentEnv = time;
   const cfg = CONFIG.LIGHTING[time];
@@ -14669,13 +14669,15 @@ function setEnvironment(time) {
     light.intensity = isNight ? 1.8 : (isSunset ? 0.75 : 0);
   });
 
-  // Phản ứng sinh hoạt của CBNV khi chuyển đổi Ngày / Đêm
-  if (isNight) {
-    showCampusToast('🌙 Trời tối - Đèn đường bật sáng: Mọi người đi bộ & chạy vào Nhà Ăn CBNV dùng bữa tối!', 'night');
-    triggerEventSpeechBubbles('night');
-  } else if (time === 'day' || time === 'sunset') {
-    showCampusToast(time === 'day' ? '☀️ Bắt đầu ngày mới: Mọi người trở lại vị trí làm việc và tiếp tục các hoạt động!' : '🌇 Chiều hoàng hôn: Không khí mát mẻ, làm việc hăng say!', 'day');
-    triggerEventSpeechBubbles('day');
+  // Phản ứng sinh hoạt của CBNV khi chuyển đổi Ngày / Đêm (CHỈ KÍCH HOẠT KHI NGƯỜI DÙNG BẤM NÚT, KHÔNG HIỆN KHI MỞ TRANG)
+  if (isUserAction) {
+    if (isNight) {
+      showCampusToast('🌙 Trời tối - Đèn đường bật sáng: Mọi người đi bộ & chạy vào Nhà Ăn CBNV dùng bữa tối!', 'night');
+      triggerEventSpeechBubbles('night');
+    } else if (time === 'day' || time === 'sunset') {
+      showCampusToast(time === 'day' ? '☀️ Bắt đầu ngày mới: Mọi người trở lại vị trí làm việc và tiếp tục các hoạt động!' : '🌇 Chiều hoàng hôn: Không khí mát mẻ, làm việc hăng say!', 'day');
+      triggerEventSpeechBubbles('day');
+    }
   }
 
   logoLight.intensity = isNight ? 1.8 : (isSunset ? 0.8 : 0);
@@ -14956,7 +14958,7 @@ const CUTE_SPEECHES = {
 };
 
 function triggerRandomSpeechBubble() {
-  if (activeSpeechBubbles.length >= 2) return;
+  if (activeSpeechBubbles.length >= 1) return; // Tối đa 1 bubble duy nhất trên toàn màn hình
 
   const tempV = new THREE.Vector3();
   const tempWorldPos = new THREE.Vector3();
@@ -15062,7 +15064,7 @@ function updateCuteSpeechBubbles(delta) {
   if (nextSpeechTimer <= 0) {
     triggerRandomSpeechBubble();
     // Thời gian giãn cách ngẫu nhiên từ 4.5s đến 7.5s
-    nextSpeechTimer = 4.5 + Math.random() * 3.0;
+    nextSpeechTimer = 20.0 + Math.random() * 12.0; // Giãn cách 20-32s xuất hiện thưa thớt nhẹ nhàng
   }
 
   if (activeSpeechBubbles.length === 0) return;
@@ -15391,7 +15393,7 @@ function setupEventListeners() {
   // Time toggle buttons
   document.querySelectorAll('.toggle-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      setEnvironment(btn.dataset.time);
+      setEnvironment(btn.dataset.time, true);
     });
   });
 
