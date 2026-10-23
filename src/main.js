@@ -250,7 +250,7 @@ async function init() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -459,8 +459,8 @@ function setupLights() {
     CONFIG.LIGHTING.day.sunPosition.z
   );
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.mapSize.width = 1536;
+  dirLight.shadow.mapSize.height = 1536;
   dirLight.shadow.camera.near = 20;
   dirLight.shadow.camera.far = 380;
 
@@ -6354,7 +6354,7 @@ function buildLandscaping() {
   const roundTrunkGeo = new THREE.CylinderGeometry(0.2, 0.36, 2.0, 5);
   const roundTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9, flatShading: true });
   const roundTrunkInst = new THREE.InstancedMesh(roundTrunkGeo, roundTrunkMat, roundCount);
-  roundTrunkInst.castShadow = true;
+  roundTrunkInst.castShadow = false; // Thân cây nằm dưới tán lá nên không cần render đổ bóng riêng
 
   const roundFoliageGeo = createPuffyCloudCanopyGeometry(1.55);
   const roundFoliageMat = createWindFoliageMaterial(0x22c55e, 0.8);
@@ -6375,7 +6375,7 @@ function buildLandscaping() {
   // --------------------------------------------------------------------------
   const autumnCount = fCfg.autumnTreeCount || 260;
   const autumnTrunkInst = new THREE.InstancedMesh(roundTrunkGeo, roundTrunkMat, autumnCount);
-  autumnTrunkInst.castShadow = true;
+  autumnTrunkInst.castShadow = false;
 
   const autumnFoliageGeo = createPuffyCloudCanopyGeometry(1.45);
   const autumnFoliageMat = createWindFoliageMaterial(0xf59e0b, 0.78);
@@ -6389,7 +6389,7 @@ function buildLandscaping() {
   const bushGeo = new THREE.DodecahedronGeometry(0.85, 0);
   const bushMat = createWindFoliageMaterial(0x4ade80, 0.82);
   const bushInst = new THREE.InstancedMesh(bushGeo, bushMat, bushCount);
-  bushInst.castShadow = true;
+  bushInst.castShadow = false; // Bụi cây nhỏ không cần render shadow pass
 
   // --------------------------------------------------------------------------
   // 5. Tảng đá cuội & Bãi sỏi ven bờ (River Rocks & Hillside Boulders)
@@ -6398,7 +6398,7 @@ function buildLandscaping() {
   const rockGeo = new THREE.DodecahedronGeometry(0.75, 0);
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9, flatShading: true });
   const rockInst = new THREE.InstancedMesh(rockGeo, rockMat, rockCount);
-  rockInst.castShadow = true;
+  rockInst.castShadow = false;
 
   // Áp dụng shader phủ tuyết tự nhiên lên ngọn và tán cây khi tuyết rơi
   applySnowShader(roundFoliageMat, 0.18, 0.96);
@@ -15253,7 +15253,7 @@ function applySnowShader(material, minNormalY = 0.2, coverage = 0.95) {
 
 // Khởi tạo hệ thống hạt tuyết rơi bồng bềnh
 function setupSnowEffect() {
-  const flakeCount = 3200;
+  const flakeCount = 1800;
   const positions = new Float32Array(flakeCount * 3);
   snowData = [];
 
@@ -15690,7 +15690,7 @@ function spawnRandomRainbow() {
   };
 }
 
-// Cập nhật hoạt cảnh tuyết rơi và mức độ tích lũy tuyết
+// Cập nhật hoạt cảnh tuyết rơi và mức độ tích lũy tuyết (Tối ưu hóa hiệu năng cao)
 function updateSnow(delta, currentTime) {
   // Cập nhật mức độ phủ tuyết dần dần (Cây, nhà, sân, đường, núi...)
   if (isSnowing && snowAccumulation < 1.0) {
@@ -15701,29 +15701,42 @@ function updateSnow(delta, currentTime) {
     snowUniforms.uSnowAmount.value = snowAccumulation;
   }
 
-  // Cập nhật hạt tuyết rơi bồng bềnh, chao liệng trong gió
+  // Cập nhật hạt tuyết rơi bồng bềnh, chao liệng trong gió (Truy cập mảng Float32Array trực tiếp không qua accessor)
   if (isSnowing && snowParticleSystem) {
-    const pos = snowParticleSystem.geometry.attributes.position;
+    const posAttr = snowParticleSystem.geometry.attributes.position;
+    const posArr = posAttr.array;
+    const timeSec = currentTime * 0.001;
+
     for (let i = 0; i < snowData.length; i++) {
       const flake = snowData[i];
-      let x = pos.getX(i);
-      let y = pos.getY(i);
-      let z = pos.getZ(i);
+      const i3 = i * 3;
+      let x = posArr[i3];
+      let y = posArr[i3 + 1];
+      let z = posArr[i3 + 2];
 
       y -= flake.fallSpeed * delta;
-      x += Math.sin(currentTime * 0.001 * flake.swaySpeed + flake.swayPhase) * flake.swayRadius * delta + 0.4 * delta;
-      z += Math.cos(currentTime * 0.001 * flake.swaySpeed + flake.swayPhase) * (flake.swayRadius * 0.6) * delta;
+      x += Math.sin(timeSec * flake.swaySpeed + flake.swayPhase) * flake.swayRadius * delta + 0.35 * delta;
+      z += Math.cos(timeSec * flake.swaySpeed + flake.swayPhase) * (flake.swayRadius * 0.5) * delta;
 
-      const groundY = getTerrainElevation(x, z);
-      if (y < groundY + 0.1 || y < 0) {
-        y = 52.0 + Math.random() * 10.0;
-        x = -160 + Math.random() * 300;
-        z = -185 + Math.random() * 285;
+      // Tối ưu hóa: Chỉ kiểm tra địa hình khi hạt tuyết đã rơi xuống gần mặt đất (< 24m)
+      if (y < 24.0) {
+        let groundY = 0.1;
+        // Nếu ở ngoài rìa khuôn viên mới cần tính toán sườn núi đồi
+        if (x < -105 || x > 105 || z < -85 || z > 75) {
+          groundY = getTerrainElevation(x, z);
+        }
+        if (y < groundY + 0.1 || y < 0) {
+          y = 52.0 + Math.random() * 8.0;
+          x = -160 + Math.random() * 300;
+          z = -185 + Math.random() * 285;
+        }
       }
 
-      pos.setXYZ(i, x, y, z);
+      posArr[i3] = x;
+      posArr[i3 + 1] = y;
+      posArr[i3 + 2] = z;
     }
-    pos.needsUpdate = true;
+    posAttr.needsUpdate = true;
   }
 }
 
@@ -16015,12 +16028,27 @@ function smoothFocusOnPoint(targetPoint, offset = new THREE.Vector3(26, 22, 26))
 }
 
 const _tempLabelV = new THREE.Vector3();
+let _lastLabelCamPos = new THREE.Vector3();
+let _lastLabelCamTarget = new THREE.Vector3();
 
 function updateLabels() {
   if (!showLabels) {
-    labelElements.forEach((l) => (l.el.style.display = 'none'));
+    labelElements.forEach((l) => {
+      if (l.visible) {
+        l.el.style.display = 'none';
+        l.visible = false;
+      }
+    });
     return;
   }
+
+  // Bỏ qua cập nhật DOM nếu camera đứng yên không xoay chuyển (giảm 100% DOM reflow khi đứng yên)
+  const camMoved = _lastLabelCamPos.distanceToSquared(camera.position) > 0.0001 ||
+                   _lastLabelCamTarget.distanceToSquared(controls.target) > 0.0001;
+  if (!camMoved) return;
+
+  _lastLabelCamPos.copy(camera.position);
+  _lastLabelCamTarget.copy(controls.target);
 
   const camPos = camera.position;
 
@@ -16029,22 +16057,29 @@ function updateLabels() {
     _tempLabelV.project(camera);
 
     if (_tempLabelV.z > 1) {
-      l.el.style.display = 'none';
+      if (l.visible) {
+        l.el.style.display = 'none';
+        l.visible = false;
+      }
       return;
     }
 
-    const x = (_tempLabelV.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-(_tempLabelV.y * 0.5) + 0.5) * window.innerHeight;
-
-    // Khoảng cách camera tới nhãn: Nếu gần (< 68m) thì tự động bung mở tên nhãn
-    const dist = camPos.distanceTo(l.worldPos);
-    if (dist < 68) {
-      l.el.classList.add('is-near');
-    } else {
-      l.el.classList.remove('is-near');
+    if (!l.visible) {
+      l.el.style.display = 'flex';
+      l.visible = true;
     }
 
-    l.el.style.display = 'flex';
+    const x = Math.round((_tempLabelV.x * 0.5 + 0.5) * window.innerWidth);
+    const y = Math.round((-(_tempLabelV.y * 0.5) + 0.5) * window.innerHeight);
+
+    // Khoảng cách camera tới nhãn: Chỉ thay đổi class khi trạng thái thay đổi
+    const dist = camPos.distanceTo(l.worldPos);
+    const isNear = dist < 68;
+    if (l.isNear !== isNear) {
+      l.isNear = isNear;
+      l.el.classList.toggle('is-near', isNear);
+    }
+
     l.el.style.left = `${x}px`;
     l.el.style.top = `${y}px`;
   });
@@ -17119,18 +17154,13 @@ function updateQualityButton() {
 // 21. Animation Loop
 // ============================================================================
 let lastTime = performance.now();
-let lastFrameTime = 0;
-const frameInterval = 1000 / 60; // Giới hạn max 60 FPS tránh ngốn tài nguyên trên màn 144Hz/240Hz
 
 function animate(time) {
   requestAnimationFrame(animate);
 
   const currentTime = typeof time === 'number' ? time : performance.now();
-  if (currentTime - lastFrameTime < frameInterval - 1) return; // Bỏ qua render thừa nếu chưa đủ thời gian 1 frame
-  lastFrameTime = currentTime;
-
   const rawDelta = (currentTime - lastTime) / 1000;
-  const delta = (!isNaN(rawDelta) && rawDelta > 0) ? Math.min(rawDelta, 0.1) : 0.016;
+  const delta = (!isNaN(rawDelta) && rawDelta > 0) ? Math.min(rawDelta, 0.05) : 0.016;
   lastTime = currentTime;
 
   // Cập nhật thời gian gió đung đưa cây rừng (Khối 2)

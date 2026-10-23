@@ -290,13 +290,24 @@ export class LightPool {
   }
 }
 
-// Tối ưu bóng đổ: Loại bỏ castShadow trên các vật thể nhỏ li ti (cốc, ghế, nan can...)
-export function pruneSmallShadowCasters(scene, minDimThreshold = 1.8) {
+// Tối ưu bóng đổ: Loại bỏ castShadow trên các vật thể nhỏ li ti (cốc, ghế, nan can...) và các hiệu ứng khói/trong suốt
+export function pruneSmallShadowCasters(scene, minDimThreshold = 2.2) {
   let pruned = 0;
   const size = new THREE.Vector3();
   scene.traverse((o) => {
-    if (o.isMesh && o.castShadow && !o.isInstancedMesh) {
-      if (o.geometry) {
+    if (o.isMesh && o.castShadow) {
+      // Loại bỏ bóng đổ cho các vật liệu trong suốt, khói lam chiều, ống khói
+      if (o.material && o.material.transparent) {
+        o.castShadow = false;
+        pruned++;
+        return;
+      }
+      if (o.name && (o.name.includes('smoke') || o.name.includes('puff') || o.name.includes('cloud'))) {
+        o.castShadow = false;
+        pruned++;
+        return;
+      }
+      if (!o.isInstancedMesh && o.geometry) {
         if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
         o.geometry.boundingBox.getSize(size);
         const maxDim = Math.max(size.x, size.y, size.z);
@@ -315,8 +326,8 @@ export function pruneSmallShadowCasters(scene, minDimThreshold = 1.8) {
 // 3. ADAPTIVE QUALITY
 // ----------------------------------------------------------------------------
 export const QUALITY_PRESETS = {
-  high:   { label: 'Cao',          maxPixelRatio: 1.25, minPixelRatio: 1.0,  shadows: true,  shadowEvery: 4,  lights: 4, dewDensity: 1.0 },
-  medium: { label: 'Trung bình',   maxPixelRatio: 1.0,  minPixelRatio: 0.75, shadows: true,  shadowEvery: 12, lights: 2, dewDensity: 0.85 },
+  high:   { label: 'Cao',          maxPixelRatio: 1.25, minPixelRatio: 1.0,  shadows: true,  shadowEvery: 6,  lights: 4, dewDensity: 1.0 },
+  medium: { label: 'Trung bình',   maxPixelRatio: 1.0,  minPixelRatio: 0.75, shadows: true,  shadowEvery: 12, lights: 2, dewDensity: 0.8 },
   low:    { label: 'Thấp (Mượt)',  maxPixelRatio: 0.8,  minPixelRatio: 0.6,  shadows: false, shadowEvery: 0,  lights: 0, dewDensity: 0.5 },
 };
 
