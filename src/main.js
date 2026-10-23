@@ -177,8 +177,24 @@ let windowLights = [];
 let streetLightLamps = [];
 let streetLightSpotLights = [];
 let logoLight;
+let nhaALogoLight;
+let nhaDieuHanhDK2LogoLight;
+let illuminatedLogoMats = [];
 let labelElements = [];
 let showLabels = true;
+
+// Snowfall & Progressive Accumulation System (Request 3)
+let isSnowing = false;
+let snowParticleSystem = null;
+let snowData = [];
+let snowAccumulation = 0.0;
+const snowUniforms = {
+  uSnowAmount: { value: 0.0 }
+};
+let snowMaterials = [];
+
+// 3D Arched Rainbow System (Request 2)
+let activeRainbow = null;
 
 // Performance monitoring
 let frameCount = 0;
@@ -306,8 +322,9 @@ async function init() {
   setupTrain();
   setupFlockOfBirds();
 
-  // Weather & Rain
+  // Weather & Precipitation
   setupRainEffect();
+  setupSnowEffect();
 
   // 3D HTML Labels
   createBuildingLabels();
@@ -459,6 +476,14 @@ function setupLights() {
   logoLight = new THREE.PointLight(0xe0f2fe, 0, 35);
   logoLight.position.set(CONFIG.BUILDINGS.nhaB.position.x, 14, CONFIG.BUILDINGS.nhaB.position.z + 18);
   scene.add(logoLight);
+
+  nhaALogoLight = new THREE.PointLight(0x38bdf8, 0, 18);
+  nhaALogoLight.position.set(CONFIG.BUILDINGS.nhaA.position.x, 11, CONFIG.BUILDINGS.nhaA.position.z + CONFIG.BUILDINGS.nhaA.depth / 2 + 1.2);
+  scene.add(nhaALogoLight);
+
+  nhaDieuHanhDK2LogoLight = new THREE.PointLight(0x38bdf8, 0, 18);
+  nhaDieuHanhDK2LogoLight.position.set(CONFIG.BUILDINGS.nhaDieuHanhDK2.position.x, 11, CONFIG.BUILDINGS.nhaDieuHanhDK2.position.z + CONFIG.BUILDINGS.nhaDieuHanhDK2.depth / 2 + 1.2);
+  scene.add(nhaDieuHanhDK2LogoLight);
 }
 
 // ============================================================================
@@ -474,6 +499,7 @@ function buildGroundsAndRoadDT234() {
     new THREE.BoxGeometry(roadCfg.width, 0.1, 296),
     new THREE.MeshStandardMaterial({ color: roadCfg.asphaltColor, roughness: 0.75 })
   );
+  applySnowShader(dt234.material, 0.35, 0.92);
   dt234.position.set(roadCfg.positionX, 0.05, -50);
   dt234.receiveShadow = true;
   scene.add(dt234);
@@ -705,7 +731,7 @@ const CANAL_WAYPOINTS = [
 ];
 const canalCurve = new THREE.CatmullRomCurve3(CANAL_WAYPOINTS);
 
-function getRiverBedDepth(x, z) {
+function getDistanceToCanal(x, z) {
   // Khoảng cách tới đường tim dòng sông máng nước (tính chính xác theo spline uốn lượn)
   const tEst = Math.max(0, Math.min(1, (z - (-198)) / 296));
   let minDist = 9999;
@@ -715,6 +741,11 @@ function getRiverBedDepth(x, z) {
     const d = Math.hypot(x - pt.x, z - pt.z);
     if (d < minDist) minDist = d;
   }
+  return minDist;
+}
+
+function getRiverBedDepth(x, z) {
+  const minDist = getDistanceToCanal(x, z);
   const halfW = 4.8;  // Nửa bề rộng mặt nước ~ 4.8m (mặt nước rộng 9.6m)
   const bankW = 3.6;  // Mái taluy bờ dốc thoai thoải 3.6m
   if (minDist < halfW) {
@@ -749,9 +780,28 @@ function buildVastTerrainAndClouds() {
 
   const posAttr = topGrassGeo.attributes.position;
   const colors = [];
-  const cGrass = new THREE.Color(CONFIG.GROUND.grassColor);
-  const cBank = new THREE.Color(0x854d0e);  // Tầng đất bờ sông nâu ấm
-  const cBed = new THREE.Color(0xb45309);   // Cát vàng đáy mương
+  // Bảng màu hòa sắc mô phỏng đất và cỏ tự nhiên chân thật
+  const cGrass = new THREE.Color(CONFIG.GROUND.grassColor);        // Xanh lá đậm ấm (0x16a34a)
+  const cGrassVibrant = new THREE.Color(0x22c55e);                 // Xanh lá non tươi sáng
+  const cGrassDeep = new THREE.Color(0x15803d);                    // Xanh ngọc sẫm
+  const cGrassOlive = new THREE.Color(0x65a30d);                   // Xanh ô-liu rêu
+  const cEarthWarm = new THREE.Color(0x78350f);                    // Đất nâu ấm
+  const cEarthDark = new THREE.Color(0x542d13);                    // Đất mùn sẫm màu
+  const cSandClay = new THREE.Color(0x9a5a22);                     // Đất sét cát nâu vàng
+  const cBankMud = new THREE.Color(0x854d0e);                      // Tầng bùn đất bờ mương
+  const cBed = new THREE.Color(0xb45309);                          // Cát vàng đáy mương
+
+  const hillCenters = [
+    { x: 58, z: -128, r: 44 },   // Đồi cối xay gió Bắc
+    { x: 115, z: -80, r: 32 },   // Đồi Đông
+    { x: 116, z: -25, r: 28 },   // Đồi Đông Nam
+    { x: -145, z: -155, r: 56 }, // Đồi Tây Bắc
+    { x: 75, z: -160, r: 54 },   // Đồi Đông Bắc
+    { x: -60, z: -160, r: 60 },  // Đồi sườn Bắc
+    { x: -138, z: 72, r: 40 },   // Đồi Tây Nam
+    { x: -120, z: -78, r: 62 },  // Đồi chính DK2
+    { x: -142, z: -38, r: 52 },  // Đồi mới DK2
+  ];
 
   for (let i = 0; i < posAttr.count; i++) {
     const vx = posAttr.getX(i);
@@ -761,13 +811,81 @@ function buildVastTerrainAndClouds() {
     posAttr.setY(i, bedDepth);
 
     if (bedDepth < -0.85) {
+      // Đáy lòng sông máng nước
       colors.push(cBed.r, cBed.g, cBed.b);
     } else if (bedDepth < -0.05) {
+      // Mái dốc bờ kênh taluy
       const t = (bedDepth - (-0.85)) / (0.0 - (-0.85));
-      const col = cBed.clone().lerp(cGrass, t);
+      const col = cBed.clone().lerp(cBankMud, t);
       colors.push(col.r, col.g, col.b);
     } else {
-      colors.push(cGrass.r, cGrass.g, cGrass.b);
+      // Mặt đất tự nhiên: Loang màu nâu đất sinh động, chân thật theo yêu cầu
+      const distCanal = getDistanceToCanal(vx, vz);
+
+      // 1. Loang màu đất nâu ẩm ven mương nước (distCanal từ 4.8m đến 24m)
+      let canalSoilFactor = 0;
+      if (distCanal < 24.0) {
+        const canalT = Math.max(0, 1.0 - (distCanal - 4.8) / 19.2); // 1.0 sát mép nước, 0.0 tại 24m
+        const mudNoise = (Math.sin(vz * 0.16) * 0.45 + Math.cos(vx * 0.22 + vz * 0.08) * 0.35 + Math.sin(vz * 0.04) * 0.2 + 1.0) * 0.5;
+        canalSoilFactor = Math.min(1.0, Math.pow(canalT, 1.1) * (0.45 + 0.55 * mudNoise));
+      }
+
+      // 2. Loang màu đất sỏi xói mòn quanh chân và sườn núi đồi
+      let hillSoilFactor = 0;
+      for (let h = 0; h < hillCenters.length; h++) {
+        const hc = hillCenters[h];
+        const distH = Math.hypot(vx - hc.x, vz - hc.z);
+        if (distH < hc.r) {
+          const ratio = 1.0 - distH / hc.r; // 0 ở mép ngoài, 1 ở tâm đồi
+          const hNoise = (Math.sin(vx * 0.09 + vz * 0.07) * 0.45 + Math.cos(vx * 0.18 - vz * 0.14) * 0.35 + Math.sin(vz * 0.28) * 0.2 + 1.0) * 0.5;
+          const factor = ratio * (0.35 + 0.65 * hNoise);
+          if (factor > hillSoilFactor) hillSoilFactor = factor;
+        }
+      }
+
+      // 3. Thi thoảng loang các vạt đất nâu tự nhiên ngẫu nhiên trên toàn cảnh đảo
+      const patchNoise1 = Math.sin(vx * 0.038 + Math.cos(vz * 0.035) * 1.8);
+      const patchNoise2 = Math.sin(vx * 0.082 - vz * 0.078);
+      const patchNoise3 = Math.cos(vx * 0.165 + vz * 0.145);
+      const generalNoise = (patchNoise1 * 0.48 + patchNoise2 * 0.32 + patchNoise3 * 0.20 + 1.0) * 0.5; // [0..1]
+
+      let randomSoilFactor = 0;
+      if (generalNoise > 0.63) {
+        // Xuất hiện từng vạt loang màu đất nâu tự nhiên
+        randomSoilFactor = Math.min(1.0, (generalNoise - 0.63) / 0.37 * 0.8);
+      }
+
+      // Tổng hợp độ loang đất nâu tại tọa độ này
+      const totalSoil = Math.min(0.92, Math.max(canalSoilFactor * 0.95, hillSoilFactor * 0.88, randomSoilFactor));
+
+      // Nền cỏ phong phú, giàu sắc thái sinh thái (không bị phẳng lì đơn điệu)
+      const grassHueNoise = (Math.sin(vx * 0.05 + vz * 0.04) + 1.0) * 0.5;
+      let col = cGrass.clone();
+      if (grassHueNoise > 0.62) {
+        col.lerp(cGrassVibrant, (grassHueNoise - 0.62) * 1.5);
+      } else if (grassHueNoise < 0.36) {
+        col.lerp(cGrassDeep, (0.36 - grassHueNoise) * 1.6);
+      } else {
+        col.lerp(cGrassOlive, 0.2);
+      }
+
+      // Hòa trộn loang màu đất nâu: Phù sa ven mương hoặc đất nâu đồi núi
+      if (totalSoil > 0.02) {
+        let soilCol;
+        if (canalSoilFactor > hillSoilFactor && canalSoilFactor > randomSoilFactor) {
+          // Gần mương nước: Đất sét ẩm & bùn phù sa pha cát
+          soilCol = cBankMud.clone().lerp(cSandClay, generalNoise);
+        } else if (hillSoilFactor > randomSoilFactor) {
+          // Quanh chân đồi núi: Đất nâu ấm & mùn xám nâu sườn dốc
+          soilCol = cEarthWarm.clone().lerp(cEarthDark, generalNoise * 0.65);
+        } else {
+          // Vạt đất ngẫu nhiên trên đồng cỏ: Đất nâu ấm tự nhiên
+          soilCol = cEarthWarm.clone().lerp(cSandClay, 0.35);
+        }
+        col.lerp(soilCol, totalSoil);
+      }
+
+      colors.push(col.r, col.g, col.b);
     }
   }
 
@@ -783,6 +901,7 @@ function buildVastTerrainAndClouds() {
     polygonOffsetFactor: 1.0,
     polygonOffsetUnits: 1.0,
   });
+  applySnowShader(topGrassMat, 0.12, 0.96);
   const topGrass = new THREE.Mesh(topGrassGeo, topGrassMat);
   topGrass.receiveShadow = true;
   dioramaGroup.add(topGrass);
@@ -900,10 +1019,78 @@ function buildVastTerrainAndClouds() {
   ];
 
   interiorHills.forEach((h) => {
-    const hillMesh = new THREE.Mesh(
-      new THREE.ConeGeometry(h.radius, h.height, h.segs || 9),
-      new THREE.MeshStandardMaterial({ color: h.color, roughness: 0.92, flatShading: true })
-    );
+    // Tăng mật độ phân đoạn (14 cạnh, 8 tầng) để hỗ trợ hòa sắc vertex colors loang màu đất nâu
+    const hillGeo = new THREE.ConeGeometry(h.radius, h.height, h.segs ? Math.max(h.segs, 12) : 14, 8);
+    const pos = hillGeo.attributes.position;
+    const hillColors = [];
+    const baseGreen = new THREE.Color(h.color);
+    const deepGreen = baseGreen.clone().offsetHSL(-0.02, 0.05, -0.09);
+    const vibrantGreen = baseGreen.clone().offsetHSL(0.03, 0.08, 0.06);
+    const earthWarm = new THREE.Color(0x78350f);
+    const earthDark = new THREE.Color(0x542d13);
+    const sandLoam = new THREE.Color(0x92400e);
+
+    for (let vi = 0; vi < pos.count; vi++) {
+      const vx = pos.getX(vi);
+      const vy = pos.getY(vi);
+      const vz = pos.getZ(vi);
+      const wx = h.x + vx;
+      const wz = h.z + vz;
+
+      // Chuẩn hóa cao độ từ đáy nón (-height/2) lên đỉnh (+height/2)
+      const normY = (vy + h.height / 2) / h.height; // [0..1]
+
+      // Nhiễu địa tầng & vỉa đất lộ thiên sườn đồi
+      const strataNoise = Math.sin(wx * 0.14 + vy * 0.35) * 0.5 + Math.cos(wz * 0.16 + vy * 0.2) * 0.5;
+      const patchNoise = Math.sin(wx * 0.08 - wz * 0.09) * 0.5 + Math.cos(wx * 0.22 + wz * 0.18) * 0.5;
+
+      // Đáy đồi và sườn dốc thi thoảng loang vạt đất nâu tự nhiên
+      let isEarth = false;
+      let earthIntensity = 0;
+
+      if (normY < 0.22) {
+        // Chân đồi: chuyển tiếp từ đất ven chân đồi lên thảm cỏ
+        if (strataNoise > 0.15 || patchNoise > 0.28) {
+          isEarth = true;
+          earthIntensity = Math.min(1.0, (0.22 - normY) / 0.22 * 0.75 + strataNoise * 0.35);
+        }
+      } else if (normY >= 0.22 && normY <= 0.82) {
+        // Sườn đồi: các vệt loang đất nâu & đá lộ thiên theo vách dốc
+        if (strataNoise > 0.18 && patchNoise > -0.15) {
+          isEarth = true;
+          earthIntensity = Math.min(1.0, (strataNoise - 0.18) * 1.7 + patchNoise * 0.35);
+        }
+      } else {
+        // Đỉnh đồi: mảng đất mòn / phong hóa trên chỏm
+        if (patchNoise > 0.42) {
+          isEarth = true;
+          earthIntensity = 0.55;
+        }
+      }
+
+      let col = baseGreen.clone();
+      if (normY > 0.5) col.lerp(vibrantGreen, (normY - 0.5) * 0.6);
+      else col.lerp(deepGreen, (0.5 - normY) * 0.5);
+
+      if (isEarth && earthIntensity > 0) {
+        const targetSoil = (strataNoise > 0.38) ? earthDark : ((patchNoise > 0.2) ? earthWarm : sandLoam);
+        col.lerp(targetSoil, Math.min(0.92, earthIntensity));
+      }
+
+      hillColors.push(col.r, col.g, col.b);
+    }
+
+    hillGeo.setAttribute('color', new THREE.Float32BufferAttribute(hillColors, 3));
+    hillGeo.computeVertexNormals();
+
+    const hillMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.92,
+      flatShading: true
+    });
+    applySnowShader(hillMat, 0.22, 0.96);
+
+    const hillMesh = new THREE.Mesh(hillGeo, hillMat);
     hillMesh.position.set(h.x, h.y, h.z);
     hillMesh.receiveShadow = true;
     dioramaGroup.add(hillMesh);
@@ -1208,16 +1395,14 @@ function buildBridgeLushForest() {
   );
 
   // Danh sách vị trí cây rừng dày dặc bao bọc 2 bên bờ sông và 2 đầu cầu
+  // (Đã loại bỏ 100% cây phía Tây xâm lấn vào Nhà B, Mái che xe và đường chạy thử)
   const bridgeTrees = [
     // Bờ Bắc (North Bank, Z = -58 đến -78)
-    // Phía Tây đường sắt
-    { x: 84.0, z: -58.5, r: 1.85, matIdx: 1 },
-    { x: 81.5, z: -63.0, r: 2.10, matIdx: 2 },
-    { x: 86.0, z: -66.5, r: 1.70, matIdx: 0 },
-    { x: 83.0, z: -71.0, r: 2.25, matIdx: 3 },
-    { x: 87.5, z: -74.0, r: 1.95, matIdx: 5 }, // Cây thu vàng
-    { x: 79.5, z: -68.0, r: 2.30, matIdx: 1 },
-    // Phía Đông đường sắt
+    // Phía Tây đường sắt: Chỉ trồng sát mép mương nước X >= 86.0, cách xa Nhà B và Mái che xe
+    { x: 86.5, z: -66.5, r: 1.65, matIdx: 0 },
+    { x: 87.5, z: -74.0, r: 1.85, matIdx: 5 }, // Cây thu vàng
+    { x: 87.0, z: -60.0, r: 1.60, matIdx: 1 },
+    // Phía Đông đường sắt & chân đồi phía Đông
     { x: 104.0, z: -57.0, r: 2.05, matIdx: 2 },
     { x: 107.5, z: -62.0, r: 2.40, matIdx: 5 }, // Cây thu vàng cam
     { x: 102.5, z: -67.0, r: 1.85, matIdx: 0 },
@@ -1225,15 +1410,14 @@ function buildBridgeLushForest() {
     { x: 110.5, z: -66.0, r: 2.00, matIdx: 6 }, // Cây thu cam
     { x: 112.0, z: -74.0, r: 2.50, matIdx: 2 },
     { x: 101.0, z: -75.0, r: 1.90, matIdx: 4 },
+    { x: 108.0, z: -80.0, r: 2.30, matIdx: 1 },
+    { x: 114.0, z: -68.0, r: 2.10, matIdx: 3 },
 
-    // Bờ Nam (South Bank, Z = -36 đến -20)
-    // Phía Tây đường sắt
-    { x: 84.5, z: -36.0, r: 1.90, matIdx: 0 },
-    { x: 81.0, z: -31.5, r: 2.20, matIdx: 2 },
-    { x: 85.5, z: -27.0, r: 1.80, matIdx: 5 }, // Cây vàng
-    { x: 82.5, z: -22.0, r: 2.10, matIdx: 1 },
+    // Bờ Nam (South Bank, Z = -36 đến -16)
+    // Phía Tây đường sắt: Giữ khoảng cách an toàn với sân thử xe và Nhà B
+    { x: 86.5, z: -35.0, r: 1.70, matIdx: 0 },
     { x: 86.8, z: -18.0, r: 1.75, matIdx: 3 },
-    { x: 78.5, z: -28.0, r: 2.40, matIdx: 2 },
+    { x: 86.0, z: -23.0, r: 1.65, matIdx: 1 },
     // Phía Đông đường sắt
     { x: 102.0, z: -36.0, r: 2.15, matIdx: 1 },
     { x: 106.0, z: -31.0, r: 2.35, matIdx: 6 }, // Cây thu cam rực rỡ
@@ -1241,9 +1425,13 @@ function buildBridgeLushForest() {
     { x: 105.0, z: -21.0, r: 2.20, matIdx: 2 },
     { x: 109.0, z: -25.0, r: 2.00, matIdx: 5 }, // Cây vàng
     { x: 108.5, z: -17.0, r: 2.40, matIdx: 3 },
+    { x: 113.0, z: -22.0, r: 2.20, matIdx: 2 },
   ];
 
   bridgeTrees.forEach((bt) => {
+    // Tuyệt đối loại bỏ bất kỳ cây nào vi phạm khoảng cách an toàn với Nhà B, Mái che xe và đường chạy thử
+    if (bt.x <= 85.0 && bt.z >= -86 && bt.z <= -20) return;
+
     const treeGroup = new THREE.Group();
     const groundY = getTerrainElevation ? getTerrainElevation(bt.x, bt.z) : 0.2;
     treeGroup.position.set(bt.x, Math.max(0.1, groundY), bt.z);
@@ -2279,6 +2467,7 @@ function buildRoadsAndTestTrack() {
     polygonOffsetFactor: -1.0,
     polygonOffsetUnits: -1.0,
   });
+  applySnowShader(roadMat, 0.35, 0.92);
 
   // Đường trước Nhà A
   const road1 = new THREE.Mesh(new THREE.PlaneGeometry(55, 3.5), roadMat);
@@ -2658,6 +2847,7 @@ function buildNhaB() {
   roof.position.y = cfg.height + 0.3;
   roof.castShadow = true;
   nhaBRoofGroup.add(roof);
+  applySnowShader(roof.material, 0.3, 0.95);
 
   const corniceMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
   const cThick = 0.45;
@@ -2691,6 +2881,7 @@ function buildNhaB() {
   monitor.position.y = cfg.height + 0.6 + monCfg.height / 2;
   monitor.castShadow = true;
   nhaBRoofGroup.add(monitor);
+  applySnowShader(monitor.material, 0.3, 0.95);
 
   for (let vz = -10; vz <= 10; vz += 5.0) {
     const vent = new THREE.Mesh(
@@ -3465,34 +3656,55 @@ function createBuildingLogo(group, cfg) {
   const texLoader = new THREE.TextureLoader();
   const logoTexture = texLoader.load('/LogoDKBike.png');
   logoTexture.colorSpace = THREE.SRGBColorSpace;
+  const logoWhiteTex = texLoader.load('/LogoDKBike_white.png');
+  logoWhiteTex.colorSpace = THREE.SRGBColorSpace;
 
-  const signW = 7.6;
-  const signH = 3.12;
+  const signW = 6.4;
+  const signH = 2.4;
+  const plateDepth = 0.08;
 
-  // Biển hiệu nền trắng trang nhã chuẩn phong cách nhà máy hiện đại DK Bike
+  // Đế biển hiệu kiến trúc màu xám đen sang trọng giống Nhà A DK1
   const signBackMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.2,
-    metalness: 0.05,
+    color: 0x0f172a,
+    roughness: 0.35,
+    metalness: 0.5,
   });
-  const logoMat = new THREE.MeshBasicMaterial({
+  const bezelMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.85 });
+
+  // 1. Mặt Nam (Quay ra sân chính & bốc dỡ)
+  const signSouth = new THREE.Group();
+  signSouth.position.set(0, cfg.height - 1.6, cfg.depth / 2 + 0.08);
+
+  const backSouth = new THREE.Mesh(new THREE.BoxGeometry(signW, signH, plateDepth), signBackMat);
+  backSouth.castShadow = true;
+  signSouth.add(backSouth);
+
+  const bezelTopS = new THREE.Mesh(new THREE.BoxGeometry(signW + 0.1, 0.06, plateDepth + 0.02), bezelMat);
+  bezelTopS.position.set(0, signH / 2, plateDepth / 2);
+  signSouth.add(bezelTopS);
+
+  const bezelBotS = new THREE.Mesh(new THREE.BoxGeometry(signW + 0.1, 0.06, plateDepth + 0.02), bezelMat);
+  bezelBotS.position.set(0, -signH / 2, plateDepth / 2);
+  signSouth.add(bezelBotS);
+
+  const logoMatSouth = new THREE.MeshStandardMaterial({
     map: logoTexture,
+    emissiveMap: logoWhiteTex,
+    emissive: new THREE.Color(0x67e8f9),
+    emissiveIntensity: 0.0,
     transparent: true,
+    roughness: 0.2,
+    metalness: 0.1,
     polygonOffset: true,
     polygonOffsetFactor: -1.0,
     polygonOffsetUnits: -1.0,
   });
+  logoMatSouth.userData = { nightColor: 0x67e8f9, sunsetColor: 0x0284c7 };
+  illuminatedLogoMats.push(logoMatSouth);
 
-  // 1. Mặt Nam (Quay ra sân chính & bốc dỡ)
-  const signSouth = new THREE.Group();
-  signSouth.position.set(0, cfg.height - 2.2, cfg.depth / 2 + 0.08);
-
-  const backSouth = new THREE.Mesh(new THREE.BoxGeometry(signW, signH, 0.06), signBackMat);
-  backSouth.castShadow = true;
-  signSouth.add(backSouth);
-
-  const faceSouth = new THREE.Mesh(new THREE.PlaneGeometry(signW - 0.6, (signW - 0.6) / 2.44), logoMat);
-  faceSouth.position.z = 0.035;
+  const faceSouthW = 5.2;
+  const faceSouth = new THREE.Mesh(new THREE.PlaneGeometry(faceSouthW, faceSouthW / 2.44), logoMatSouth);
+  faceSouth.position.z = plateDepth + 0.02;
   signSouth.add(faceSouth);
 
   if (nhaBRoofGroupGlobal) {
@@ -3503,15 +3715,38 @@ function createBuildingLogo(group, cfg) {
 
   // 2. Mặt Đông (Quay ra đường chạy thử & đường sắt)
   const signEast = new THREE.Group();
-  signEast.position.set(cfg.width / 2 + 0.08, cfg.height - 2.2, 5.0);
+  signEast.position.set(cfg.width / 2 + 0.08, cfg.height - 1.6, 5.0);
   signEast.rotation.y = Math.PI / 2;
 
-  const backEast = new THREE.Mesh(new THREE.BoxGeometry(signW, signH, 0.06), signBackMat);
+  const backEast = new THREE.Mesh(new THREE.BoxGeometry(signW, signH, plateDepth), signBackMat);
   backEast.castShadow = true;
   signEast.add(backEast);
 
-  const faceEast = new THREE.Mesh(new THREE.PlaneGeometry(signW - 0.6, (signW - 0.6) / 2.44), logoMat);
-  faceEast.position.z = 0.035;
+  const bezelTopE = new THREE.Mesh(new THREE.BoxGeometry(signW + 0.1, 0.06, plateDepth + 0.02), bezelMat);
+  bezelTopE.position.set(0, signH / 2, plateDepth / 2);
+  signEast.add(bezelTopE);
+
+  const bezelBotE = new THREE.Mesh(new THREE.BoxGeometry(signW + 0.1, 0.06, plateDepth + 0.02), bezelMat);
+  bezelBotE.position.set(0, -signH / 2, plateDepth / 2);
+  signEast.add(bezelBotE);
+
+  const logoMatEast = new THREE.MeshStandardMaterial({
+    map: logoTexture,
+    emissiveMap: logoWhiteTex,
+    emissive: new THREE.Color(0x67e8f9),
+    emissiveIntensity: 0.0,
+    transparent: true,
+    roughness: 0.2,
+    metalness: 0.1,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -1.0,
+  });
+  logoMatEast.userData = { nightColor: 0x67e8f9, sunsetColor: 0x0284c7 };
+  illuminatedLogoMats.push(logoMatEast);
+
+  const faceEast = new THREE.Mesh(new THREE.PlaneGeometry(faceSouthW, faceSouthW / 2.44), logoMatEast);
+  faceEast.position.z = plateDepth + 0.02;
   signEast.add(faceEast);
 
   group.add(signEast);
@@ -3550,6 +3785,7 @@ function buildNhaA() {
   roof.position.y = cfg.height + 0.25; // Mặt trên sàn mái tại cfg.height + 0.5
   roof.castShadow = true;
   group.add(roof);
+  applySnowShader(roof.material, 0.3, 0.95);
 
   // Gờ tường chắn nước quanh 4 mép mái (Parapet Rim - 4 thanh bao quanh, không phủ mặt sàn)
   const parapetMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3 });
@@ -3629,8 +3865,78 @@ function buildNhaA() {
 
   group.add(walkwayGroup);
 
+  // 10. Biển hiệu Logo DKBike phát sáng trên mặt tiền Nhà điều hành DK1 (Không đè lên cửa kính)
+  createNhaADKBikeLogo(group, cfg);
+
   scene.add(group);
   buildingMeshes.push(body);
+}
+
+function createNhaADKBikeLogo(group, cfg) {
+  const texLoader = new THREE.TextureLoader();
+  const logoTex = texLoader.load('/LogoDKBike.png');
+  logoTex.colorSpace = THREE.SRGBColorSpace;
+  const logoWhiteTex = texLoader.load('/LogoDKBike_white.png');
+  logoWhiteTex.colorSpace = THREE.SRGBColorSpace;
+
+  const logoGroup = new THREE.Group();
+  // Vị trí: Mặt Nam (Mặt sảnh chính quay ra cổng & sân DK1)
+  // Cao độ: y = 10.55m (dải tường phẳng tầng 3 trên cùng, đỉnh cửa sổ kính tầng 3 là y = 9.49m)
+  const logoY = 10.55;
+  const logoZ = cfg.depth / 2 + 0.08;
+  logoGroup.position.set(0, logoY, logoZ);
+
+  // 1. Đế bảng hiệu kiến trúc hiện đại (Architectural Backing Plate)
+  const plateW = 4.8;
+  const plateH = 1.62;
+  const plateDepth = 0.08;
+  const plateMat = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.35,
+    metalness: 0.5,
+  });
+  const backPlate = new THREE.Mesh(new THREE.BoxGeometry(plateW, plateH, plateDepth), plateMat);
+  backPlate.position.set(0, 0, plateDepth / 2);
+  backPlate.castShadow = true;
+  logoGroup.add(backPlate);
+
+  // Viền nẹp hợp kim bạc cao cấp bao quanh biển hiệu
+  const bezelMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.85 });
+  const bezelTop = new THREE.Mesh(new THREE.BoxGeometry(plateW + 0.1, 0.05, plateDepth + 0.02), bezelMat);
+  bezelTop.position.set(0, plateH / 2, plateDepth / 2);
+  logoGroup.add(bezelTop);
+
+  const bezelBottom = new THREE.Mesh(new THREE.BoxGeometry(plateW + 0.1, 0.05, plateDepth + 0.02), bezelMat);
+  bezelBottom.position.set(0, -plateH / 2, plateDepth / 2);
+  logoGroup.add(bezelBottom);
+
+  // 2. Mặt chữ & biểu tượng Logo DKBike phát sáng (Illuminated Logo Face)
+  // Tỷ lệ ảnh 2.44 : 1 -> chiều rộng 3.6m, chiều cao 1.475m (nằm trọn trên tường, mép dưới logo cách đỉnh kính tầng 3 hơn 32cm, hoàn toàn không đè lên kính)
+  const faceW = 3.6;
+  const faceH = faceW / 2.44;
+  const logoMat = new THREE.MeshStandardMaterial({
+    map: logoTex,
+    emissiveMap: logoWhiteTex,
+    emissive: new THREE.Color(0x67e8f9),
+    emissiveIntensity: 0.0,
+    transparent: true,
+    roughness: 0.2,
+    metalness: 0.1,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -1.0,
+  });
+  logoMat.userData = {
+    nightColor: 0x67e8f9,
+    sunsetColor: 0x0284c7,
+  };
+  illuminatedLogoMats.push(logoMat);
+
+  const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(faceW, faceH), logoMat);
+  faceMesh.position.set(0, 0, plateDepth + 0.02);
+  logoGroup.add(faceMesh);
+
+  group.add(logoGroup);
 }
 
 function buildNhaC() {
@@ -3657,6 +3963,7 @@ function buildNhaC() {
   roof.position.y = cfg.height + 0.3;
   roof.castShadow = true;
   group.add(roof);
+  applySnowShader(roof.material, 0.3, 0.95);
 
   // Gờ nóc mái tôn (Roof Ridge Cap)
   const ridge = new THREE.Mesh(
@@ -3737,6 +4044,7 @@ function buildNhaAn() {
   roof.scale.set(1.0, 1.0, (cfg.depth / cfg.width) * 1.5);
   roof.castShadow = true;
   group.add(roof);
+  applySnowShader(roof.material, 0.2, 0.95);
 
   // Gờ máng xối chân mái ngói
   const gutterMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.6 });
@@ -3764,6 +4072,7 @@ function buildNhaAn() {
   porchRoof.position.set(0, 3.2, cfg.depth / 2 + 1.1);
   porchRoof.castShadow = true;
   group.add(porchRoof);
+  applySnowShader(porchRoof.material, 0.25, 0.95);
 
   const steps = new THREE.Mesh(
     new THREE.BoxGeometry(5.2, 0.3, 1.4),
@@ -3799,6 +4108,7 @@ function buildNhaBaoVeDK1() {
   );
   roof.position.y = cfg.height + 0.2;
   group.add(roof);
+  applySnowShader(roof.material, 0.3, 0.95);
 
   // Cửa sổ kính quan sát an ninh 3 mặt
   const winMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.1, metalness: 0.7 });
@@ -3854,6 +4164,7 @@ function buildCanopyAndBikes() {
   canopyRoof.position.y = cfg.height + 0.18;
   canopyRoof.castShadow = true;
   group.add(canopyRoof);
+  applySnowShader(canopyMat, 0.3, 0.85);
 
   // Xe điện 3 bánh chở hàng DK Bike chi tiết đỗ ngay ngắn dưới mái che (Khối 8)
   const cargoColors = [0x0284c7, 0xef4444, 0x10b981, 0xf59e0b, 0x6366f1, 0x0284c7, 0xdc2626];
@@ -3954,11 +4265,113 @@ function buildNhaDieuHanhDK2() {
     group.add(wSouth);
   }
 
+  // 4. Biển hiệu Logo DKBike phát sáng trên Nhà điều hành DK2 (Mặt Nam & Mặt Đông) giống Nhà A DK1
+  createNhaDieuHanhDK2Logo(group, cfg);
+
+  // Mái phủ tuyết khi tuyết rơi
+  applySnowShader(roof.material, 0.3, 0.95);
+
   // Hồ cá Koi phong cách Nhật Bản bên cạnh Nhà điều hành DK2 (Gần đường ĐT234)
   buildDK2HeadquartersKoiPond(group, cfg);
 
   scene.add(group);
   buildingMeshes.push(body);
+}
+
+function createNhaDieuHanhDK2Logo(group, cfg) {
+  const texLoader = new THREE.TextureLoader();
+  const logoTexture = texLoader.load('/LogoDKBike.png');
+  logoTexture.colorSpace = THREE.SRGBColorSpace;
+  const logoWhiteTex = texLoader.load('/LogoDKBike_white.png');
+  logoWhiteTex.colorSpace = THREE.SRGBColorSpace;
+
+  const plateW = 4.8;
+  const plateH = 1.45;
+  const plateDepth = 0.08;
+
+  const signBackMat = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.35,
+    metalness: 0.5,
+  });
+  const bezelMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.85 });
+
+  // 1. Mặt Nam (Mặt đón tiếp khách quay ra sân nội bộ & DK Coffee)
+  // Cao độ: y = 10.8m (trên dải tường tầng 3, đỉnh cửa sổ là y = 10.05m -> hoàn toàn không đè lên kính)
+  const signSouth = new THREE.Group();
+  signSouth.position.set(0, 10.8, cfg.depth / 2 + 0.08);
+
+  const backSouth = new THREE.Mesh(new THREE.BoxGeometry(plateW, plateH, plateDepth), signBackMat);
+  backSouth.castShadow = true;
+  signSouth.add(backSouth);
+
+  const bezelTopS = new THREE.Mesh(new THREE.BoxGeometry(plateW + 0.1, 0.05, plateDepth + 0.02), bezelMat);
+  bezelTopS.position.set(0, plateH / 2, plateDepth / 2);
+  signSouth.add(bezelTopS);
+
+  const bezelBotS = new THREE.Mesh(new THREE.BoxGeometry(plateW + 0.1, 0.05, plateDepth + 0.02), bezelMat);
+  bezelBotS.position.set(0, -plateH / 2, plateDepth / 2);
+  signSouth.add(bezelBotS);
+
+  const logoMatSouth = new THREE.MeshStandardMaterial({
+    map: logoTexture,
+    emissiveMap: logoWhiteTex,
+    emissive: new THREE.Color(0x67e8f9),
+    emissiveIntensity: 0.0,
+    transparent: true,
+    roughness: 0.2,
+    metalness: 0.1,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -1.0,
+  });
+  logoMatSouth.userData = { nightColor: 0x67e8f9, sunsetColor: 0x0284c7 };
+  illuminatedLogoMats.push(logoMatSouth);
+
+  const faceW = 3.4;
+  const faceSouth = new THREE.Mesh(new THREE.PlaneGeometry(faceW, faceW / 2.44), logoMatSouth);
+  faceSouth.position.z = plateDepth + 0.02;
+  signSouth.add(faceSouth);
+
+  group.add(signSouth);
+
+  // 2. Mặt Đông (Quay ra đường ĐT234 & Cổng DK2)
+  const signEast = new THREE.Group();
+  signEast.position.set(cfg.width / 2 + 0.08, 10.8, 0);
+  signEast.rotation.y = Math.PI / 2;
+
+  const backEast = new THREE.Mesh(new THREE.BoxGeometry(plateW, plateH, plateDepth), signBackMat);
+  backEast.castShadow = true;
+  signEast.add(backEast);
+
+  const bezelTopE = new THREE.Mesh(new THREE.BoxGeometry(plateW + 0.1, 0.05, plateDepth + 0.02), bezelMat);
+  bezelTopE.position.set(0, plateH / 2, plateDepth / 2);
+  signEast.add(bezelTopE);
+
+  const bezelBotE = new THREE.Mesh(new THREE.BoxGeometry(plateW + 0.1, 0.05, plateDepth + 0.02), bezelMat);
+  bezelBotE.position.set(0, -plateH / 2, plateDepth / 2);
+  signEast.add(bezelBotE);
+
+  const logoMatEast = new THREE.MeshStandardMaterial({
+    map: logoTexture,
+    emissiveMap: logoWhiteTex,
+    emissive: new THREE.Color(0x67e8f9),
+    emissiveIntensity: 0.0,
+    transparent: true,
+    roughness: 0.2,
+    metalness: 0.1,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -1.0,
+  });
+  logoMatEast.userData = { nightColor: 0x67e8f9, sunsetColor: 0x0284c7 };
+  illuminatedLogoMats.push(logoMatEast);
+
+  const faceEast = new THREE.Mesh(new THREE.PlaneGeometry(faceW, faceW / 2.44), logoMatEast);
+  faceEast.position.z = plateDepth + 0.02;
+  signEast.add(faceEast);
+
+  group.add(signEast);
 }
 
 
@@ -4334,6 +4747,7 @@ function buildKhoLinhKienDK2() {
   roof.position.y = cfg.height + 0.3;
   roof.castShadow = true;
   group.add(roof);
+  applySnowShader(roof.material, 0.3, 0.95);
 
   // Cửa cuốn tự động chính Kho Linh Kiện D2.1 (kết nối bãi bốc xếp phía Nam)
   createShutterDoor(group, 0, 0, cfg.depth / 2 + 0.08, 4.8, 3.8, 'doorD21', 'Cửa Kho Linh kiện D2.1');
@@ -4384,6 +4798,7 @@ function buildXuongDK2() {
     polygonOffsetFactor: -1.0,
     polygonOffsetUnits: -1.0,
   });
+  applySnowShader(yardMat, 0.35, 0.92);
   const yard = new THREE.Mesh(yardGeo, yardMat);
   yard.rotation.x = -Math.PI / 2;
   yard.position.y = 0.05;
@@ -4571,6 +4986,7 @@ function buildDKCoffeeBar() {
 
   // 1. Sàn gỗ Terrace ngoài trời (Raised Timber Deck 9.6m x 7.8m)
   const deckMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+  applySnowShader(deckMat, 0.35, 0.9);
   const deck = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.22, 7.8), deckMat);
   deck.position.set(0, 0.11, 0);
   deck.receiveShadow = true;
@@ -4585,6 +5001,7 @@ function buildDKCoffeeBar() {
 
   // Mái che phẳng viền thép đen
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.3 });
+  applySnowShader(roofMat, 0.3, 0.95);
   const roof = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.25, 3.6), roofMat);
   roof.position.set(-2.2, 3.2, -1.8);
   roof.castShadow = true;
@@ -4863,6 +5280,7 @@ function buildRoadsideHouses() {
 
     // 3. Mái ngói dốc kiểu truyền thống (Pitched Roof)
     const roofMat = new THREE.MeshStandardMaterial({ color: hData.roofColor, roughness: 0.6, flatShading: true });
+    applySnowShader(roofMat, 0.2, 0.95);
     const roofGeo = new THREE.ConeGeometry(w * 0.76, 1.8, 4);
     const roof = new THREE.Mesh(roofGeo, roofMat);
     roof.rotation.y = Math.PI / 4;
@@ -4966,11 +5384,65 @@ function buildRoadsideHouses() {
 // 8. DK2: Hillside, Winding Road, Eco-Pond & Orchid Garden
 // ============================================================================
 function buildDK2HillAndOrchidGarden() {
-  // 1. Đồi chính DK2 (Đỉnh cao phía Bắc)
+  // 1. Đồi chính DK2 (Đỉnh cao phía Bắc) - Hòa sắc vertex colors đất nâu & thảm cỏ sinh thái
   const hillCfg = CONFIG.HILLS.dk2;
+  const hillGeo = new THREE.ConeGeometry(hillCfg.radius, hillCfg.height, 14, 8);
+  const hillPos = hillGeo.attributes.position;
+  const hillColors = [];
+  const baseDk2Green = new THREE.Color(hillCfg.color);
+  const vibrantDk2Green = baseDk2Green.clone().offsetHSL(0.03, 0.08, 0.06);
+  const deepDk2Green = baseDk2Green.clone().offsetHSL(-0.02, 0.05, -0.09);
+  const earthWarm = new THREE.Color(0x78350f);
+  const earthDark = new THREE.Color(0x542d13);
+  const sandLoam = new THREE.Color(0x92400e);
+
+  for (let vi = 0; vi < hillPos.count; vi++) {
+    const vx = hillPos.getX(vi);
+    const vy = hillPos.getY(vi);
+    const vz = hillPos.getZ(vi);
+    const wx = hillCfg.position.x + vx;
+    const wz = hillCfg.position.z + vz;
+    const normY = (vy + hillCfg.height / 2) / hillCfg.height;
+
+    const strataNoise = Math.sin(wx * 0.12 + vy * 0.3) * 0.5 + Math.cos(wz * 0.15 + vy * 0.22) * 0.5;
+    const patchNoise = Math.sin(wx * 0.07 - wz * 0.08) * 0.5 + Math.cos(wx * 0.2 + wz * 0.16) * 0.5;
+
+    let isEarth = false;
+    let earthIntensity = 0;
+
+    if (normY < 0.22) {
+      if (strataNoise > 0.12 || patchNoise > 0.25) {
+        isEarth = true;
+        earthIntensity = Math.min(1.0, (0.22 - normY) / 0.22 * 0.75 + strataNoise * 0.35);
+      }
+    } else if (normY >= 0.22 && normY <= 0.82) {
+      if (strataNoise > 0.16 && patchNoise > -0.18) {
+        isEarth = true;
+        earthIntensity = Math.min(1.0, (strataNoise - 0.16) * 1.6 + patchNoise * 0.35);
+      }
+    } else {
+      if (patchNoise > 0.4) {
+        isEarth = true;
+        earthIntensity = 0.55;
+      }
+    }
+
+    let col = baseDk2Green.clone();
+    if (normY > 0.5) col.lerp(vibrantDk2Green, (normY - 0.5) * 0.6);
+    else col.lerp(deepDk2Green, (0.5 - normY) * 0.5);
+
+    if (isEarth && earthIntensity > 0) {
+      const targetSoil = (strataNoise > 0.35) ? earthDark : ((patchNoise > 0.15) ? earthWarm : sandLoam);
+      col.lerp(targetSoil, Math.min(0.92, earthIntensity));
+    }
+    hillColors.push(col.r, col.g, col.b);
+  }
+  hillGeo.setAttribute('color', new THREE.Float32BufferAttribute(hillColors, 3));
+  hillGeo.computeVertexNormals();
+
   const hill = new THREE.Mesh(
-    new THREE.ConeGeometry(hillCfg.radius, hillCfg.height, 11),
-    new THREE.MeshStandardMaterial({ color: hillCfg.color, roughness: 0.9, flatShading: true })
+    hillGeo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true })
   );
   hill.position.set(hillCfg.position.x, hillCfg.height / 2 - 2, hillCfg.position.z);
   hill.receiveShadow = true;
@@ -4982,9 +5454,64 @@ function buildDK2HillAndOrchidGarden() {
     const flatR = nhCfg.flatRadius || 24;
     const baseR = nhCfg.radius || 66;
     const h = nhCfg.height || 18.5;
+
+    const newHillGeo = new THREE.CylinderGeometry(flatR, baseR, h, 24, 8);
+    const nhPos = newHillGeo.attributes.position;
+    const nhColors = [];
+    const baseNhGreen = new THREE.Color(nhCfg.color);
+    const vibrantNhGreen = baseNhGreen.clone().offsetHSL(0.03, 0.08, 0.05);
+    const deepNhGreen = baseNhGreen.clone().offsetHSL(-0.02, 0.05, -0.08);
+
+    for (let vi = 0; vi < nhPos.count; vi++) {
+      const vx = nhPos.getX(vi);
+      const vy = nhPos.getY(vi);
+      const vz = nhPos.getZ(vi);
+      const wx = nhCfg.position.x + vx;
+      const wz = nhCfg.position.z + vz;
+      const normY = (vy + h / 2) / h; // 0 ở chân đồi, 1 ở đỉnh đồi phẳng
+
+      const strataNoise = Math.sin(wx * 0.11 + vy * 0.32) * 0.5 + Math.cos(wz * 0.13 + vy * 0.25) * 0.5;
+      const patchNoise = Math.sin(wx * 0.06 - wz * 0.08) * 0.5 + Math.cos(wx * 0.18 + wz * 0.15) * 0.5;
+
+      let isEarth = false;
+      let earthIntensity = 0;
+
+      if (normY < 0.2) {
+        // Chân đồi loang đất nâu tiếp giáp mặt bằng
+        if (strataNoise > 0.12 || patchNoise > 0.22) {
+          isEarth = true;
+          earthIntensity = Math.min(0.9, (0.2 - normY) / 0.2 * 0.7 + strataNoise * 0.35);
+        }
+      } else if (normY >= 0.2 && normY <= 0.88) {
+        // Sườn taluy đồi: vạt đất nâu tự nhiên bám dốc
+        if (strataNoise > 0.18) {
+          isEarth = true;
+          earthIntensity = Math.min(0.88, (strataNoise - 0.18) * 1.5 + patchNoise * 0.3);
+        }
+      } else {
+        // Đỉnh đồi bằng phẳng: điểm xuyết vạt đất mùn bồn hoa
+        if (patchNoise > 0.45) {
+          isEarth = true;
+          earthIntensity = 0.5;
+        }
+      }
+
+      let col = baseNhGreen.clone();
+      if (normY > 0.7) col.lerp(vibrantNhGreen, (normY - 0.7) * 1.2);
+      else col.lerp(deepNhGreen, (0.7 - normY) * 0.45);
+
+      if (isEarth && earthIntensity > 0) {
+        const targetSoil = (strataNoise > 0.35) ? earthDark : ((patchNoise > 0.15) ? earthWarm : sandLoam);
+        col.lerp(targetSoil, Math.min(0.92, earthIntensity));
+      }
+      nhColors.push(col.r, col.g, col.b);
+    }
+    newHillGeo.setAttribute('color', new THREE.Float32BufferAttribute(nhColors, 3));
+    newHillGeo.computeVertexNormals();
+
     const newHill = new THREE.Mesh(
-      new THREE.CylinderGeometry(flatR, baseR, h, 20),
-      new THREE.MeshStandardMaterial({ color: nhCfg.color, roughness: 0.9, flatShading: true })
+      newHillGeo,
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true })
     );
     newHill.position.set(nhCfg.position.x, h / 2 - 0.2, nhCfg.position.z);
     newHill.receiveShadow = true;
@@ -5716,23 +6243,22 @@ function getTerrainElevation(x, z) {
   const dk2Y = getDK2HillSurfaceY(x, z);
   if (dk2Y > maxY) maxY = dk2Y;
 
-  // 2. Các ngọn đồi phía Đông, Bắc và sau xưởng DK1
+  // 2. Các ngọn đồi nội vi diorama (khớp chính xác 100% với interiorHills)
   const hillsData = [
-    { x: 55, z: -108, radius: 54, apex: 28, base: -2 },  // Đồi Cối xay gió
-    { x: 115, z: -75, radius: 25, apex: 22, base: -2 },  // Đồi Đông xa
-    { x: 116, z: -20, radius: 22, apex: 18, base: -2 },  // Đồi Đông Nam xa
-    { x: 50, z: -108, radius: 32, apex: 22, base: -2 },  // Đồi sau DK1
-    { x: -145, z: -155, radius: 48, apex: 30, base: -2 }, // Đồi góc Tây Bắc
-    { x: 80, z: -160, radius: 48, apex: 30, base: -2 },  // Đồi góc Đông Bắc
-    { x: -60, z: -160, radius: 52, apex: 32, base: -2 }, // Đồi sườn Bắc
-    { x: -138, z: 72, radius: 32, apex: 18, base: -2 },   // Đồi góc Tây Nam
+    { x: 58, z: -128, radius: 36, apex: 26 },  // Đồi Cối xay gió (lùi xa z = -128, chân đồi kết thúc tại z = -92)
+    { x: 115, z: -80, radius: 24, apex: 22 },  // Đồi Đông xa
+    { x: 116, z: -25, radius: 20, apex: 18 },  // Đồi Đông Nam xa
+    { x: -145, z: -155, radius: 48, apex: 30 }, // Đồi góc Tây Bắc
+    { x: 75, z: -160, radius: 46, apex: 30 },   // Đồi góc Đông Bắc
+    { x: -60, z: -160, radius: 52, apex: 32 },  // Đồi sườn Bắc
+    { x: -138, z: 72, radius: 32, apex: 18 },   // Đồi góc Tây Nam
   ];
 
   for (let i = 0; i < hillsData.length; i++) {
     const h = hillsData[i];
     const dist = Math.hypot(x - h.x, z - h.z);
     if (dist < h.radius) {
-      const hillY = h.base + (h.apex - h.base) * (1 - dist / h.radius);
+      const hillY = h.apex * (1 - dist / h.radius);
       if (hillY > maxY) maxY = hillY;
     }
   }
@@ -5760,8 +6286,10 @@ function isNearRailwayTrack(x, z, minDist = 3.2) {
 
 // Vùng cấm mọc cây rừng tự nhiên (bảo vệ nhà xưởng, đường sá, đồng cỏ đàn cừu, ao cá, đàn gà, vườn lan, đài phun nước)
 function isForestExcludedZone(x, z) {
-  // Khuôn viên nhà máy DK1 (Xưởng B, Văn phòng A, Nhà C, Nhà ăn, Đài phun nước DK, Sân bóng chuyền, Bãi đỗ)
-  if (x > 10 && x < 84 && z > -70 && z < 2) return true;
+  // 1. Tuyệt đối loại bỏ cây cối xâm lấn Nhà B, Mái che xe 3 bánh, đường chạy thử bao quanh và sân thử xe
+  if (x >= 47 && x <= 85.5 && z >= -86 && z <= -20) return true;
+  // 2. Khuôn viên nhà máy DK1 (Xưởng B, Văn phòng A, Nhà C, Nhà ăn, Đài phun nước DK, Sân bóng chuyền, Bãi đỗ)
+  if (x > 10 && x < 85.5 && z > -86 && z < 4) return true;
   // Khuôn viên nhà máy DK2 & Lối vào cổng chính DK2 kết nối ĐT234 (Dịch chuyển 22m theo mũi tên)
   if (x > -96 && x < -12 && z > -58 && z < 24) return true;
   // Vườn Lan & Sinh thái trên đồi DK2 (-108, -66)
@@ -5872,6 +6400,14 @@ function buildLandscaping() {
   const rockInst = new THREE.InstancedMesh(rockGeo, rockMat, rockCount);
   rockInst.castShadow = true;
 
+  // Áp dụng shader phủ tuyết tự nhiên lên ngọn và tán cây khi tuyết rơi
+  applySnowShader(roundFoliageMat, 0.18, 0.96);
+  applySnowShader(pineMat, 0.18, 0.96);
+  applySnowShader(autumnFoliageMat, 0.18, 0.96);
+  applySnowShader(bushMat, 0.18, 0.96);
+  applySnowShader(rockMat, 0.25, 0.95);
+  applySnowShader(roundTrunkMat, 0.45, 0.75);
+
   // --------------------------------------------------------------------------
   // 6. Thảm hoa dại rực rỡ (Wildflowers - Trắng, Vàng, Hồng phấn, Tím pastel)
   // --------------------------------------------------------------------------
@@ -5891,16 +6427,17 @@ function buildLandscaping() {
   // --------------------------------------------------------------------------
   // 8. Các mảng đất nâu ấm & vỉa đá lộ thiên trên sườn đồi núi (Earthen Soil Patches)
   // --------------------------------------------------------------------------
-  const earthPatchCount = 150;
-  const earthGeo = new THREE.CylinderGeometry(1.6, 2.2, 0.28, 6);
+  const earthPatchCount = 450;
+  const earthGeo = new THREE.CylinderGeometry(1.6, 2.3, 0.25, 7);
   const earthMat = new THREE.MeshStandardMaterial({
-    color: CONFIG.GROUND.earthColor, // 0x78350f đất nâu ấm
+    color: 0xffffff, // Hỗ trợ instance colors phong phú
     roughness: 0.95,
     flatShading: true,
   });
   const earthInst = new THREE.InstancedMesh(earthGeo, earthMat, earthPatchCount);
   earthInst.receiveShadow = true;
   let eaIdx = 0;
+  const earthColors = [0x78350f, 0x854d0e, 0x6c3a16, 0x5c3d2e, 0x92400e, 0x9a5a22, 0x6b3f19];
 
   // Color helper objects
   const colObj = new THREE.Color();
@@ -5955,7 +6492,9 @@ function buildLandscaping() {
   // Dọc lối dạo bộ bờ kênh DK1
   for (let z = -65; z <= -12; z += 5.2) {
     if (rIdx >= roundCount) break;
-    const x = 79.2 + (Math.random() - 0.5) * 0.6;
+    // Bỏ qua tuyệt đối toàn bộ đoạn cạnh Nhà B, Mái che xe và đường chạy thử (Z từ -78 đến -25)
+    if (z >= -78 && z <= -25) continue;
+    const x = 84.5 + (Math.random() - 0.5) * 0.4;
     const y = 0.5;
     const s = 0.85 + Math.random() * 0.3;
 
@@ -6184,15 +6723,53 @@ function buildLandscaping() {
         tuftInst.setMatrixAt(tuIdx++, dummy.matrix);
       }
 
-      // Điểm xuyết mảng đất nâu ấm trên sườn đồi cao hoặc rìa núi xa (rìa đồi núi thi thoảng điểm xuyết thêm màu nâu đất)
-      if (eaIdx < earthPatchCount && elevation > 5.0 && (Math.abs(x) > 85 || z < -65) && Math.random() < 0.14) {
-        dummy.position.set(x, elevation + 0.08, z);
-        dummy.scale.set(0.9 + Math.random() * 0.7, 0.5 + Math.random() * 0.4, 0.9 + Math.random() * 0.7);
-        dummy.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
-        dummy.updateMatrix();
-        earthInst.setMatrixAt(eaIdx++, dummy.matrix);
+      // Điểm xuyết mảng đất nâu ấm trên sườn đồi núi hoặc ven bờ mương nước
+      if (eaIdx < earthPatchCount) {
+        const isNearCanalPatch = Math.abs(x - 90) < 18;
+        const isHillPatch = elevation > 2.8;
+        const isRandomMeadow = nVal > 0.68 && !isForestExcludedZone(x, z);
+
+        if ((isNearCanalPatch || isHillPatch || isRandomMeadow) && Math.random() < 0.28) {
+          dummy.position.set(x, elevation + 0.08, z);
+          dummy.scale.set(0.9 + Math.random() * 0.8, 0.4 + Math.random() * 0.35, 0.9 + Math.random() * 0.8);
+          dummy.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
+          dummy.updateMatrix();
+          earthInst.setMatrixAt(eaIdx, dummy.matrix);
+
+          colObj.setHex(earthColors[eaIdx % earthColors.length]);
+          colObj.offsetHSL((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08);
+          earthInst.setColorAt(eaIdx, colObj);
+          eaIdx++;
+        }
       }
     }
+  }
+
+  // Bổ sung các mảng đất nâu ẩm & thảm bùn phù sa tự nhiên dọc 2 bên mương nước (Canal Banks)
+  for (let cz = -190; cz <= 90; cz += 4.5) {
+    if (eaIdx >= earthPatchCount) break;
+    [-1, 1].forEach((side) => {
+      if (eaIdx >= earthPatchCount) return;
+      const t = Math.max(0, Math.min(1, (cz - (-198)) / 296));
+      const pt = canalCurve.getPointAt(t);
+      const dist = 5.2 + Math.random() * 5.8; // Gần mép mương 5.2m - 11m
+      const ex = pt.x + side * dist;
+      const ez = cz + (Math.random() - 0.5) * 2.5;
+      if (isForestExcludedZone(ex, ez)) return;
+      const ey = getTerrainElevation(ex, ez);
+
+      dummy.position.set(ex, Math.max(0.04, ey + 0.06), ez);
+      dummy.scale.set(1.1 + Math.random() * 0.9, 0.4 + Math.random() * 0.3, 1.1 + Math.random() * 0.9);
+      dummy.rotation.set((Math.random() - 0.5) * 0.12, Math.random() * Math.PI, (Math.random() - 0.5) * 0.12);
+      dummy.updateMatrix();
+      earthInst.setMatrixAt(eaIdx, dummy.matrix);
+
+      // Tông màu bùn đất phù sa & đất sét nâu vàng ven sông mương
+      colObj.setHex(earthColors[eaIdx % earthColors.length]);
+      colObj.offsetHSL((Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08);
+      earthInst.setColorAt(eaIdx, colObj);
+      eaIdx++;
+    });
   }
 
   // Cập nhật ma trận và bảng màu InstancedMesh
@@ -6240,6 +6817,7 @@ function buildLandscaping() {
 
   earthInst.count = eaIdx;
   earthInst.instanceMatrix.needsUpdate = true;
+  if (earthInst.instanceColor) earthInst.instanceColor.needsUpdate = true;
   scene.add(earthInst);
 }
 
@@ -12329,20 +12907,26 @@ function triggerEventSpeechBubbles(eventType) {
       "Ăn cơm xong rồi, quay lại ca làm việc thôi! 💼🛠️",
       "Chiều mát mẻ, làm việc hiệu quả và an toàn nhé cả nhà! 🌇✨",
     ],
+    snow: [
+      "Oa, tuyết đầu mùa rơi rồi! Khuôn viên DK Bike đẹp ngỡ ngàng như tranh vẽ cổ tích! ❄️✨",
+      "Tuyết phủ trắng các mái xưởng và ngọn đồi rồi kìa! Nhớ giữ ấm nhé mọi người! 🧣☃️",
+      "Khung cảnh lãng mạn quá, tí hết ca làm ra sân bóng đắp người tuyết thôi! 📸❄️",
+      "Tuyết rơi êm đềm quá, nhìn nhà máy phủ tuyết trắng tinh khôi thật bình yên! 🌨️✨",
+    ],
   };
 
   const quotes = quotesMap[eventType] || quotesMap.day;
-  const typeClass = eventType === 'rain' ? 'type-weather-rain' : (eventType === 'sun' ? 'type-weather-sun' : 'type-night');
-  const icon = eventType === 'rain' ? '🌧️' : (eventType === 'sun' ? '☀️' : (eventType === 'night' ? '🌙' : '✨'));
+  const typeClass = eventType === 'rain' ? 'type-weather-rain' : (eventType === 'sun' ? 'type-weather-sun' : (eventType === 'snow' ? 'type-weather-snow' : 'type-night'));
+  const icon = eventType === 'rain' ? '🌧️' : (eventType === 'sun' ? '☀️' : (eventType === 'snow' ? '❄️' : (eventType === 'night' ? '🌙' : '✨')));
 
-  // Chọn 2 - 3 người để hiện popup thoại
+  // Chọn 1 - 2 người để hiện popup thoại theo yêu cầu
   const candidates = [];
   wanderingPedestrians.forEach(p => { if (p.mesh) candidates.push(p.mesh); });
   if (candidates.length === 0) return;
 
   // Xáo trộn ngẫu nhiên
   const shuffled = candidates.slice().sort(() => 0.5 - Math.random());
-  const selectedCount = 1; // Chỉ chọn đúng 1 người để nói, tránh làm rối màn hình
+  const selectedCount = eventType === 'snow' ? 2 : 1; // 1-2 câu nói popup khi tuyết bắt đầu rơi theo yêu cầu
 
   for (let i = 0; i < selectedCount; i++) {
     const mesh = shuffled[i];
@@ -12351,7 +12935,6 @@ function triggerEventSpeechBubbles(eventType) {
       const el = document.createElement('div');
       el.className = `cute-speech-bubble ${typeClass}`;
       el.innerHTML = `
-        <span class="speech-icon">${icon}</span>
         <span class="speech-text">${quote}</span>
         <div class="speech-tail"></div>
       `;
@@ -14609,6 +15192,571 @@ function updateRain(delta) {
 }
 
 // ============================================================================
+// HỆ THỐNG PHỦ TUYẾT, TUYẾT RƠI & CẦU VỒNG 3D NỐI 2 NÚI (Request 2 & 3)
+// ============================================================================
+
+// Hàm gắn shader phủ tuyết lên bất kỳ vật liệu MeshStandardMaterial nào
+function applySnowShader(material, minNormalY = 0.2, coverage = 0.95) {
+  if (!material) return;
+  if (!snowMaterials.includes(material)) {
+    snowMaterials.push(material);
+  }
+
+  const prevOnBeforeCompile = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    if (prevOnBeforeCompile) prevOnBeforeCompile(shader, renderer);
+
+    shader.uniforms.uSnowAmount = snowUniforms.uSnowAmount;
+
+    // Tiêm biến vSnowUpNormal vào Vertex Shader
+    if (!shader.vertexShader.includes('vSnowUpNormal')) {
+      shader.vertexShader = `
+        varying float vSnowUpNormal;
+        ${shader.vertexShader}
+      `;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <beginnormal_vertex>',
+        `
+        #include <beginnormal_vertex>
+        #ifdef USE_INSTANCING
+          mat3 snowWorldMat = mat3(modelMatrix) * mat3(instanceMatrix);
+        #else
+          mat3 snowWorldMat = mat3(modelMatrix);
+        #endif
+        vSnowUpNormal = normalize(snowWorldMat * objectNormal).y;
+        `
+      );
+    }
+
+    // Tiêm logic phủ tuyết vào Fragment Shader (Chỉ phủ các mặt hướng lên trời)
+    if (!shader.fragmentShader.includes('uSnowAmount')) {
+      shader.fragmentShader = `
+        uniform float uSnowAmount;
+        varying float vSnowUpNormal;
+        ${shader.fragmentShader}
+      `;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `
+        #include <dithering_fragment>
+        if (uSnowAmount > 0.001) {
+          float snowCoverage = smoothstep(${minNormalY.toFixed(2)}, ${(minNormalY + 0.42).toFixed(2)}, vSnowUpNormal) * uSnowAmount;
+          vec3 snowColor = vec3(0.95, 0.97, 1.0);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, snowColor, snowCoverage * ${coverage.toFixed(2)});
+        }
+        `
+      );
+    }
+  };
+  material.needsUpdate = true;
+}
+
+// Khởi tạo hệ thống hạt tuyết rơi bồng bềnh
+function setupSnowEffect() {
+  const flakeCount = 3200;
+  const positions = new Float32Array(flakeCount * 3);
+  snowData = [];
+
+  for (let i = 0; i < flakeCount; i++) {
+    const x = -160 + Math.random() * 300;
+    const y = Math.random() * 55;
+    const z = -185 + Math.random() * 285;
+
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
+
+    snowData.push({
+      fallSpeed: 1.8 + Math.random() * 2.2, // Rơi từ từ, mềm mại
+      swaySpeed: 1.2 + Math.random() * 2.0, // Tốc độ chao liệng
+      swayRadius: 0.8 + Math.random() * 1.5, // Biên độ đu đưa trong gió
+      swayPhase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  const snowGeo = new THREE.BufferGeometry();
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  // Tạo texture bông tuyết tròn mềm mại bằng Canvas
+  const snowCanvas = document.createElement('canvas');
+  snowCanvas.width = 32;
+  snowCanvas.height = 32;
+  const ctx = snowCanvas.getContext('2d');
+  const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+  grad.addColorStop(0.45, 'rgba(240, 248, 255, 0.9)');
+  grad.addColorStop(0.85, 'rgba(230, 245, 255, 0.35)');
+  grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(16, 16, 16, 0, Math.PI * 2);
+  ctx.fill();
+
+  const snowTex = new THREE.CanvasTexture(snowCanvas);
+  snowTex.needsUpdate = true;
+
+  const snowMat = new THREE.PointsMaterial({
+    map: snowTex,
+    color: 0xffffff,
+    size: 1.35,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+  });
+
+  snowParticleSystem = new THREE.Points(snowGeo, snowMat);
+  snowParticleSystem.visible = false;
+  scene.add(snowParticleSystem);
+
+  // Quét toàn bộ scene để tự động phủ tuyết lên các mái phụ, hiên nhà dân, kiosk, bãi xe ngoài trời
+  scene.traverse((obj) => {
+    if (obj.isMesh && obj.material && obj.material.isMeshStandardMaterial) {
+      const mat = obj.material;
+      if (mat.transparent && mat.opacity < 0.8) return;
+      if (illuminatedLogoMats.includes(mat)) return;
+      if (windowLights.includes(mat)) return;
+      if (snowMaterials.includes(mat)) return;
+
+      const isPitchedRoof = obj.geometry instanceof THREE.ConeGeometry;
+      const isHighRoof = obj.position.y > 2.2 && obj.geometry && obj.geometry.type === 'BoxGeometry';
+
+      if (isPitchedRoof || isHighRoof) {
+        applySnowShader(mat, 0.25, 0.95);
+      }
+    }
+  });
+}
+
+// Bật / Tắt trạng thái tuyết rơi
+function updateSnowState(enabled) {
+  isSnowing = enabled;
+  const snowBtn = document.getElementById('btn-toggle-snow');
+  if (snowBtn) snowBtn.classList.toggle('active', enabled);
+
+  if (snowParticleSystem) {
+    snowParticleSystem.visible = enabled;
+  }
+
+  if (enabled) {
+    // Nếu đang mưa thì tắt mưa để tuyết rơi
+    if (isRaining) {
+      const rainBtn = document.getElementById('btn-toggle-rain');
+      if (rainBtn && rainBtn.classList.contains('active')) {
+        rainBtn.click();
+      }
+    }
+    showCampusToast('❄️ Tuyết bắt đầu rơi: Cây cối, mái nhà và các ngọn đồi đang dần được phủ tuyết trắng xóa!', 'snow');
+    triggerEventSpeechBubbles('snow');
+  } else {
+    showCampusToast('☀️ Ngừng tuyết rơi: Không khí trong lành, tuyết đang tan dần trên khắp khuôn viên.', 'sun');
+  }
+}
+
+// Danh sách các ngọn đồi nội vi diorama
+const RAINBOW_HILLS = [
+  { name: 'Đồi Cối xay gió', x: 58, y: 16, z: -128 },
+  { name: 'Đồi Đông xa', x: 115, y: 14, z: -80 },
+  { name: 'Đồi Đông Nam', x: 116, y: 11, z: -25 },
+  { name: 'Đồi Tây Bắc', x: -145, y: 18, z: -155 },
+  { name: 'Đồi Đông Bắc', x: 75, y: 18, z: -160 },
+  { name: 'Đồi sườn Bắc', x: -60, y: 19, z: -160 },
+  { name: 'Đồi Tây Nam', x: -138, y: 11, z: 72 },
+  { name: 'Đồi chính DK2', x: -120, y: 16, z: -78 },
+  { name: 'Đồi mới DK2', x: -142, y: 14, z: -38 },
+];
+
+function pickTwoRandomHills() {
+  const h1 = RAINBOW_HILLS[Math.floor(Math.random() * RAINBOW_HILLS.length)];
+  const candidates = RAINBOW_HILLS.filter(h => {
+    const d = Math.hypot(h.x - h1.x, h.z - h1.z);
+    return d >= 75 && d <= 210;
+  });
+  const h2 = candidates.length > 0
+    ? candidates[Math.floor(Math.random() * candidates.length)]
+    : RAINBOW_HILLS[(RAINBOW_HILLS.indexOf(h1) + 3) % RAINBOW_HILLS.length];
+  return [h1, h2];
+}
+
+// ============================================================================
+// HỆ THỐNG CẦU VỒNG 3D ĐA CHIỀU (VOLUMETRIC & CAMERA-FACING MULTI-LAYER RAINBOW)
+// ============================================================================
+
+// Các vector tái sử dụng để tránh tạo rác bộ nhớ (Zero-allocation scratch vectors)
+const _rbPt = new THREE.Vector3();
+const _rbTan = new THREE.Vector3();
+const _rbV = new THREE.Vector3();
+const _rbExp = new THREE.Vector3();
+const _rbWorldUp = new THREE.Vector3(0, 1, 0);
+const _rbArchBinormal = new THREE.Vector3();
+const _rbArchUpNormal = new THREE.Vector3();
+
+// Bảng màu 7 sắc cầu vồng quang phổ tự nhiên kèm dải gradient hòa tan vào bầu trời
+const RAINBOW_SPECTRUM_STOPS = [
+  { frac: -0.50, color: new THREE.Color(0x38bdf8), alpha: 0.15 }, // Inner sky blue fade
+  { frac: -0.42, color: new THREE.Color(0x7c3aed), alpha: 0.85 }, // Violet (Tím)
+  { frac: -0.28, color: new THREE.Color(0x2563eb), alpha: 0.90 }, // Indigo (Chàm)
+  { frac: -0.14, color: new THREE.Color(0x06b6d4), alpha: 0.95 }, // Cyan (Lam)
+  { frac:  0.00, color: new THREE.Color(0x10b981), alpha: 1.00 }, // Green (Lục)
+  { frac:  0.14, color: new THREE.Color(0xfacc15), alpha: 1.00 }, // Yellow (Vàng)
+  { frac:  0.28, color: new THREE.Color(0xf97316), alpha: 0.95 }, // Orange (Cam)
+  { frac:  0.42, color: new THREE.Color(0xef4444), alpha: 0.90 }, // Red (Đỏ)
+  { frac:  0.50, color: new THREE.Color(0xf87171), alpha: 0.20 }, // Outer red ambient glow
+];
+
+function disposeActiveRainbow() {
+  if (!activeRainbow) return;
+  if (activeRainbow.group) {
+    scene.remove(activeRainbow.group);
+  }
+  if (activeRainbow.viewRibbonGeo) activeRainbow.viewRibbonGeo.dispose();
+  if (activeRainbow.viewRibbonMat) activeRainbow.viewRibbonMat.dispose();
+  if (activeRainbow.inPlaneRibbonGeo) activeRainbow.inPlaneRibbonGeo.dispose();
+  if (activeRainbow.inPlaneRibbonMat) activeRainbow.inPlaneRibbonMat.dispose();
+  if (activeRainbow.tubeGeo) activeRainbow.tubeGeo.dispose();
+  if (activeRainbow.tubeMat) activeRainbow.tubeMat.dispose();
+  if (activeRainbow.innerGlowGeo) activeRainbow.innerGlowGeo.dispose();
+  if (activeRainbow.innerGlowMat) activeRainbow.innerGlowMat.dispose();
+  activeRainbow = null;
+}
+
+// Sinh cầu vồng 3D đa chiều ngẫu nhiên nối giữa 2 ngọn núi bất kỳ khi tắt mưa
+function spawnRandomRainbow() {
+  disposeActiveRainbow();
+
+  const [h1, h2] = pickTwoRandomHills();
+  const P1 = new THREE.Vector3(h1.x, h1.y, h1.z);
+  const P2 = new THREE.Vector3(h2.x, h2.y, h2.z);
+  const dist = P1.distanceTo(P2);
+
+  // Đỉnh vòm cao vút và hùng vĩ
+  const apexH = Math.max(42, dist * 0.44);
+  const Pmid = new THREE.Vector3(
+    (P1.x + P2.x) / 2,
+    Math.max(P1.y, P2.y) + apexH,
+    (P1.z + P2.z) / 2
+  );
+
+  const curve = new THREE.QuadraticBezierCurve3(P1, Pmid, P2);
+  const segs = 64;
+  // Bề rộng dải màu dày dặn và nổi bật (22m - 28m)
+  const ribbonW = Math.max(22.0, dist * 0.13);
+  const widthSteps = RAINBOW_SPECTRUM_STOPS.length;
+
+  const rainbowGroup = new THREE.Group();
+
+  // Dây cung nối 2 chân núi và pháp tuyến mặt phẳng vòm
+  const chord = new THREE.Vector3().subVectors(P2, P1);
+  const archBinormal = new THREE.Vector3().crossVectors(chord, _rbWorldUp).normalize();
+  if (archBinormal.lengthSq() < 0.0001) {
+    archBinormal.set(1, 0, 0);
+  }
+
+  // --------------------------------------------------------------------------
+  // LỚP 1: DẢI MÀU QUANH MẶT PHẲNG VÒM (In-Plane Radial Arch)
+  // Luôn giữ bề dày 22m theo phương bán kính vòm, giúp khi nhìn ngang từ sườn đồi
+  // cầu vồng vẫn là một khối cầu vồng dày dặn, không bao giờ bị mỏng dẹt thành 1 vạch.
+  // --------------------------------------------------------------------------
+  const inPlanePositions = [];
+  const inPlaneColors = [];
+  const ribbonIndices = [];
+
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const pt = curve.getPoint(t);
+    const tangent = curve.getTangent(t);
+
+    // Vector hướng lên theo phương bán kính vòm
+    const upNormal = new THREE.Vector3().crossVectors(archBinormal, tangent).normalize();
+    if (upNormal.y < 0) upNormal.negate();
+
+    const endFade = Math.pow(Math.sin(t * Math.PI), 0.65);
+
+    for (let j = 0; j < widthSteps; j++) {
+      const stop = RAINBOW_SPECTRUM_STOPS[j];
+      const offset = stop.frac * ribbonW;
+      inPlanePositions.push(
+        pt.x + upNormal.x * offset,
+        pt.y + upNormal.y * offset,
+        pt.z + upNormal.z * offset
+      );
+
+      const col = stop.color.clone();
+      col.multiplyScalar(stop.alpha * endFade);
+      inPlaneColors.push(col.r, col.g, col.b);
+    }
+  }
+
+  for (let i = 0; i < segs; i++) {
+    for (let j = 0; j < widthSteps - 1; j++) {
+      const a = i * widthSteps + j;
+      const b = (i + 1) * widthSteps + j;
+      const c = (i + 1) * widthSteps + (j + 1);
+      const d = i * widthSteps + (j + 1);
+      ribbonIndices.push(a, b, d);
+      ribbonIndices.push(b, c, d);
+    }
+  }
+
+  const inPlaneRibbonGeo = new THREE.BufferGeometry();
+  inPlaneRibbonGeo.setAttribute('position', new THREE.Float32BufferAttribute(inPlanePositions, 3));
+  inPlaneRibbonGeo.setAttribute('color', new THREE.Float32BufferAttribute(inPlaneColors, 3));
+  inPlaneRibbonGeo.setIndex(ribbonIndices);
+  inPlaneRibbonGeo.computeVertexNormals();
+
+  const inPlaneRibbonMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+  const inPlaneMesh = new THREE.Mesh(inPlaneRibbonGeo, inPlaneRibbonMat);
+  rainbowGroup.add(inPlaneMesh);
+
+  // --------------------------------------------------------------------------
+  // LỚP 2: DẢI MÀU QUAY MẶT THEO CAMERA (View-Aligned Dynamic Ribbon)
+  // Liên tục nở rộng vuông góc với tia nhìn của người quan sát, đảm bảo từ bất kỳ
+  // góc nhìn nào (nhìn nghiêng, nhìn từ trên xuống, nhìn trực diện), toàn bộ 7 sắc
+  // cầu vồng luôn hướng thẳng vào mắt người xem với độ dày tối đa.
+  // --------------------------------------------------------------------------
+  const viewRibbonGeo = new THREE.BufferGeometry();
+  viewRibbonGeo.setAttribute('position', new THREE.Float32BufferAttribute([...inPlanePositions], 3));
+  viewRibbonGeo.setAttribute('color', new THREE.Float32BufferAttribute([...inPlaneColors], 3));
+  viewRibbonGeo.setIndex([...ribbonIndices]);
+  viewRibbonGeo.computeVertexNormals();
+
+  const viewRibbonMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+  const viewFacingMesh = new THREE.Mesh(viewRibbonGeo, viewRibbonMat);
+  rainbowGroup.add(viewFacingMesh);
+
+  // --------------------------------------------------------------------------
+  // LỚP 3: HÀO QUANG 3D DẠNG ỐNG KHÔNG GIAN (Volumetric 3D Cylinder Aura)
+  // Một ống tròn 3D bao bọc dọc theo toàn bộ vòm cầu vồng với đường kính ~14m.
+  // Tạo thể tích ánh sáng chân thực 360 độ trong không gian, làm cầu vồng có chiều sâu
+  // và độ phát quang thể tích chuẩn AAA.
+  // --------------------------------------------------------------------------
+  const tubeRadius = Math.max(6.5, ribbonW * 0.28);
+  const tubeGeo = new THREE.TubeGeometry(curve, 64, tubeRadius, 12, false);
+  const tubeColors = [];
+  const tubePos = tubeGeo.attributes.position;
+  for (let i = 0; i < tubePos.count; i++) {
+    const py = tubePos.getY(i);
+    const tVal = Math.min(1.0, Math.max(0.0, (py - Math.min(P1.y, P2.y)) / apexH));
+    const tubeFade = Math.pow(Math.sin(tVal * Math.PI), 0.7);
+    const auraCol = new THREE.Color().lerpColors(
+      new THREE.Color(0x38bdf8),
+      new THREE.Color(0xfef08a),
+      tVal
+    );
+    auraCol.multiplyScalar(0.42 * tubeFade);
+    tubeColors.push(auraCol.r, auraCol.g, auraCol.b);
+  }
+  tubeGeo.setAttribute('color', new THREE.Float32BufferAttribute(tubeColors, 3));
+
+  const tubeMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.0,
+    depthWrite: false,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+  });
+  const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+  rainbowGroup.add(tubeMesh);
+
+  // --------------------------------------------------------------------------
+  // LỚP 4: ÁNH SÁNG TÁN XẠ NỘI VÒM (Inner Arch Sky Diffusion)
+  // Trong quang học khí quyển, vùng trời phía dưới vòm cầu vồng luôn sáng hơn bầu trời
+  // bên ngoài do các tia khúc xạ hội tụ. Tạo một màng hào quang nhẹ phía dưới lòng vòm.
+  // --------------------------------------------------------------------------
+  const innerGlowPositions = [];
+  const innerGlowColors = [];
+  const innerGlowIndices = [];
+  const pMidChord = new THREE.Vector3().addVectors(P1, P2).multiplyScalar(0.5);
+
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const pt = curve.getPoint(t);
+    const tangent = curve.getTangent(t);
+    const upNormal = new THREE.Vector3().crossVectors(archBinormal, tangent).normalize();
+    if (upNormal.y < 0) upNormal.negate();
+
+    const endFade = Math.pow(Math.sin(t * Math.PI), 0.65);
+
+    // Điểm mép trong của vòm
+    const innerPt = new THREE.Vector3().copy(pt).addScaledVector(upNormal, -0.42 * ribbonW);
+    innerGlowPositions.push(innerPt.x, innerPt.y, innerPt.z);
+    innerGlowColors.push(0.35 * endFade, 0.65 * endFade, 0.95 * endFade);
+
+    // Điểm kéo xuống thấp vào lòng vòm
+    const basePt = new THREE.Vector3().lerpVectors(pMidChord, innerPt, 0.35);
+    innerGlowPositions.push(basePt.x, basePt.y, basePt.z);
+    innerGlowColors.push(0.0, 0.0, 0.0);
+  }
+
+  for (let i = 0; i < segs; i++) {
+    const a = i * 2;
+    const b = a + 1;
+    const c = (i + 1) * 2;
+    const d = c + 1;
+    innerGlowIndices.push(a, b, d);
+    innerGlowIndices.push(a, d, c);
+  }
+
+  const innerGlowGeo = new THREE.BufferGeometry();
+  innerGlowGeo.setAttribute('position', new THREE.Float32BufferAttribute(innerGlowPositions, 3));
+  innerGlowGeo.setAttribute('color', new THREE.Float32BufferAttribute(innerGlowColors, 3));
+  innerGlowGeo.setIndex(innerGlowIndices);
+
+  const innerGlowMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+  const innerGlowMesh = new THREE.Mesh(innerGlowGeo, innerGlowMat);
+  rainbowGroup.add(innerGlowMesh);
+
+  scene.add(rainbowGroup);
+
+  // Hàm cập nhật góc quay của dải viewFacingMesh theo camera
+  const viewPosAttr = viewRibbonGeo.attributes.position;
+  const updateCameraFacing = (camPos) => {
+    let pIdx = 0;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      curve.getPoint(t, _rbPt);
+      curve.getTangent(t, _rbTan);
+
+      _rbArchUpNormal.crossVectors(archBinormal, _rbTan).normalize();
+      if (_rbArchUpNormal.y < 0) _rbArchUpNormal.negate();
+
+      _rbV.subVectors(camPos, _rbPt);
+      _rbExp.crossVectors(_rbTan, _rbV).normalize();
+      if (_rbExp.lengthSq() < 0.0001) {
+        _rbExp.copy(_rbArchUpNormal);
+      }
+      if (_rbExp.dot(_rbArchUpNormal) < 0) {
+        _rbExp.negate();
+      }
+
+      for (let j = 0; j < widthSteps; j++) {
+        const offset = RAINBOW_SPECTRUM_STOPS[j].frac * ribbonW;
+        viewPosAttr.setXYZ(
+          pIdx,
+          _rbPt.x + _rbExp.x * offset,
+          _rbPt.y + _rbExp.y * offset,
+          _rbPt.z + _rbExp.z * offset
+        );
+        pIdx++;
+      }
+    }
+    viewPosAttr.needsUpdate = true;
+  };
+
+  activeRainbow = {
+    group: rainbowGroup,
+    inPlaneRibbonGeo,
+    inPlaneRibbonMat,
+    viewRibbonGeo,
+    viewRibbonMat,
+    tubeGeo,
+    tubeMat,
+    innerGlowGeo,
+    innerGlowMat,
+    updateCameraFacing,
+    applyOpacity: (op) => {
+      inPlaneRibbonMat.opacity = op * 0.70;
+      viewRibbonMat.opacity = op * 0.88;
+      tubeMat.opacity = op * 0.35;
+      innerGlowMat.opacity = op * 0.20;
+    },
+    opacity: 0.0,
+    maxOpacity: 0.88,
+    state: 'fade_in',
+    lifeTimer: 35.0,
+  };
+}
+
+// Cập nhật hoạt cảnh tuyết rơi và mức độ tích lũy tuyết
+function updateSnow(delta, currentTime) {
+  // Cập nhật mức độ phủ tuyết dần dần (Cây, nhà, sân, đường, núi...)
+  if (isSnowing && snowAccumulation < 1.0) {
+    snowAccumulation = Math.min(1.0, snowAccumulation + delta / 16.0); // Tăng dần trong ~16s
+    snowUniforms.uSnowAmount.value = snowAccumulation;
+  } else if (!isSnowing && snowAccumulation > 0.0) {
+    snowAccumulation = Math.max(0.0, snowAccumulation - delta / 12.0); // Tan dần trong ~12s
+    snowUniforms.uSnowAmount.value = snowAccumulation;
+  }
+
+  // Cập nhật hạt tuyết rơi bồng bềnh, chao liệng trong gió
+  if (isSnowing && snowParticleSystem) {
+    const pos = snowParticleSystem.geometry.attributes.position;
+    for (let i = 0; i < snowData.length; i++) {
+      const flake = snowData[i];
+      let x = pos.getX(i);
+      let y = pos.getY(i);
+      let z = pos.getZ(i);
+
+      y -= flake.fallSpeed * delta;
+      x += Math.sin(currentTime * 0.001 * flake.swaySpeed + flake.swayPhase) * flake.swayRadius * delta + 0.4 * delta;
+      z += Math.cos(currentTime * 0.001 * flake.swaySpeed + flake.swayPhase) * (flake.swayRadius * 0.6) * delta;
+
+      const groundY = getTerrainElevation(x, z);
+      if (y < groundY + 0.1 || y < 0) {
+        y = 52.0 + Math.random() * 10.0;
+        x = -160 + Math.random() * 300;
+        z = -185 + Math.random() * 285;
+      }
+
+      pos.setXYZ(i, x, y, z);
+    }
+    pos.needsUpdate = true;
+  }
+}
+
+// Cập nhật hoạt cảnh cầu vồng đa chiều 3D
+function updateRainbow(delta) {
+  if (!activeRainbow) return;
+
+  // Luôn cập nhật góc nhìn bám sát camera để cầu vồng luôn dày dặn, không bị mỏng dẹt từ mọi góc nhìn
+  if (camera && activeRainbow.updateCameraFacing) {
+    activeRainbow.updateCameraFacing(camera.position);
+  }
+
+  if (activeRainbow.state === 'fade_in') {
+    activeRainbow.opacity = Math.min(activeRainbow.maxOpacity, activeRainbow.opacity + delta * 0.35);
+    activeRainbow.applyOpacity(activeRainbow.opacity);
+    if (activeRainbow.opacity >= activeRainbow.maxOpacity) {
+      activeRainbow.state = 'sustain';
+    }
+  } else if (activeRainbow.state === 'sustain') {
+    activeRainbow.lifeTimer -= delta;
+    if (activeRainbow.lifeTimer <= 0) {
+      activeRainbow.state = 'fade_out';
+    }
+  } else if (activeRainbow.state === 'fade_out') {
+    activeRainbow.opacity = Math.max(0, activeRainbow.opacity - delta * 0.25);
+    activeRainbow.applyOpacity(activeRainbow.opacity);
+    if (activeRainbow.opacity <= 0) {
+      disposeActiveRainbow();
+    }
+  }
+}
+
+// ============================================================================
 // 16. Environment Toggle (Day / Sunset / Night)
 // ============================================================================
 function setEnvironment(time, isUserAction = false) {
@@ -14681,6 +15829,22 @@ function setEnvironment(time, isUserAction = false) {
   }
 
   logoLight.intensity = isNight ? 1.8 : (isSunset ? 0.8 : 0);
+  if (nhaALogoLight) nhaALogoLight.intensity = isNight ? 2.0 : (isSunset ? 0.8 : 0);
+  if (nhaDieuHanhDK2LogoLight) nhaDieuHanhDK2LogoLight.intensity = isNight ? 2.0 : (isSunset ? 0.8 : 0);
+
+  // Đèn chữ nổi phát sáng trên các tòa nhà ban đêm (Nhà điều hành DK1, Xưởng Nhà B, Nhà điều hành DK2)
+  illuminatedLogoMats.forEach((mat) => {
+    if (isNight) {
+      mat.emissive.set(mat.userData.nightColor || 0x67e8f9);
+      mat.emissiveIntensity = 2.4;
+    } else if (isSunset) {
+      mat.emissive.set(mat.userData.sunsetColor || 0x0284c7);
+      mat.emissiveIntensity = 0.8;
+    } else {
+      mat.emissive.set(0x000000);
+      mat.emissiveIntensity = 0;
+    }
+  });
 
   // Khối 7: Áo bảo hộ phản quang & Đèn pin bảo vệ ban đêm
   nightReflectiveMaterials.forEach((mat) => {
@@ -15027,7 +16191,6 @@ function triggerRandomSpeechBubble() {
   const el = document.createElement('div');
   el.className = `cute-speech-bubble ${config.typeClass}`;
   el.innerHTML = `
-    <span class="speech-icon">${icon}</span>
     <span class="speech-text">${quote}</span>
     <div class="speech-tail"></div>
   `;
@@ -15426,6 +16589,12 @@ function setupEventListeners() {
     audioManager.toggleRain(enabled);
 
     if (enabled) {
+      if (isSnowing) {
+        updateSnowState(false);
+      }
+      if (activeRainbow) {
+        activeRainbow.state = 'fade_out';
+      }
       lightningCooldown = 0.8; // Ngay khi bật Mưa, xuất hiện tia sét sau 0.8 giây!
       // Hiện toast và câu nói trú mưa sinh động
       showCampusToast('🌧️ Trời đổ mưa rào: Mọi người nhanh chân chạy vào các hiên nhà để trú mưa!', 'rain');
@@ -15444,14 +16613,23 @@ function setupEventListeners() {
       }
       lightningCooldown = 0.8;
       // Hiện toast và câu nói tạnh mưa đáng yêu
-      showCampusToast('☀️ Tạnh mưa rồi: Cầu vồng rực rỡ, mọi người lại ra ngoài tiếp tục hoạt động!', 'sun');
+      showCampusToast('☀️ Tạnh mưa rồi: Cầu vồng rực rỡ xuất hiện nối 2 ngọn núi!', 'sun');
       triggerEventSpeechBubbles('sun');
+      spawnRandomRainbow();
     }
   };
 
   if (rainBtn) {
     rainBtn.addEventListener('click', () => {
       updateRainState(!isRaining);
+    });
+  }
+
+  // Snow toggle (Request 3)
+  const snowBtn = document.getElementById('btn-toggle-snow');
+  if (snowBtn) {
+    snowBtn.addEventListener('click', () => {
+      updateSnowState(!isSnowing);
     });
   }
 
@@ -15761,8 +16939,9 @@ function setupEventListeners() {
     else if (tag.includes('boat') || title.includes('thuyền') || title.includes('sông')) setCameraPreset('river');
     else if (tag.includes('landmark') || title.includes('cối xay')) setCameraPreset('windmill');
     else if (tag.includes('factory') || tag.includes('lift') || tag.includes('warehouse') || tag.includes('staging') || title.includes('dây chuyền') || title.includes('thang tời') || title.includes('linh kiện') || title.includes('tập kết') || title.includes('bên trong')) setCameraPreset('insideNhaB');
+    else if (title.includes('nhà a') || title.includes('văn phòng') || title.includes('điều hành dk1')) setCameraPreset('nhaA');
     else if (tag.includes('dk1') || tag === 'nhab') setCameraPreset('nhaB');
-    else if (tag.includes('dk2') || tag.includes('nha')) setCameraPreset('nhaDieuHanh');
+    else if (tag.includes('dk2') || title.includes('điều hành dk2') || title.includes('hq')) setCameraPreset('nhaDieuHanh');
     else if (tag.includes('lan')) setCameraPreset('vuonLan');
     else if (tag.includes('bốc') || tag.includes('xưởng')) setCameraPreset('logistics');
     else if (tag.includes('sạc')) setCameraPreset('chargingHub');
@@ -15972,6 +17151,12 @@ function animate(time) {
 
   // Update rain effect
   updateRain(delta);
+
+  // Update snowfall & progressive snow accumulation (Request 3)
+  updateSnow(delta, currentTime);
+
+  // Update 3D arched rainbow between 2 mountains (Request 2)
+  updateRainbow(delta);
 
   // Update glistening dew sparkles on trees & foliage (Request 1)
   if (dewSparkleSystem) {

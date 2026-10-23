@@ -24,6 +24,7 @@ class AudioManager {
     this.birdsTimer = null;
     this.trainNodes = null;
     this.rainNodes = null;
+    this.rainAudio = null;
 
     // Callbacks for UI sync
     this.onStateChange = null;
@@ -57,6 +58,9 @@ class AudioManager {
     this.sfxVolume = Math.max(0, Math.min(1, vol));
     if (this.sfxGain && this.ctx) {
       this.sfxGain.gain.setTargetAtTime(this.sfxVolume, this.ctx.currentTime, 0.05);
+    }
+    if (this.rainAudio) {
+      this.rainAudio.volume = this.sfxVolume;
     }
   }
 
@@ -309,7 +313,8 @@ class AudioManager {
   }
 
   // ==========================================================================
-  // SFX 3: TIẾNG MƯA RƠI (Mưa rơi êm đềm, rả rích, tắt là hết dứt điểm)
+  // ==========================================================================
+  // SFX 3: TIẾNG MƯA RƠI (tieng_troi_mua_lon-www_tiengdong_com.mp3)
   // ==========================================================================
   toggleRain(forceState = null) {
     this.ensureContext();
@@ -326,141 +331,52 @@ class AudioManager {
 
   startRainSound() {
     this.stopRainSound();
-    const ctx = this.ctx;
-    if (!ctx) return;
-
-    // Pink Noise êm dịu
-    const bufferSize = ctx.sampleRate * 3;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.035;
-      b6 = white * 0.115926;
-    }
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    noise.loop = true;
-
-    // Lọc Lowpass tươi sáng, rõ ràng ở 1450Hz (mưa rơi rào rạt và tí tách giòn giã hơn)
-    const filter1 = ctx.createBiquadFilter();
-    filter1.type = 'lowpass';
-    filter1.frequency.setValueAtTime(1450, ctx.currentTime);
-
-    // Lọc Highpass ở 140Hz (giữ độ trầm tự nhiên của màn mưa)
-    const filter2 = ctx.createBiquadFilter();
-    filter2.type = 'highpass';
-    filter2.frequency.setValueAtTime(140, ctx.currentTime);
-
-    // LFO gió thoảng nhẹ nhàng (chu kỳ 6 giây)
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(0.16, ctx.currentTime);
-    lfoGain.gain.setValueAtTime(180, ctx.currentTime);
-    lfo.connect(filter1.frequency);
-    lfo.start();
-
-    // Âm lượng nền mưa rõ rệt, sống động: 0.088 (tăng từ 0.045)
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.088, ctx.currentTime + 1.0);
-
-    noise.connect(filter1);
-    filter1.connect(filter2);
-    filter2.connect(gain);
-    gain.connect(this.sfxGain);
-    noise.start();
-
-    // Từng giọt mưa rơi tí tách rả rích ngẫu nhiên 160ms - 420ms (rõ ràng, sống động)
-    let dropTimeout = null;
-    const scheduleNextDrop = () => {
-      if (!this.sfxStates.rain) return;
-      const t = ctx.currentTime;
-      const dropOsc = ctx.createOscillator();
-      const dropFilter = ctx.createBiquadFilter();
-      const dropGain = ctx.createGain();
-      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-
-      const dropFreq = 650 + Math.random() * 850;
-      dropOsc.type = 'sine';
-      dropOsc.frequency.setValueAtTime(dropFreq, t);
-      dropOsc.frequency.exponentialRampToValueAtTime(dropFreq * 0.42, t + 0.045);
-
-      dropFilter.type = 'lowpass';
-      dropFilter.frequency.setValueAtTime(1800, t);
-
-      // Âm lượng giọt mưa rõ rệt hơn (0.038 - 0.062)
-      const dropVol = 0.038 + Math.random() * 0.024;
-      dropGain.gain.setValueAtTime(dropVol, t);
-      dropGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-
-      dropOsc.connect(dropFilter);
-      dropFilter.connect(dropGain);
-
-      if (panner) {
-        panner.pan.setValueAtTime((Math.random() * 2 - 1) * 0.65, t);
-        dropGain.connect(panner);
-        panner.connect(this.sfxGain);
-      } else {
-        dropGain.connect(this.sfxGain);
+    try {
+      if (!this.rainAudio) {
+        const baseUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL)
+          ? (import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/')
+          : './';
+        this.rainAudio = new Audio(baseUrl + 'tieng_troi_mua_lon-www_tiengdong_com.mp3');
+        this.rainAudio.loop = true;
       }
-
-      dropOsc.start(t);
-      dropOsc.stop(t + 0.055);
-
-      const nextDelay = 160 + Math.random() * 260;
-      dropTimeout = setTimeout(scheduleNextDrop, nextDelay);
-    };
-
-    dropTimeout = setTimeout(scheduleNextDrop, 250);
-
-    this.rainNodes = {
-      noise,
-      gain,
-      lfo,
-      lfoGain,
-      dropTimeout,
-    };
+      this.rainAudio.volume = this.sfxVolume;
+      this.rainAudio.currentTime = 0;
+      const playPromise = this.rainAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Rain audio play failed or auto-play blocked:', err);
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to start rain audio:', e);
+    }
   }
 
   stopRainSound() {
+    if (this.rainAudio) {
+      try {
+        this.rainAudio.pause();
+        this.rainAudio.currentTime = 0;
+      } catch (e) {}
+    }
     if (this.rainNodes) {
       const { noise, gain, lfo, lfoGain, dropTimeout } = this.rainNodes;
       this.rainNodes = null;
-
       if (dropTimeout) clearTimeout(dropTimeout);
-
       if (gain && this.ctx) {
         try {
           gain.gain.cancelScheduledValues(this.ctx.currentTime);
-          gain.gain.setValueAtTime(gain.gain.value, this.ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.00001, this.ctx.currentTime + 0.2);
+          gain.gain.setValueAtTime(0, this.ctx.currentTime);
         } catch (e) {}
       }
-
       setTimeout(() => {
         try {
-          if (noise) {
-            noise.stop();
-            noise.disconnect();
-          }
-          if (lfo) {
-            lfo.stop();
-            lfo.disconnect();
-          }
+          if (noise) { noise.stop(); noise.disconnect(); }
+          if (lfo) { lfo.stop(); lfo.disconnect(); }
           if (lfoGain) lfoGain.disconnect();
           if (gain) gain.disconnect();
         } catch (e) {}
-      }, 250);
+      }, 100);
     }
   }
 

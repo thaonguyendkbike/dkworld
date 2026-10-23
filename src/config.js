@@ -381,6 +381,11 @@ export const CONFIG = {
       target: { x: 65, y: 8, z: -50 },
       name: 'Xưởng chính Nhà B (DK1)',
     },
+    nhaA: {
+      pos: { x: 35, y: 16, z: -7 },
+      target: { x: 35, y: 9.5, z: -35 },
+      name: 'Nhà điều hành DK1 (Văn phòng)',
+    },
     insideNhaB: {
       pos: { x: 58.5, y: 6.2, z: -35.0 },
       target: { x: 64.5, y: 1.8, z: -51.0 },
