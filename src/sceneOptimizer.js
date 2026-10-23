@@ -34,6 +34,7 @@ function materialSignature(m) {
     m.flatShading, m.side, m.opacity, m.transparent, m.vertexColors, m.fog, m.wireframe,
     m.depthTest, m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits,
     m.toneMapped, m.alphaTest, m.envMapIntensity, hex(m.specular), m.shininess, m.blending,
+    m.userData && m.userData.snowShader ? m.userData.snowShader.key : 'nosnow',
   ].join('|');
 }
 
@@ -134,7 +135,10 @@ export function batchStaticMeshes(scene, { simulate, clickables = [] }) {
     if (clickableSet.has(m)) return;
     if (Array.isArray(m.material)) return;
     const mat = m.material;
-    if (!mat || mat.isShaderMaterial || mat.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return;
+    if (!mat || mat.isShaderMaterial) return;
+    // Shader phủ tuyết chỉ dùng normal thế giới (modelMatrix * normal) nên vẫn đúng sau khi gộp
+    const snowOnly = mat.userData && mat.userData.snowShader && mat.userData.snowShader.snowOnly;
+    if (mat.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile && !snowOnly) return;
     if (mat.transparent) return;
     const geo = m.geometry;
     if (!geo || !geo.attributes.position || geo.morphAttributes.position || (geo.groups && geo.groups.length > 1)) return;

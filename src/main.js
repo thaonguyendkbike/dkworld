@@ -15208,11 +15208,18 @@ function updateRain(delta) {
 // Hàm gắn shader phủ tuyết lên bất kỳ vật liệu MeshStandardMaterial nào
 function applySnowShader(material, minNormalY = 0.2, coverage = 0.95) {
   if (!material) return;
+  if (material.userData && material.userData.snowShader) return; // Đã gắn shader tuyết rồi
   if (!snowMaterials.includes(material)) {
     snowMaterials.push(material);
   }
 
   const prevOnBeforeCompile = material.onBeforeCompile;
+  const isDefaultPrev = prevOnBeforeCompile === THREE.Material.prototype.onBeforeCompile;
+  const prevCacheKey = material.customProgramCacheKey.bind(material);
+  const snowKey = `snow_${minNormalY.toFixed(2)}_${coverage.toFixed(2)}`;
+  // Đánh dấu vật liệu chỉ có shader tuyết (không phụ thuộc vị trí object) để static batching vẫn gộp được
+  material.userData.snowShader = { key: snowKey, snowOnly: isDefaultPrev };
+  material.customProgramCacheKey = () => (isDefaultPrev ? snowKey : `${prevCacheKey()}|${snowKey}`);
   material.onBeforeCompile = (shader, renderer) => {
     if (prevOnBeforeCompile) prevOnBeforeCompile(shader, renderer);
 
