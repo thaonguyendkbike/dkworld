@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="alternate icon" type="image/png" href="./favicon.png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DK Bike World — 3D Diorama Khuôn Viên DK1 & DK2</title>
+  <meta name="description" content="Mô hình 3D tương tác low-poly toàn bộ khuôn viên DK Bike gồm phân khu DK1 và DK2 (Lạng Sơn). Tỷ lệ chuẩn xác theo CAD và drone.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-CFNA6Acr.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C6R7cV0y.css">
+</head>
+<body>
+  <!-- Loading Screen & Interactive Diorama Preloader -->
+  <div id="loading-screen" class="loading-screen" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="loading-backdrop-glow"></div>
+    <div class="loading-content">
+      <div class="loading-brand">
+        <div class="loading-logo-pill">
+          <img src="./LogoDKBike.png" alt="DK Bike" class="loading-logo-img" />
+        </div>
+        <p class="loading-subtitle">Khuôn viên nhà máy DK1 & Phân khu công nghệ DK2</p>
+      </div>
+
+      <div class="loading-visual">
+        <div class="spinner-ring outer-ring"></div>
+        <div class="spinner-ring inner-ring"></div>
+        <div class="loading-icon-core">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5.5" cy="17.5" r="3.5"/>
+            <circle cx="18.5" cy="17.5" r="3.5"/>
+            <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5L9 9l3-3 4 5 3-1"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="loading-progress-container">
+        <div class="loading-progress-track">
+          <div class="loading-progress-bar" id="loading-progress-bar" style="width: 0%;"></div>
+        </div>
+        <div class="loading-info-row">
+          <span class="loading-status-text" id="loading-status-text">Khởi tạo môi trường 3D & ánh sáng...</span>
+          <span class="loading-percent-number" id="loading-percent-number">0%</span>
+        </div>
+      </div>
+
+      <div class="loading-tip-card">
+        <span class="tip-icon">✨</span>
+        <span class="tip-text" id="loading-tip-text">Dùng chuột trái xoay 360° • Chuột phải di chuyển • Lăn chuột phóng to • Bấm vào công trình để xem chi tiết</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D WebGL Canvas Container & Vignette -->
+  <div id="canvas-container"></div>
+  <div class="vignette-overlay" aria-hidden="true"></div>
+
+  <!-- Glassmorphism Top Navigation Bar -->
+  <header class="top-nav" id="top-nav">
+    <div class="brand">
+      <div class="brand-logo-pill">
+        <img src="./LogoDKBike.png" alt="DK Bike" class="brand-logo-img" />
+      </div>
+      <div class="brand-badge">DK1 & DK2 (10.398 m²)</div>
+    </div>
+
+    <!-- Quick Camera View Presets with Collapsible Dropdown (Auto Ẩn) -->
+    <div class="view-presets-wrapper is-collapsed" id="view-presets-wrapper">
+      <button class="preset-toggle-btn" id="btn-toggle-presets" title="Chọn góc nhìn / khu vực khuôn viên">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span id="current-preset-label">Góc nhìn: Toàn cảnh</span>
+        <span class="collapse-arrow" id="presets-arrow">▾</span>
+      </button>
+
+      <nav class="view-presets" id="view-presets" aria-label="Danh sách khu vực góc nhìn camera">
+        <!-- 1. Tổng quan -->
+        <div class="preset-group">
+          <div class="preset-group-header">
+            <span class="preset-group-title">🌐 TỔNG QUAN CAMPUS</span>
+          </div>
+          <div class="preset-group-grid">
+            <button class="preset-btn active" id="btn-view-overview" data-view="overview" title="Toàn cảnh liên hoàn DK1 + DK2">
+              <span class="p-icon">🌐</span>
+              <span class="p-name">Toàn cảnh Campus</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Phân khu DK1 -->
+        <div class="preset-group">
+          <div class="preset-group-header">
+            <span class="preset-group-title">🏭 PHÂN KHU DK1 (SẢN XUẤT)</span>
+          </div>
+          <div class="preset-group-grid">
+            <button class="preset-btn" id="btn-view-dk1" data-view="dk1" title="Toàn cảnh phân khu nhà máy DK1">
+              <span class="p-icon">🏭</span>
+              <span class="p-name">Khuôn viên DK1</span>
+            </button>
+            <button class="preset-btn" id="btn-view-nhaa" data-view="nhaA" title="Nhà điều hành & Văn phòng DK1">
+              <span class="p-icon">🏛️</span>
+              <span class="p-name">Nhà điều hành DK1</span>
+            </button>
+            <button class="preset-btn" id="btn-view-nhab" data-view="nhaB" title="Xưởng chính Nhà B (DK1)">
+              <span class="p-icon">🏢</span>
+              <span class="p-name">Xưởng Nhà B</span>
+            </button>
+            <button class="preset-btn" id="btn-view-interior-nhab" data-view="insideNhaB" title="Bên trong Xưởng B: Dây chuyền & Kho linh kiện">
+              <span class="p-icon">🔧</span>
+              <span class="p-name">Bên trong Xưởng B</span>
+            </button>
+            <button class="preset-btn" id="btn-view-logistics" data-view="logistics" title="Khu bốc dỡ & Cửa xưởng Nhà B">
+              <span class="p-icon">🚛</span>
+              <span class="p-name">Bốc dỡ & Cửa xưởng</span>
+            </button>
+            <button class="preset-btn" id="btn-view-testtrack" data-view="testTrack" title="Đường chạy thử xe máy điện DK1">
+              <span class="p-icon">🏁</span>
+              <span class="p-name">Đường thử xe DK1</span>
+            </button>
+            <button class="preset-btn" id="btn-view-charging" data-view="chargingHub" title="Trạm sạc xe máy điện thông minh">
+              <span class="p-icon">⚡</span>
+              <span class="p-name">Trạm sạc EV</span>
+            </button>
+            <button class="preset-btn" id="btn-view-volleyball" data-view="volleyball" title="Sân bóng chuyền ngoài trời DK1">
+              <span class="p-icon">🏐</span>
+              <span class="p-name">Sân bóng chuyền</span>
+            </button>
+            <button class="preset-btn" id="btn-view-fountain" data-view="fountain" title="Đài phun nước biểu tượng DK">
+              <span class="p-icon">⛲</span>
+              <span class="p-name">Đài phun nước DK</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Phân khu DK2 -->
+        <div class="preset-group">
+          <div class="preset-group-header">
+            <span class="preset-group-title">🌿 PHÂN KHU DK2 (MỞ RỘNG & SINH THÁI)</span>
+          </div>
+          <div class="preset-group-grid">
+            <button class="preset-btn" id="btn-view-dk2" data-view="dk2" title="Toàn cảnh khu mở rộng DK2">
+              <span class="p-icon">🌿</span>
+              <span class="p-name">Khuôn viên DK2</span>
+            </button>
+            <button class="preset-btn" id="btn-view-hq" data-view="nhaDieuHanh" title="Nhà điều hành & Pin mặt trời (DK2)">
+              <span class="p-icon">🏛️</span>
+              <span class="p-name">Nhà điều hành (HQ)</span>
+            </button>
+            <button class="preset-btn" id="btn-view-dkcoffee" data-view="dkCoffeeBar" title="DK Coffee & Bar (Đối diện Nhà điều hành DK2)">
+              <span class="p-icon">☕</span>
+              <span class="p-name">DK Coffee & Bar</span>
+            </button>
+            <button class="preset-btn" id="btn-view-hoca-dk2" data-view="hoCaKoiDK2" title="Bể cá hình chữ nhật & Vườn hoa DK2 (Ven đường ĐT234)">
+              <span class="p-icon">🐠</span>
+              <span class="p-name">Bể cá chữ nhật DK2</span>
+            </button>
+            <button class="preset-btn" id="btn-view-sanxedk2" data-view="sanXeDK2" title="Sân xe thành phẩm & Làn thử xe DK2">
+              <span class="p-icon">🛵</span>
+              <span class="p-name">Sân xe & Thử xe DK2</span>
+            </button>
+            <button class="preset-btn" id="btn-view-vuonlan" data-view="vuonLan" title="Vườn Lan & Ao cá trên đồi (DK2)">
+              <span class="p-icon">🌸</span>
+              <span class="p-name">Vườn Lan trên đồi</span>
+            </button>
+            <button class="preset-btn" id="btn-view-ecotrail" data-view="ecoTrail" title="Tuyến đường đi bộ sinh thái sa thạch DK2">
+              <span class="p-icon">🥾</span>
+              <span class="p-name">Đường đi bộ sinh thái</span>
+            </button>
+            <button class="preset-btn" id="btn-view-aoca" data-view="aoCaDK2" title="Ao cá đồi sinh thái DK2">
+              <span class="p-icon">🐟</span>
+              <span class="p-name">Ao cá Koi sinh thái</span>
+            </button>
+            <button class="preset-btn" id="btn-view-doiga" data-view="doiGaDK2" title="Đồi sinh thái: Vườn hoa, Đàn gà & Chim bồ câu DK2">
+              <span class="p-icon">🕊️</span>
+              <span class="p-name">Đồi hoa & Chim bồ câu</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Cảnh quan & Giao thông -->
+        <div class="preset-group">
+          <div class="preset-group-header">
+            <span class="preset-group-title">🚂 NGOẠI VI & GIAO THÔNG</span>
+          </div>
+          <div class="preset-group-grid">
+            <button class="preset-btn" id="btn-view-bridge" data-view="bridgeView" title="Cầu đường sắt vượt sông (Ảnh mẫu diorama)">
+              <span class="p-icon">🌉</span>
+              <span class="p-name">Cầu vượt sông (Ảnh mẫu)</span>
+            </button>
+            <button class="preset-btn" id="btn-view-railway" data-view="railway" title="Đoàn tàu hơi nước & Cầu vòm đỏ">
+              <span class="p-icon">🚂</span>
+              <span class="p-name">Tàu hơi nước & Cầu</span>
+            </button>
+            <button class="preset-btn" id="btn-view-station" data-view="dkStation" title="Ga xe lửa DK Station">
+              <span class="p-icon">🚉</span>
+              <span class="p-name">Ga DK Station</span>
+            </button>
+            <button class="preset-btn" id="btn-view-sheep" data-view="sheepFlock" title="Đàn cừu sinh thái trên đồi cỏ">
+              <span class="p-icon">🐑</span>
+              <span class="p-name">Đàn cừu đồi cỏ</span>
+            </button>
+            <button class="preset-btn" id="btn-view-river" data-view="river" title="Sông máng nước & Thuyền nan">
+              <span class="p-icon">⛵</span>
+              <span class="p-name">Sông máng nước</span>
+            </button>
+            <button class="preset-btn" id="btn-view-windmill" data-view="windmill" title="Cối xay gió sinh thái">
+              <span class="p-icon">💨</span>
+              <span class="p-name">Cối xay gió</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+    </div>
+
+    <!-- Environment Controls: Time & Weather & Audio & Dew -->
+    <div class="env-controls">
+
+      <div class="control-group time-toggles" role="group" aria-label="Thời gian trong ngày">
+        <button class="toggle-btn active" id="btn-time-day" data-time="day" title="Ban ngày">☀️ Ngày</button>
+        <button class="toggle-btn" id="btn-time-sunset" data-time="sunset" title="Hoàng hôn">🌅 Chiều</button>
+        <button class="toggle-btn" id="btn-time-night" data-time="night" title="Ban đêm">🌙 Đêm</button>
+      </div>
+
+      <div class="control-group action-toggles">
+        <!-- Ánh sương lung linh -->
+        <button class="icon-toggle-btn active" id="btn-toggle-dew" title="Bật/Tắt ánh sương lung linh điểm xuyết trên cây">
+          <span class="sparkle-icon">✨</span>
+          <span class="btn-text">Sương mai</span>
+        </button>
+
+        <!-- Nhạc & Âm thanh Studio -->
+        <button class="icon-toggle-btn" id="btn-toggle-audio-panel" title="Mở bảng điều khiển Âm thanh & 4 Thể loại Nhạc">
+          <div class="audio-wave-anim" id="audio-wave-anim">
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+          </div>
+          <span class="btn-text" id="audio-btn-label">Âm thanh</span>
+        </button>
+
+        <button class="icon-toggle-btn active" id="btn-toggle-labels" title="Bật/Tắt nhãn công trình">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <span class="btn-text">Nhãn</span>
+        </button>
+        <button class="icon-toggle-btn" id="btn-toggle-rain" title="Bật/Tắt hiệu ứng mưa">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="16" y1="13" x2="16" y2="21"/><line x1="8" y1="13" x2="8" y2="21"/><line x1="12" y1="15" x2="12" y2="23"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
+          <span class="btn-text">Mưa</span>
+        </button>
+        <button class="icon-toggle-btn" id="btn-toggle-snow" title="Bật/Tắt hiệu ứng tuyết rơi & phủ tuyết dần dần">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/><circle cx="12" cy="12" r="2"/></svg>
+          <span class="btn-text">Tuyết</span>
+        </button>
+        <button class="icon-toggle-btn" id="btn-toggle-quality" title="Chất lượng đồ họa: Tự động / Cao / Trung bình / Thấp (máy yếu nên chọn Thấp)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="btn-text" id="quality-btn-label">Tự động</span>
+        </button>
+        <button class="icon-toggle-btn" id="btn-toggle-ui" title="Ẩn/Hiện thanh công cụ (Chế độ ngắm cảnh Zen Mode)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="btn-text">Zen</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Floating Audio & Ambience Studio Modal -->
+  <aside class="audio-panel hidden" id="audio-panel" aria-label="Bảng điều khiển âm thanh và nhạc">
+    <div class="audio-panel-header">
+      <div class="audio-panel-title-wrap">
+        <span class="audio-badge">DK AUDIO & ATMOSPHERE</span>
+        <h3 class="audio-title">Âm Thanh & Không Gian</h3>
+      </div>
+      <div class="audio-header-actions">
+        <button class="audio-btn-mute-all" id="btn-audio-mute-all" title="Dừng toàn bộ nhạc và hiệu ứng môi trường">🔇 Tắt tất cả</button>
+        <button class="audio-panel-close" id="btn-close-audio-panel" aria-label="Đóng bảng âm thanh">&times;</button>
+      </div>
+    </div>
+
+    <!-- Section 1: Phát Nhạc YouTube (Tự Động Phát & Tuyển Chọn) -->
+    <div class="audio-section yt-section">
+      <div class="section-title-row">
+        <span class="section-icon">🔴</span>
+        <span class="section-label">Mở Nhạc Bằng Link YouTube</span>
+        <span class="yt-status-pill" id="yt-status-pill">Sẵn sàng</span>
+      </div>
+
+      <div class="yt-input-row">
+        <div class="yt-input-container">
+          <input type="text" class="yt-url-input" id="yt-url-input" placeholder="Dán link YouTube (video, live, playlist)...">
+          <button class="yt-btn-paste" id="btn-yt-paste" title="Dán từ Clipboard">📋 Dán</button>
+        </div>
+        <button class="yt-btn-load" id="btn-yt-load">
+          <span class="yt-play-icon">▶</span>
+          <span>Phát</span>
+        </button>
+      </div>
+
+      <!-- Danh sách 6 bản nhạc YouTube tự động phát -->
+      <div class="yt-presets-row">
+        <span class="yt-presets-label">Danh sách 6 bản nhạc YouTube (Tự động phát & chuyển bài):</span>
+        <div class="yt-presets-list" id="yt-playlist-chips">
+          <button class="yt-chip active" data-index="0" data-id="kbdOQF3XjKI" data-start="5808" title="Bản 1 - Acoustic Chill Tuyển Chọn">🎶 Bản 1</button>
+          <button class="yt-chip" data-index="1" data-id="1D9hx7gcKjo" data-start="946" title="Bản 2 - Lofi Chill Cafe">☕ Bản 2</button>
+          <button class="yt-chip" data-index="2" data-id="Px1HC9ExXOk" data-start="0" title="Bản 3 - Nhạc Không Lời Tĩnh Tâm">🍃 Bản 3</button>
+          <button class="yt-chip" data-index="3" data-id="0nO6OwUUF2k" data-start="0" title="Bản 4 - Giai Điệu Bình Yên">🌅 Bản 4</button>
+          <button class="yt-chip" data-index="4" data-id="l-vSSYEuO88" data-start="2051" title="Bản 5 - Piano & Ballad Thư Giãn">🎹 Bản 5</button>
+          <button class="yt-chip" data-index="5" data-id="s-sRvyFMlSY" data-start="3098" title="Bản 6 - Tuyển Tập Nhạc Ngọt Ngào">🪷 Bản 6</button>
+        </div>
+      </div>
+
+      <!-- Khung Video YouTube Player & Điều Khiển -->
+      <div class="yt-player-box" id="yt-player-box">
+        <div class="yt-iframe-container" id="yt-iframe-container">
+          <div id="yt-player-target"></div>
+        </div>
+        <div class="yt-player-bar">
+          <div class="yt-track-info">
+            <span class="yt-track-title" id="yt-track-title">Đang phát: Bản 1 - Acoustic Chill</span>
+            <span class="yt-error-msg hidden" id="yt-error-msg"></span>
+          </div>
+          <div class="yt-bar-actions">
+            <button class="yt-action-btn" id="btn-yt-prev" title="Bài trước (Lùi bài)">⏮</button>
+            <button class="yt-action-btn" id="btn-yt-play-toggle" title="Phát / Tạm dừng">⏸</button>
+            <button class="yt-action-btn" id="btn-yt-next" title="Bài tiếp theo (Chuyển bài)">⏭</button>
+            <button class="yt-action-btn stop" id="btn-yt-stop" title="Dừng hẳn">⏹</button>
+          </div>
+        </div>
+        <div class="volume-slider-group yt-vol-group">
+          <span class="vol-label">Âm lượng YouTube</span>
+          <input type="range" class="custom-range" id="slider-yt-volume" min="0" max="100" value="65">
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Ambient Sound Effects Toggles -->
+    <div class="audio-section">
+      <div class="section-title-row">
+        <span class="section-icon">🍃</span>
+        <span class="section-label">Âm Thanh Môi Trường (Bật / Tắt)</span>
+      </div>
+
+      <div class="sfx-toggle-list">
+        <!-- Chim hót -->
+        <div class="sfx-item">
+          <div class="sfx-item-info">
+            <span class="sfx-emoji">🐦</span>
+            <div class="sfx-text-wrap">
+              <span class="sfx-name">Tiếng chim hót</span>
+              <span class="sfx-sub">Ríu rít trên đồi cây & vườn lan</span>
+            </div>
+          </div>
+          <label class="switch-toggle">
+            <input type="checkbox" id="switch-sfx-birds">
+            <span class="slider-round"></span>
+          </label>
+        </div>
+
+        <!-- Tiếng tàu điện -->
+        <div class="sfx-item">
+          <div class="sfx-item-info">
+            <span class="sfx-emoji">🚆</span>
+            <div class="sfx-text-wrap">
+              <span class="sfx-name">Tiếng tàu điện / xe lửa</span>
+              <span class="sfx-sub">Nhịp đường ray & còi tàu cầu vòm</span>
+            </div>
+          </div>
+          <label class="switch-toggle">
+            <input type="checkbox" id="switch-sfx-train">
+            <span class="slider-round"></span>
+          </label>
+        </div>
+
+        <!-- Tiếng mưa -->
+        <div class="sfx-item">
+          <div class="sfx-item-info">
+            <span class="sfx-emoji">🌧️</span>
+            <div class="sfx-text-wrap">
+              <span class="sfx-name">Tiếng mưa rơi</span>
+              <span class="sfx-sub">Mưa rào êm dịu đồng bộ hiệu ứng 3D</span>
+            </div>
+          </div>
+          <label class="switch-toggle">
+            <input type="checkbox" id="switch-sfx-rain">
+            <span class="slider-round"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="sfx-volume-bar">
+        <span class="vol-label">Âm lượng hiệu ứng:</span>
+        <input type="range" class="custom-range" id="slider-sfx-volume" min="0" max="100" value="65">
+      </div>
+    </div>
+
+    <!-- Section 3: Ánh Sương Lung Linh -->
+    <div class="audio-section">
+      <div class="section-title-row">
+        <span class="section-icon">✨</span>
+        <span class="section-label">Ánh Sương & Độ Lung Linh</span>
+      </div>
+      <div class="sfx-item">
+        <div class="sfx-item-info">
+          <span class="sfx-emoji">💎</span>
+          <div class="sfx-text-wrap">
+            <span class="sfx-name">Ánh sương kim cương</span>
+            <span class="sfx-sub">Điểm xuyết lấp lánh trên tán cây</span>
+          </div>
+        </div>
+        <label class="switch-toggle">
+          <input type="checkbox" id="switch-dew-toggle" checked>
+          <span class="slider-round"></span>
+        </label>
+      </div>
+      <div class="sfx-volume-bar">
+        <span class="vol-label">Mật độ lấp lánh:</span>
+        <input type="range" class="custom-range" id="slider-dew-intensity" min="20" max="200" value="100">
+      </div>
+    </div>
+  </aside>
+
+  <!-- Floating Button to exit Zen Mode -->
+  <button class="floating-zen-exit hidden" id="btn-zen-exit" title="Hiện lại toàn bộ thanh công cụ">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    <span>Hiện giao diện</span>
+  </button>
+
+  <!-- Interactive Building Detail Modal / Card -->
+  <aside class="building-card hidden" id="building-card" aria-live="polite">
+    <div class="card-header">
+      <span class="card-tag" id="card-tag">CHI TIẾT</span>
+      <button class="card-close" id="card-close-btn" aria-label="Đóng bảng thông tin">&times;</button>
+    </div>
+    <h2 class="card-title" id="card-title">Tên công trình</h2>
+    <p class="card-desc" id="card-desc">Mô tả công năng và vị trí.</p>
+    <div class="card-specs">
+      <div class="spec-item">
+        <span class="spec-label">Phân khu:</span>
+        <span class="spec-val" id="card-zone">DK1</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">Kích thước:</span>
+        <span class="spec-val" id="card-dim">--</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">Chiều cao:</span>
+        <span class="spec-val" id="card-height">--</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">Quy mô / Diện tích:</span>
+        <span class="spec-val" id="card-area">--</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">Vật liệu & Đặc trưng:</span>
+        <span class="spec-val" id="card-roof">--</span>
+      </div>
+    </div>
+    <div class="card-actions">
+      <button class="btn-primary" id="btn-focus-card">Tập trung camera</button>
+    </div>
+  </aside>
+
+  <!-- Bottom Legend & Statistics HUD -->
+  <footer class="bottom-hud">
+    <div class="hud-item scale-indicator">
+      <span class="scale-bar-line"></span>
+      <span class="scale-text">10 mét</span>
+    </div>
+    <div class="hud-item campus-zones-pill">
+      <span class="zone-badge">📍 ĐT234 (TP. Lạng Sơn)</span>
+      <span class="zone-badge">DK1: 4.500 m²</span>
+      <span class="zone-badge">DK2: 5.898 m²</span>
+    </div>
+    <div class="hud-item compass-widget" id="compass-widget" title="Hướng Bắc (Mũi tên đỏ)">
+      <div class="compass-needle" id="compass-needle"></div>
+      <span class="compass-label">B</span>
+    </div>
+    <div class="hud-item stats-widget">
+      <span class="stat-badge stat-fps" id="stat-fps">60 FPS</span>
+    </div>
+  </footer>
+
+  <!-- Help / Instructions Hint Overlay -->
+  <div class="interaction-hint" id="interaction-hint">
+    <span>💡 Dùng chuột trái xoay • Chuột phải di chuyển • Lăn chuột phóng to • Bấm vào công trình để xem chi tiết</span>
+  </div>
+
+</body>
+</html>
