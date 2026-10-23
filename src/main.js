@@ -7,6 +7,16 @@ import { youtubeAudioManager, extractYouTubeId, extractYouTubeIdAndStart, DEFAUL
 import { DewSparkleSystem } from './dewSparkles.js';
 import { batchStaticMeshes, LightPool, AdaptiveQuality, QUALITY_PRESETS, pruneSmallShadowCasters } from './sceneOptimizer.js';
 
+// Base asset URL for relative deployment (GitHub Pages subpath /dkworld/ or local dev)
+const BASE_ASSET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL)
+  ? (import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/')
+  : './';
+
+const getAssetUrl = (path) => {
+  const clean = path.startsWith('/') ? path.slice(1) : path;
+  return BASE_ASSET_URL + clean;
+};
+
 // Wind shader uniform for swaying foliage (Khối 2)
 const windUniforms = {
   uWindTime: { value: 0 },
@@ -640,7 +650,7 @@ function buildPylonSign(x, y, z, brand, sub, colorHex, id) {
   pylonGroup.add(signPanelBack);
 
   // Gắn Logo DK Bike trắng chính thức lên mặt Pylon
-  const pylonLogoTex = new THREE.TextureLoader().load('/LogoDKBike_white.png');
+  const pylonLogoTex = new THREE.TextureLoader().load(getAssetUrl('LogoDKBike_white.png'));
   pylonLogoTex.colorSpace = THREE.SRGBColorSpace;
   const pylonLogoMat = new THREE.MeshBasicMaterial({
     map: pylonLogoTex,
@@ -3654,9 +3664,9 @@ function createShutterDoor(parentGroup, x, y, z, width, height, id, name) {
 
 function createBuildingLogo(group, cfg) {
   const texLoader = new THREE.TextureLoader();
-  const logoTexture = texLoader.load('/LogoDKBike.png');
+  const logoTexture = texLoader.load(getAssetUrl('LogoDKBike.png'));
   logoTexture.colorSpace = THREE.SRGBColorSpace;
-  const logoWhiteTex = texLoader.load('/LogoDKBike_white.png');
+  const logoWhiteTex = texLoader.load(getAssetUrl('LogoDKBike_white.png'));
   logoWhiteTex.colorSpace = THREE.SRGBColorSpace;
 
   const signW = 6.4;
@@ -3874,9 +3884,9 @@ function buildNhaA() {
 
 function createNhaADKBikeLogo(group, cfg) {
   const texLoader = new THREE.TextureLoader();
-  const logoTex = texLoader.load('/LogoDKBike.png');
+  const logoTex = texLoader.load(getAssetUrl('LogoDKBike.png'));
   logoTex.colorSpace = THREE.SRGBColorSpace;
-  const logoWhiteTex = texLoader.load('/LogoDKBike_white.png');
+  const logoWhiteTex = texLoader.load(getAssetUrl('LogoDKBike_white.png'));
   logoWhiteTex.colorSpace = THREE.SRGBColorSpace;
 
   const logoGroup = new THREE.Group();
@@ -4280,9 +4290,9 @@ function buildNhaDieuHanhDK2() {
 
 function createNhaDieuHanhDK2Logo(group, cfg) {
   const texLoader = new THREE.TextureLoader();
-  const logoTexture = texLoader.load('/LogoDKBike.png');
+  const logoTexture = texLoader.load(getAssetUrl('LogoDKBike.png'));
   logoTexture.colorSpace = THREE.SRGBColorSpace;
-  const logoWhiteTex = texLoader.load('/LogoDKBike_white.png');
+  const logoWhiteTex = texLoader.load(getAssetUrl('LogoDKBike_white.png'));
   logoWhiteTex.colorSpace = THREE.SRGBColorSpace;
 
   const plateW = 4.8;
@@ -9384,7 +9394,7 @@ function buildConnectingGateAndRoad() {
   gateGroup.add(archTrim);
 
   // Bảng chữ nổi & Logo thương hiệu trên cổng vòm (Mặt Tây hướng ra ĐT234 & Cổng DK2)
-  const westLogoTex = new THREE.TextureLoader().load('/LogoDKBike_white.png');
+  const westLogoTex = new THREE.TextureLoader().load(getAssetUrl('LogoDKBike_white.png'));
   westLogoTex.colorSpace = THREE.SRGBColorSpace;
   const westLogoMat = new THREE.MeshBasicMaterial({
     map: westLogoTex,
@@ -9882,7 +9892,7 @@ function createFlagpole(x, y, z, flagColor, height = 8.0) {
     starBack.position.set(0, 0, -0.02);
     flag.add(starBack);
   } else if (flagColor === 0x184995) {
-    const flagLogoTex = new THREE.TextureLoader().load('/LogoDKBike_white.png');
+    const flagLogoTex = new THREE.TextureLoader().load(getAssetUrl('LogoDKBike_white.png'));
     flagLogoTex.colorSpace = THREE.SRGBColorSpace;
     const flagLogoMat = new THREE.MeshBasicMaterial({
       map: flagLogoTex,
